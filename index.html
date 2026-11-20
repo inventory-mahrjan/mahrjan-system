@@ -85,6 +85,10 @@
   .kpi span{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.kpi b{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}.kpi small{color:var(--muted);font-size:12px}
   .sheet-head{display:flex;justify-content:space-between;border-bottom:2px solid var(--accent-ink);padding-bottom:6px;margin-bottom:8px;font-size:14px}
   .signs{display:flex;justify-content:space-between;gap:20px;margin-top:46px}.signs span{flex:1;border-top:1px solid var(--ink);padding-top:6px;text-align:center;font-size:12px;color:var(--muted)}
+  .cobox{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)} .cosel{position:relative} .cosel summary{list-style:none;cursor:pointer;border:1px solid var(--line2);border-radius:6px;padding:8px 30px 8px 12px;background:#fff;min-width:120px;font-size:14px;position:relative}
+  .cosel summary::-webkit-details-marker{display:none} .cosel summary::after{content:'▾';position:absolute;right:10px;color:var(--muted)}
+  .cosel>div{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line2);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:6px;min-width:150px}
+  .cosel>div label{display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer;flex-direction:row}
   .os{border-collapse:collapse;font-size:12.5px;width:100%} .os td{border:1px solid #d9dcd6;padding:4px 7px;white-space:nowrap} .os td.n{text-align:right;font-family:'IBM Plex Mono',monospace}
   .os tr.h td{background:var(--accent-ink);color:#fff;font-weight:600} .os tr.b td{font-weight:600} .os tr.t td{background:var(--soft);font-weight:600;color:var(--accent-ink)} .os tr.g td{border:0;height:10px} .os tr.s td{border:0;padding-top:34px}
   .rtabs{display:flex;gap:6px;flex-wrap:wrap} .rtabs button.on{background:var(--accent-ink);color:#fff;border-color:var(--accent-ink)}
@@ -147,7 +151,6 @@ function renderLogin(){
     <div class="login-main"><div class="login-card"><h1>Sign in to the Sales Portal</h1><div class="lead">Use the account your administrator created for you.</div>
       <label>Username<input id="u" name="mj-user" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
       <label>Password<input id="pw" name="mj-pass" type="password" autocomplete="new-password"></label>
-      <label>Company<select id="lu"><option value="MGAZ">Mahrjan General Trading LLC – Al Quoz</option><option value="MGT" ${localStorage.getItem('mj_unit')==='MGT'?'selected':''}>Mahrjan General Trading LLC – Ajman</option></select></label>
       <button class="p" id="go">Sign in</button></div></div></div>`;
   const go = async () => {
     const u = $('#u').value.trim().toLowerCase(); if (!u) return;
@@ -155,7 +158,6 @@ function renderLogin(){
     if (error) return toast('Login failed: ' + error.message, false);
     boot();
   };
-  $('#lu').onchange = e => localStorage.setItem('mj_unit', e.target.value); localStorage.setItem('mj_unit', $('#lu').value);
   $('#go').onclick = go; $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
@@ -167,7 +169,9 @@ async function boot(){
     q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
   Object.assign(S, { items, staff, vans, branches });
   await loadAccess();
-  S.br = S.me.branch_id || branches.find(b => b.code === (localStorage.getItem('mj_unit') || 'MGAZ'))?.id || branches.find(b => b.code === 'MGAZ')?.id;
+  if (S.me.branch_id) S.brs = [S.me.branch_id];
+  else { let k = []; try { k = JSON.parse(localStorage.getItem('mj_brs') || '[]'); } catch (e) {} S.brs = branches.filter(b => k.includes(b.id)).map(b => b.id); if (!S.brs.length) S.brs = [branches.find(b => b.code === 'MGAZ')?.id || branches[0].id]; }
+  S.br = S.brs[0];
   S.from = S.date.slice(0,8) + '01';
   const tabs = tabsFor(); S.tab = tabs[0][0];
   render();
@@ -187,8 +191,8 @@ function tabsFor(){
 
 function render(){
   const T = tabsFor(), title = (T.find(t => t[0] === S.tab) || [])[1] || '';
-  const br = S.branches.find(b => b.id === S.br)?.name || '';
-  const unitName = br.toUpperCase();
+  const brN = id => { const b = S.branches.find(x => x.id === id); return b ? (b.code === 'MGT' ? 'Ajman' : 'Al Quoz') : ''; }, br = S.brs.length > 1 ? 'Al Quoz + Ajman' : (S.branches.find(b => b.id === S.br)?.name || '');
+  const unitName = S.brs.length > 1 ? 'SALES PORTAL' : br.toUpperCase();
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
     days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
     req:'Next-day order by salesman, in cartons.', wh:'Production and cleaning batches: issue, return, differences and output.',
@@ -203,20 +207,23 @@ function render(){
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
       <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.role)} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
     <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${SUB[S.tab]||''}</p></div>
-      <div class="header-actions">
+      <div class="header-actions">${S.me.branch_id ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
         ${RANGE.has(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label></div></header>
       <div id="v"></div>
       <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
   $('#out').onclick = () => sb.auth.signOut();
+  document.querySelectorAll('[data-br]').forEach(c => c.onchange = () => { const v = [...document.querySelectorAll('[data-br]:checked')].map(x => +x.dataset.br); if (!v.length) { c.checked = true; return; }
+    S.brs = v; S.br = v[0]; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
+  document.addEventListener('click', e => { const d = $('#cosel'); if (d && d.open && !d.contains(e.target)) d.open = false; }, { once: true });
   $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   $('#dt').onchange = e => { S.date = e.target.value; if (S.from > S.date) { S.from = S.date; if ($('#df')) $('#df').value = S.date; } S.dayId = null; view(); };
   $('#df') && ($('#df').onchange = e => { S.from = e.target.value; if (S.from > S.date) { S.date = S.from; $('#dt').value = S.from; } view(); });
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','sc','pc'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
-const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && s.branch_id === S.br);
+const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
 
 // ---------- quantity grid (cartons + loose) ----------
@@ -240,7 +247,7 @@ async function vLoading(){
   const v = $('#v');
   v.innerHTML = `<div class="card"><h3>Loading (board) — ${S.date}</h3>
     <div class="row"><label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.lsm)}</select></label>
-      <label>Van (plate no.)<select id="van"><option value="">Select van</option>${S.vans.filter(x => x.branch_id === S.br).map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
+      <label>Van (plate no.)<select id="van"><option value="">Select van</option>${S.vans.filter(x => S.brs.includes(x.branch_id)).map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
       <label>Start KM<input type="number" id="km" style="width:110px"></label>
       <label>Load temp<input type="number" id="tp" step="0.1"></label></div><div id="g"></div></div>`;
   $('#sm').onchange = async e => { S.lsm = +e.target.value || null; await fill(); };
@@ -273,7 +280,7 @@ async function vLoading(){
 
 // ---------- RETURN ----------
 async function vReturn(){
-  const days = await q(sb.from('van_day').select('id,salesman_id,status').eq('business_date', S.date).eq('branch_id', S.br).in('status',['LOADED','RETURNED']));
+  const days = await q(sb.from('van_day').select('id,salesman_id,status').eq('business_date', S.date).in('branch_id', S.brs).in('status',['LOADED','RETURNED']));
   const v = $('#v');
   v.innerHTML = `<div class="card"><h3>Return — ${S.date}</h3>
     <div class="row"><label>Salesman<select id="d"><option value="">Select</option>${days.map(d=>`<option value="${d.id}">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)} (${d.status})</option>`).join('')}</select></label></div>
@@ -312,7 +319,7 @@ async function vReturn(){
 // ---------- VAN DAYS ----------
 async function vDays(){
   if (S.dayId) return vDay(S.dayId);
-  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).eq('branch_id', S.br).order('id'));
+  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).in('branch_id', S.brs).order('id'));
   const cash = days.length ? await q(sb.from('v_van_day_cash').select('*').in('van_day_id', days.map(d => d.id))) : [];
   $('#v').innerHTML = `<div class="card"><h3>Van days — ${S.date}</h3>${days.length ? `<div class="tw"><table>
     <tr><th class="l">Salesman</th><th>Van</th><th>Status</th><th>Cash sales</th><th>Credit sales</th><th>Cash to hand over</th><th>Counted</th><th></th></tr>
@@ -628,16 +635,16 @@ async function byIds(table, cols, key, ids){ const out = []; for (let i = 0; i <
 const RC = {};   // small cache for one page visit
 async function cached(k, f){ if (!RC[k]) RC[k] = f().catch(e => { delete RC[k]; throw e; }); return RC[k]; }
 const clearCache = () => Object.keys(RC).forEach(k => delete RC[k]);
-const rk = () => S.br + '|' + S.from + '|' + S.date;
-const getDays = () => cached('d' + rk(), () => fetchAll(() => sb.from('van_day').select('*').eq('branch_id', S.br).gte('business_date', S.from).lte('business_date', S.date).order('business_date')));
+const rk = () => S.brs.join(',') + '|' + S.from + '|' + S.date;
+const getDays = () => cached('d' + rk(), () => fetchAll(() => sb.from('van_day').select('*').in('branch_id', S.brs).gte('business_date', S.from).lte('business_date', S.date).order('business_date')));
 const getSales = () => cached('s' + rk(), () => fetchAll(() => sb.from('sales_lines')
   .select('tran_date,invoice_no,line_no,tran_type,tender_type,sales_executive,itrade_user,salesman_id,customer_code,customer_name,customer_id,item_code,item_name,item_id,qty_base,gross,disc,net,vat,net_incl_vat,profit,van_day_id')
-  .eq('branch_id', S.br).eq('cancelled', false).gte('tran_date', S.from).lte('tran_date', S.date).order('id')));
+  .in('branch_id', S.brs).eq('cancelled', false).gte('tran_date', S.from).lte('tran_date', S.date).order('id')));
 const getItems = days => cached('i' + rk(), () => byIds('v_van_day_items', '*', 'van_day_id', days.map(d => d.id)));
 const getCash  = days => cached('c' + rk(), () => byIds('v_van_day_cash', '*', 'van_day_id', days.map(d => d.id)));
 const getColl  = days => cached('o' + rk(), () => byIds('collections', '*', 'van_day_id', days.map(d => d.id)));
 const getExp   = days => cached('e' + rk(), () => byIds('expenses', '*', 'van_day_id', days.map(d => d.id)));
-const getCust  = () => cached('cu' + S.br, () => fetchAll(() => sb.from('customers').select('id,itrade_code,name,branch_id').eq('branch_id', S.br)));
+const getCust  = () => cached('cu' + S.brs.join(','), () => fetchAll(() => sb.from('customers').select('id,itrade_code,name,branch_id').in('branch_id', S.brs)));
 const saleName = r => r.salesman_id ? smNm(r.salesman_id) : (r.sales_executive || r.itrade_user || 'STORE SALE');
 
 // generic table: cols = [{k, l, left, f(row)->value, sum:true, money:true, cls(row)}]
@@ -729,27 +736,31 @@ async function vDash(){
 async function vSheets(){
   const TY = [['LOADING SHEET','Loading sheet'],['SALESMAN SUMMARY','Salesman summary'],['CASH SHEET','Cash sheet'],['PICKING SHEET','Picking sheet']];
   S.dst = S.dst || 'LOADING SHEET'; const noMan = S.dst === 'CASH SHEET' || S.dst === 'PICKING SHEET';
-  const men = salesmen(); if (!noMan && !men.some(m => m.name === S.dsn)) S.dsn = men[0]?.name || '';
-  const unitOf = () => S.branches.find(b => b.id === S.br)?.code === 'MGT' ? 'AJMAN' : 'AL QUOZ';
+  const men = salesmen().sort((x, y) => x.name.localeCompare(y.name)); if (!noMan && !men.some(m => m.name === S.dsn)) S.dsn = men[0]?.name || '';
+  const unitOf = id => S.branches.find(b => b.id === id)?.code === 'MGT' ? 'AJMAN' : 'AL QUOZ';
+  const jobs = noMan ? S.brs.slice() : [men.find(m => m.name === S.dsn)?.branch_id].filter(Boolean);
   $('#v').innerHTML = `<div class="card noprint"><div class="row" style="margin:0;justify-content:space-between"><div class="rtabs">${TY.map(([k,l]) => `<button data-st="${k}" class="${k===S.dst?'on':''}">${l}</button>`).join('')}</div>
       <div class="row" style="margin:0">${noMan ? '' : `<label>Salesman<select id="dsn">${men.map(m => `<option ${m.name===S.dsn?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>`}${tools()}</div></div>
       <p class="muted" style="margin:8px 0 0">${S.dst === 'PICKING SHEET' ? 'Requirement for the selected date (required date).' : 'Same sheet as the old portal, built live from the database.'}</p></div>
-    <div class="card sheet" id="osheet"><p class="muted">Loading…</p></div>`;
+    ${jobs.map((b, i) => `<div class="card sheet" id="osheet${i}"><p class="muted">Loading…</p></div>`).join('') || '<div class="card"><p class="muted">No salesman.</p></div>'}`;
   document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { S.dst = b.dataset.st; vSheets(); });
   $('#dsn') && ($('#dsn').onchange = e => { S.dsn = e.target.value; vSheets(); });
-  let d; try { d = await window.MJ_REPORTS.report(unitOf(), S.dst, S.date, noMan ? '' : S.dsn); } catch (e) { $('#osheet').innerHTML = `<p class="bad">${esc(e.message || e)}</p>`; return; }
-  const brn = S.branches.find(b => b.id === S.br)?.name || '', H = new Set(d.head), B = new Set(d.bold), T = new Set(d.titles || []), G = new Set(d.sign || []), M = new Set(d.money || []);
-  const cell = (v, j) => typeof v === 'number' ? `<td class="n">${M.has(j + 1) ? v.toFixed(2) : (Math.round(v * 100) / 100)}</td>` : `<td>${esc(v)}</td>`;
-  const body = d.rows.map((r, i) => { const empty = r.every(v => v === '' || v == null);
-    if (empty) return '<tr class="g"><td colspan="' + r.length + '"></td></tr>';
-    if (H.has(i)) { const sg = (d.segs && d.segs[i]) || [[1, r.length]]; let out = '', at = 1;
-      sg.forEach(([a2, b2]) => { for (; at < a2; at++) out += '<td style="border:0;background:none"></td>'; for (; at <= b2; at++) out += `<td>${esc(r[at - 1])}</td>`; });
-      for (; at <= r.length; at++) out += '<td style="border:0;background:none"></td>'; return `<tr class="h">${out}</tr>`; }
-    return `<tr class="${T.has(i) ? 't' : G.has(i) ? 's' : B.has(i) ? 'b' : ''}">${r.map(cell).join('')}</tr>`; }).join('');
-  const pos = d.position && S.dst !== 'CASH SHEET' ? '' : '';
-  $('#osheet').innerHTML = `<div class="sheet-head"><b>MAHRJAN GENERAL TRADING — ${esc(brn.toUpperCase())}</b><span>${esc(d.name)}${d.salesman ? ' · ' + esc(d.salesman) : ''} · ${esc(d.date)}</span></div><div class="tw"><table class="os">${body}</table></div>${pos}`;
-  const w = d.rows.reduce((a, r) => Math.max(a, r.length), 0), cols = Array.from({ length: w }, (_, j) => ({ l: '', f: r => r[j] ?? '' }));
-  bindTools([d.salesman, d.name, d.date].filter(Boolean).join(' '), [[d.name.slice(0, 30), cols, d.rows]]);
+  const xl = [];
+  for (let i = 0; i < jobs.length; i++) {
+    const box = $('#osheet' + i); let d;
+    try { d = await window.MJ_REPORTS.report(unitOf(jobs[i]), S.dst, S.date, noMan ? '' : S.dsn); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message || e)}</p>`; continue; }
+    const brn = S.branches.find(b => b.id === jobs[i])?.name || '', H = new Set(d.head), B = new Set(d.bold), T = new Set(d.titles || []), G = new Set(d.sign || []), M = new Set(d.money || []);
+    const cell = (v, j) => typeof v === 'number' ? `<td class="n">${M.has(j + 1) ? v.toFixed(2) : (Math.round(v * 100) / 100)}</td>` : `<td>${esc(v)}</td>`;
+    const body = d.rows.map((r, k) => { if (r.every(v => v === '' || v == null)) return '<tr class="g"><td colspan="' + r.length + '"></td></tr>';
+      if (H.has(k)) { const sg = (d.segs && d.segs[k]) || [[1, r.length]]; let out = '', at = 1;
+        sg.forEach(([a2, b2]) => { for (; at < a2; at++) out += '<td style="border:0;background:none"></td>'; for (; at <= b2; at++) out += `<td>${esc(r[at - 1])}</td>`; });
+        for (; at <= r.length; at++) out += '<td style="border:0;background:none"></td>'; return `<tr class="h">${out}</tr>`; }
+      return `<tr class="${T.has(k) ? 't' : G.has(k) ? 's' : B.has(k) ? 'b' : ''}">${r.map(cell).join('')}</tr>`; }).join('');
+    box.innerHTML = `<div class="sheet-head"><b>${esc(brn.toUpperCase())}</b><span>${esc(d.name)}${d.salesman ? ' · ' + esc(d.salesman) : ''} · ${esc(d.date)}</span></div><div class="tw"><table class="os">${body}</table></div>`;
+    const w = d.rows.reduce((x, r) => Math.max(x, r.length), 0);
+    xl.push([(unitOf(jobs[i]) + ' ' + d.name).slice(0, 30), Array.from({ length: w }, (_, j) => ({ l: '', f: r => r[j] ?? '' })), d.rows]);
+  }
+  bindTools([S.dst, noMan ? '' : S.dsn, S.date].filter(Boolean).join(' '), xl);
 }
 
 // ---------- range item rows (van days in range) ----------
