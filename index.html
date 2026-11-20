@@ -490,9 +490,9 @@ async function vImport(){
       for (const [code, rs] of Object.entries(branchSplit(rows))) {
         const br = S.branches.find(b => b.code === code);
         if (!br) { out.push(`<p class="bad">${esc(code)}: unknown branch prefix, skipped</p>`); continue; }
-        // sent in parts of whole days (about 1,500 lines each) so a long period does not time out
+        // sent in parts of whole days (about 400 lines each) so a long period does not time out
         const days = [...new Set(rs.map(x => x['Tran Date']))].sort(), parts = []; let cur = [];
-        days.forEach(d => { const dl = rs.filter(x => x['Tran Date'] === d); if (cur.length && cur.length + dl.length > 1500) { parts.push(cur); cur = []; } cur = cur.concat(dl); }); if (cur.length) parts.push(cur);
+        days.forEach(d => { const dl = rs.filter(x => x['Tran Date'] === d); if (cur.length && cur.length + dl.length > 400) { parts.push(cur); cur = []; } cur = cur.concat(dl); }); if (cur.length) parts.push(cur);
         const r = { rows:0, new:0, already_there:0, cancelled:0, new_customers:0, customers_moved:0, from:days[0], to:days[days.length-1], unknown_items:'', not_salesman_sales_executives:'' };
         for (const [k, part] of parts.entries()) { $('#out').innerHTML = `<p>${esc(br.name)}: part ${k+1} of ${parts.length}…</p>` + out.join('');
           const x = await rpc('import_sales', { p_branch:br.id, p_rows:part, p_full_export:true });
