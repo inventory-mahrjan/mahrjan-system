@@ -20,7 +20,8 @@ jobs:
           KS_PASS: "${{ github.run_id }}x"
       - name: Build
         working-directory: android
-        run: gradle --no-daemon assembleRelease
+        run: gradle --no-daemon assembleRelease --stacktrace 2>&1 | tee ../build.log; exit ${PIPESTATUS[0]}
+        shell: bash
         env:
           KS_PASS: "${{ github.run_id }}x"
           APP_VERSION_CODE: "${{ github.run_number }}"
@@ -32,3 +33,12 @@ jobs:
           body: Android app for the Mahrjan van sales system. Download Mahrjan-Van-Sales.apk and install it on the phone or PDT.
           files: Mahrjan-Van-Sales.apk
           make_latest: true
+      - name: Share build log when it fails
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-log-${{ github.run_number }}
+          name: APK build log ${{ github.run_number }}
+          files: build.log
+          prerelease: true
+          make_latest: false
