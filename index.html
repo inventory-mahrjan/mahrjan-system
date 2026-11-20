@@ -81,7 +81,7 @@ function renderLogin(){
     if (error) return toast('Login failed: ' + error.message, false);
     boot();
   };
-  $('#go').onclick = go; $('#pw').onkeydown = e => e.key === 'Enter' && go();
+  $('#go').onclick = go; $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
 async function boot(){
