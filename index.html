@@ -210,7 +210,7 @@ function tabsFor(){
   G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
-  if (has('ADMIN')) t.push(['stf','Users','Admin'], ['acc','Role access','Admin']);
+  if (has('ADMIN')) t.push(['itm','Items & BOM','Admin'], ['stf','Users','Admin'], ['acc','Role access','Admin']);
   G('Admin', ['dc','Data check']);
   if (!t.length) t.push(['none','No access','']);
   return t;
@@ -228,7 +228,7 @@ function render(){
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
-    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
+    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
@@ -248,7 +248,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','sc','pc'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','sc','pc'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -1038,6 +1038,84 @@ async function vStaff(){
         S.staff = await q(sb.from('staff').select('id,name,role,branch_id,active').order('name')); vStaff(); }
       catch (e) { st.textContent = e.message || String(e); ev.target.disabled = false; } };
     d.addEventListener('close', () => d.remove()); d.showModal(); f.name.focus();
+  }
+}
+
+// ---------- ITEMS & BOM (ADMIN) ----------
+async function vItems(){
+  loading();
+  const [items, rec] = await Promise.all([q(sb.from('items').select('*').order('display_order', { nullsFirst:false })), q(sb.from('item_recipe').select('*').order('id'))]);
+  const TY = { FG:'Finished goods', RAW_EGG:'Raw egg', MATERIAL:'Packing material' };
+  S.itab = S.itab || 'items'; S.ity = S.ity ?? ''; S.iq = S.iq || '';
+  const nm = id => { const i = items.find(x => x.id === id); return i ? (i.short_name || i.name) : '#' + id; };
+  const tabs = `<div class="rtabs" style="margin-bottom:12px"><button data-it="items" class="${S.itab==='items'?'on':''}">Item master</button><button data-it="bom" class="${S.itab==='bom'?'on':''}">BOM (recipe)</button></div>`;
+  if (S.itab === 'items') {
+    const shown = items.filter(i => (!S.ity || i.item_type === S.ity) && (!S.iq || [i.name, i.short_name, i.barcode, i.itrade_code].join(' ').toUpperCase().includes(S.iq.toUpperCase())));
+    $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addi">Add item</button>
+      <label>Type<select id="ity"><option value="">All</option>${Object.entries(TY).map(([k,l]) => `<option value="${k}" ${k===S.ity?'selected':''}>${l}</option>`).join('')}</select></label>
+      <label>Search<input id="iq" value="${esc(S.iq)}" placeholder="Name, code…"></label></div>${tools()}</div>
+      <div class="tw"><table><tr><th>Order</th><th class="l">Barcode</th><th class="l">iTrade code</th><th class="l">Name</th><th class="l">Short name</th><th>Type</th><th>Pcs / pack</th><th>Packs / ctn</th><th>Pcs / ctn</th><th>Pcs / tray</th><th>Segment</th><th>Active</th><th></th></tr>
+      ${shown.map(i => `<tr><td>${i.display_order ?? ''}</td><td class="l">${esc(i.barcode||'')}</td><td class="l">${esc(i.itrade_code||'')}</td><td class="l">${esc(i.name)}</td><td class="l">${esc(i.short_name||'')}</td>
+        <td>${TY[i.item_type]||i.item_type}</td><td>${i.pcs_per_pack ?? ''}</td><td>${i.packs_per_carton ?? ''}</td><td>${i.pcs_per_carton ?? ''}</td><td>${i.pcs_per_tray ?? ''}</td><td>${esc(i.segment||'')}</td>
+        <td>${i.active ? 'Yes' : '<span class="bad">No</span>'}</td><td><button data-ei="${i.id}">Edit</button></td></tr>`).join('')}</table></div></div>`;
+    $('#ity').onchange = e => { S.ity = e.target.value; vItems(); };
+    $('#iq').onchange = e => { S.iq = e.target.value; vItems(); };
+    $('#addi').onclick = () => itemDialog(null);
+    $('#v').querySelectorAll('[data-ei]').forEach(b => b.onclick = () => itemDialog(items.find(i => i.id === +b.dataset.ei)));
+    bindTools('Item master', [['Items', [{k:'display_order',l:'Order'},{k:'barcode',l:'Barcode'},{k:'itrade_code',l:'iTrade code'},{k:'name',l:'Name'},{k:'short_name',l:'Short name'},{l:'Type',f:i=>TY[i.item_type]},{k:'pcs_per_pack',l:'Pcs/pack'},{k:'packs_per_carton',l:'Packs/ctn'},{k:'pcs_per_carton',l:'Pcs/ctn'},{k:'pcs_per_tray',l:'Pcs/tray'},{k:'segment',l:'Segment'},{l:'Active',f:i=>i.active?'Yes':'No'}], shown]]);
+  } else {
+    const fgs = items.filter(i => i.item_type === 'FG'), parts = items.filter(i => i.item_type !== 'FG' && i.active);
+    if (!fgs.some(f => f.id === S.ifg)) S.ifg = fgs[0]?.id;
+    const fg = items.find(i => i.id === S.ifg) || {}, lines = rec.filter(r => r.fg_item_id === S.ifg);
+    const rows = fgs.map(f => { const L = rec.filter(r => r.fg_item_id === f.id && r.active); return { f, n: L.length, raw: L.filter(r => items.find(i => i.id === r.raw_item_id)?.item_type === 'RAW_EGG').map(r => nm(r.raw_item_id)).join(', ') }; });
+    $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="align-items:flex-start;gap:20px">
+      <div style="flex:1;min-width:260px"><div class="tw" style="max-height:70vh"><table><tr><th class="l">Finished good</th><th>Lines</th><th class="l">Raw egg</th></tr>
+        ${rows.map(r => `<tr data-fg="${r.f.id}" style="cursor:pointer;${r.f.id===S.ifg?'background:var(--soft)':''}"><td class="l">${esc(r.f.short_name||r.f.name)}</td><td class="${r.n?'':'bad'}">${r.n||'None'}</td><td class="l">${esc(r.raw)}</td></tr>`).join('')}</table></div></div>
+      <div style="flex:1.4;min-width:320px"><h3 style="margin-top:0">${esc(fg.name||'')}</h3><p class="muted">Quantity per carton of ${fg.packs_per_carton||'?'} packs. Per pack is worked out automatically. Issue, unwrap and wastage in the warehouse use this.</p>
+        <div class="tw"><table><tr><th class="l">Raw egg / material</th><th>Qty per carton</th><th>Per pack</th><th>Active</th><th></th></tr>
+        ${lines.map(r => `<tr data-r="${r.id}"><td class="l">${esc(nm(r.raw_item_id))}</td><td><input type="number" step="0.001" min="0" class="bq" value="${+r.qty_per_carton}" style="width:110px"></td>
+          <td>${fg.packs_per_carton ? +(r.qty_per_carton / fg.packs_per_carton).toFixed(3) : ''}</td><td><input type="checkbox" class="ba" ${r.active?'checked':''}></td><td><button data-sr="${r.id}">Save</button></td></tr>`).join('') || '<tr><td colspan="5" class="muted">No BOM lines yet.</td></tr>'}
+        </table></div>
+        <div class="row" style="margin-top:10px"><label>Add raw egg / material<select id="bi"><option value="">Select</option>${parts.filter(p => !lines.some(l => l.raw_item_id === p.id)).map(p => `<option value="${p.id}">${esc(p.short_name||p.name)} · ${TY[p.item_type]}</option>`).join('')}</select></label>
+          <label>Qty per carton<input type="number" step="0.001" min="0" id="bqn" style="width:120px"></label><button class="p" id="badd">Add</button></div></div></div></div>`;
+    $('#v').querySelectorAll('[data-fg]').forEach(tr => tr.onclick = () => { S.ifg = +tr.dataset.fg; vItems(); });
+    $('#v').querySelectorAll('[data-sr]').forEach(b => b.onclick = async () => { const tr = b.closest('tr'), qn = num($('.bq', tr).value);
+      if (qn <= 0) return toast('Qty must be more than 0', false);
+      try { await q(sb.from('item_recipe').update({ qty_per_carton: qn, active: $('.ba', tr).checked }).eq('id', +tr.dataset.r)); toast('Saved'); vItems(); } catch (e) { toast(e.message, false); } });
+    $('#badd').onclick = async () => { const it = +$('#bi').value, qn = num($('#bqn').value);
+      if (!it || qn <= 0) return toast('Choose the item and type the qty per carton', false);
+      try { await q(sb.from('item_recipe').insert({ fg_item_id: S.ifg, raw_item_id: it, qty_per_carton: qn })); toast('Added'); vItems(); } catch (e) { toast(e.message, false); } };
+    bindTools('BOM', [['BOM', [{l:'Finished good',f:r=>nm(r.fg_item_id)},{l:'Raw / material',f:r=>nm(r.raw_item_id)},{k:'qty_per_carton',l:'Qty per carton'},{l:'Active',f:r=>r.active?'Yes':'No'}], rec]]);
+  }
+  $('#v').querySelectorAll('[data-it]').forEach(b => b.onclick = () => { S.itab = b.dataset.it; vItems(); });
+
+  function itemDialog(i){
+    const d = document.createElement('dialog'); d.className = 'udlg';
+    const n = (k, l, v) => `<label>${l}<input name="${k}" type="number" min="0" step="1" value="${v ?? ''}"></label>`;
+    d.innerHTML = `<form method="dialog"><h3 style="margin-top:0">${i ? 'Edit item' : 'Add item'}</h3>
+      <label>Name (as in iTrade)<input name="name" required value="${esc(i?.name||'')}"></label>
+      <label>Short name (app, sheets and requirement)<input name="short_name" value="${esc(i?.short_name||'')}"></label>
+      <label>Barcode<input name="barcode" value="${esc(i?.barcode||'')}"></label>
+      <label>iTrade item code<input name="itrade_code" value="${esc(i?.itrade_code||'')}"></label>
+      <label>Type<select name="item_type">${Object.entries(TY).map(([k,l]) => `<option value="${k}" ${k===(i?.item_type||'FG')?'selected':''}>${l}</option>`).join('')}</select></label>
+      <div class="row" style="margin:0">${n('pcs_per_pack','Pcs per pack',i?.pcs_per_pack)}${n('packs_per_carton','Packs per carton',i?.packs_per_carton)}</div>
+      <div class="row" style="margin:0">${n('pcs_per_carton','Pcs per carton (raw)',i?.pcs_per_carton)}${n('pcs_per_tray','Pcs per tray (raw)',i?.pcs_per_tray)}</div>
+      <div class="row" style="margin:0"><label>Segment<select name="segment"><option ${i?.segment!=='OFFER'?'selected':''}>NORMAL</option><option ${i?.segment==='OFFER'?'selected':''}>OFFER</option></select></label>${n('display_order','Display order',i?.display_order ?? (items.reduce((m,x)=>Math.max(m,x.display_order||0),0)+1))}</div>
+      <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="active" ${!i || i.active ? 'checked' : ''}> Active</label>
+      <p class="bad st"></p><div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="isv">Save</button></div></form>`;
+    document.body.append(d); const f = d.querySelector('form');
+    d.querySelector('#isv').onclick = async ev => { ev.preventDefault(); const st = d.querySelector('.st'); st.textContent = '';
+      const t = v => String(v || '').trim() || null, nn = v => v === '' ? null : Math.round(num(v));
+      const row = { name: String(f.name.value).trim().toUpperCase(), short_name: t(f.short_name.value)?.toUpperCase() || null, barcode: t(f.barcode.value), itrade_code: t(f.itrade_code.value),
+        item_type: f.item_type.value, pcs_per_pack: nn(f.pcs_per_pack.value), packs_per_carton: nn(f.packs_per_carton.value), pcs_per_carton: nn(f.pcs_per_carton.value),
+        pcs_per_tray: nn(f.pcs_per_tray.value), segment: f.segment.value, display_order: nn(f.display_order.value), active: f.active.checked };
+      if (!row.name) { st.textContent = 'Enter the item name.'; return; }
+      if (row.item_type === 'FG' && !row.packs_per_carton) { st.textContent = 'Enter packs per carton for a finished good.'; return; }
+      ev.target.disabled = true;
+      try { if (i) await q(sb.from('items').update(row).eq('id', i.id)); else await q(sb.from('items').insert(row));
+        S.items = await q(sb.from('items').select('*')); d.close(); toast(i ? 'Item saved' : 'Item added'); vItems(); }
+      catch (e) { st.textContent = /duplicate|unique/i.test(e.message) ? 'This barcode or iTrade code is already used by another item.' : e.message; ev.target.disabled = false; } };
+    d.addEventListener('close', () => d.remove()); d.showModal();
   }
 }
 
