@@ -78,7 +78,7 @@ function renderLogin(){
   const go = async () => {
     const u = $('#u').value.trim().toLowerCase(); if (!u) return;
     const { error } = await sb.auth.signInWithPassword({ email: u.includes('@') ? u : u + EMAIL_DOMAIN, password: $('#pw').value });
-    if (error) return toast('Wrong username or password', false);
+    if (error) return toast('Login failed: ' + error.message, false);
     boot();
   };
   $('#go').onclick = go; $('#pw').onkeydown = e => e.key === 'Enter' && go();
