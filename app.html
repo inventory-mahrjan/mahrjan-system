@@ -148,6 +148,14 @@ async function q(p){ const { data, error } = await p; if (error) { toast(error.m
 const rpc = (fn, a) => q(sb.rpc(fn, a));
 window.addEventListener('unhandledrejection', e => { if (e.reason && (e.reason.message || e.reason.code)) e.preventDefault(); });
 const has = (...r) => r.includes(S.me?.role);
+// ---------- role access (Admin → Role access). Falls back to the built-in defaults until the table exists ----------
+const ACC_DEF = { V:{ ACCOUNTANT:'ov dd load ret days settle close wh ite sc itstock imp req ds pc se wo qs sa lr vl co ex dc', RECEIVER:'load ret days wh ite sc req', SALESMAN:'days req', VIEWER:'ov dd days wh ite sc ds pc se wo qs sa lr vl co ex dc', PACKER:'' },
+                  E:{ ACCOUNTANT:'load ret days settle close wh sc itstock imp req pc', RECEIVER:'load ret wh sc req', SALESMAN:'days req', VIEWER:'', PACKER:'' } };
+async function loadAccess(){ const { data, error } = await sb.from('role_access').select('module,can_view,can_edit').eq('role', S.me.role);
+  S.acc = error || !data?.length ? null : Object.fromEntries(data.map(a => [a.module, a])); }
+const canE = m => S.me?.role === 'ADMIN' || (S.acc ? !!S.acc[m]?.can_edit : (ACC_DEF.E[S.me?.role] || '').split(' ').includes(m));
+const canV = m => S.me?.role === 'ADMIN' || canE(m) || (S.acc ? !!S.acc[m]?.can_view : (ACC_DEF.V[S.me?.role] || '').split(' ').includes(m));
+
 const itemById = id => S.items.find(i => i.id === id) || {};
 const itemByCode = c => S.items.find(i => i.active && i.item_type !== 'MATERIAL' && (i.barcode === c || i.itrade_code === c));
 const iname = it => it.short_name || it.name || '';
@@ -184,6 +192,7 @@ async function boot(){
     q(sb.from('items').select('*')), q(sb.from('staff').select('id,name,role,branch_id,active').order('name')),
     q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
   Object.assign(S, { items, staff, vans, branches });
+  await loadAccess();
   S.br = S.me.branch_id || (+localStorage.getItem('mj_branch') || null) || branches.find(b => b.code === 'MGAZ')?.id;
   if (S.me.role === 'SALESMAN') S.sm = S.me.id;
   home();
@@ -207,7 +216,6 @@ async function home(){
   const st = S.sm ? S.stats[S.sm] : null, d = st?.day;
   const route = id => { const r = salesmen().find(s=>s.id===id); return r ? '' : ''; };
   const vanOf = id => S.vans.find(v => v.id === S.stats[id]?.day?.van_id)?.van_no || '';
-  const canStock = has('RECEIVER','ACCOUNTANT','ADMIN');
   const brName = S.branches.find(b => b.id === S.br)?.name || '';
   const brSwitch = S.me.branch_id ? `<div class="ok">${esc(brName)} · Linked</div>`
     : `<div class="brsw">${S.branches.map(b => `<button data-br="${b.id}" class="${b.id===S.br?'on':''}">${esc(b.name)}</button>`).join('')}</div>`;
@@ -223,17 +231,17 @@ async function home(){
       <div class="three"><span><span class="cap">Boarded</span><div>${st?.board||0}</div></span><span><span class="cap">Sold</span><div>${st?.sale||0}</div></span><span><span class="cap">Returned</span><div>${st?.ret||0}</div></span></div></div>
     <div class="cap">Stock</div>
     <div class="grid3">
-      <button class="tile" data-m="board" ${S.sm&&canStock?'':'disabled'}><b>Board</b><span class="n">${st?.board||0}</span><small>on the van</small></button>
+      <button class="tile" data-m="board" ${S.sm&&canE('load')?'':'disabled'}><b>Board</b><span class="n">${st?.board||0}</span><small>on the van</small></button>
       <button class="tile" data-m="sum" ${st?'':'disabled'}><b>Sales</b><span class="n">${st?.sale||0}</span><small>from office</small></button>
-      <button class="tile" data-m="ret" ${st&&canStock?'':'disabled'}><b>Return</b><span class="n">${st?.ret||0}</span><small>counted back</small></button></div>
+      <button class="tile" data-m="ret" ${st&&canE('ret')?'':'disabled'}><b>Return</b><span class="n">${st?.ret||0}</span><small>counted back</small></button></div>
     <div class="cap">Money · AED</div>
     <div class="grid2">
       <button class="tile" data-m="col" ${st?'':'disabled'}><b>Collection</b><span class="n">${money(st?.cash?.collections)}</span><small>${num(st?.cash?.collections)?'collected':'nothing yet'}</small></button>
       <button class="tile amb" data-m="exp" ${st?'':'disabled'}><b>Expense</b><span class="n">${money(st?.cash?.expenses)}</span><small>${num(st?.cash?.expenses)?'spent':'nothing yet'}</small></button></div>
     <button class="row ${S.sm?'':'dash'}" data-m="sum" ${st?'':'disabled'}><div><b>Summary</b><small>Item check · cash to hand over</small></div><span class="end">Open →</span></button>
     <button class="row dash" data-m="req" ${S.sm?'':'disabled'}><div><b>Requirement</b><small>for ${dLabel(today(1))}</small></div><span class="end">Open →</span></button>
-    ${canStock ? `<button class="row" id="whb"><div><b>Warehouse</b><small>Production · Cleaning</small></div><span class="end">Open →</span></button>
-      <button class="row" id="scb"><div><b>Stock count</b><small>Daily · Weekly · good and damage</small></div><span class="end">Open →</span></button>` : ''}
+    ${canE('wh') ? `<button class="row" id="whb"><div><b>Warehouse</b><small>Production · Cleaning</small></div><span class="end">Open →</span></button>` : ''}
+    ${canE('sc') ? `<button class="row" id="scb"><div><b>Stock count</b><small>Daily · Weekly · good and damage</small></div><span class="end">Open →</span></button>` : ''}
     ${S.me.role === 'SALESMAN' ? '' : `
     <div class="cap" style="display:flex;justify-content:space-between;margin:14px 0 8px"><span>${Object.values(S.stats).filter(x=>x.day.status==='CLOSED').length} of ${salesmen().length} closed</span><span>PCS</span></div>
     <table class="sm"><tr><th>Salesman</th><th>Board</th><th>Sales</th><th>Open</th></tr>
@@ -266,7 +274,7 @@ const MODS = [['board','Board'],['ret','Return'],['sum','Summary'],['req','Requi
 function shell(mod, body){
   S.mod = mod; const st = S.stats[S.sm], d = st?.day;
   const van = S.vans.find(v => v.id === d?.van_id)?.van_no;
-  const allowed = MODS.filter(([k]) => (k === 'board' || k === 'ret') ? has('RECEIVER','ACCOUNTANT','ADMIN') : true);
+  const allowed = MODS.filter(([k]) => k === 'board' ? canE('load') : k === 'ret' ? canE('ret') : true);
   $('#app').innerHTML = `<div class="mh"><div class="r1"><button class="back" id="bk">←</button>
       <div><h2>${MODS.find(m=>m[0]===mod)[1]}</h2><div class="sub">${esc(smName(S.sm))}${van?' · '+esc(van):''} · ${dLabel(S.date)}</div></div>
       <div class="open"><b>${st?st.open:0}</b><span>OPEN</span></div></div>

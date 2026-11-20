@@ -115,6 +115,14 @@ const rpc = (fn, args) => q(sb.rpc(fn, args));
 // errors are already shown on screen by q(); don't also report them as uncaught
 window.addEventListener('unhandledrejection', e => { if (e.reason && (e.reason.message || e.reason.code)) e.preventDefault(); });
 const has = (...r) => r.includes(S.me?.role);
+// ---------- role access (Admin → Role access). Falls back to the built-in defaults until the table exists ----------
+const ACC_DEF = { V:{ ACCOUNTANT:'ov dd load ret days settle close wh ite sc itstock imp req ds pc se wo qs sa lr vl co ex dc', RECEIVER:'load ret days wh ite sc req', SALESMAN:'days req', VIEWER:'ov dd days wh ite sc ds pc se wo qs sa lr vl co ex dc', PACKER:'' },
+                  E:{ ACCOUNTANT:'load ret days settle close wh sc itstock imp req pc', RECEIVER:'load ret wh sc req', SALESMAN:'days req', VIEWER:'', PACKER:'' } };
+async function loadAccess(){ const { data, error } = await sb.from('role_access').select('module,can_view,can_edit').eq('role', S.me.role);
+  S.acc = error || !data?.length ? null : Object.fromEntries(data.map(a => [a.module, a])); }
+const canE = m => S.me?.role === 'ADMIN' || (S.acc ? !!S.acc[m]?.can_edit : (ACC_DEF.E[S.me?.role] || '').split(' ').includes(m));
+const canV = m => S.me?.role === 'ADMIN' || canE(m) || (S.acc ? !!S.acc[m]?.can_view : (ACC_DEF.V[S.me?.role] || '').split(' ').includes(m));
+
 const item = id => S.items.find(i => i.id === id) || {};
 const per = it => it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 1) : (it.packs_per_carton || 1);
 const unit = it => it.item_type === 'FG' ? 'pk' : 'pcs';
@@ -152,6 +160,7 @@ async function boot(){
     q(sb.from('items').select('*')), q(sb.from('staff').select('id,name,role,branch_id,active').order('name')),
     q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
   Object.assign(S, { items, staff, vans, branches });
+  await loadAccess();
   S.br = S.me.branch_id || (+localStorage.getItem('mj_branch') || null) || branches.find(b => b.code === 'MGAZ')?.id;
   S.from = S.date.slice(0,8) + '01';
   const tabs = tabsFor(); S.tab = tabs[0][0];
@@ -159,17 +168,14 @@ async function boot(){
 }
 
 function tabsFor(){
-  const t = [], off = has('ADMIN','ACCOUNTANT','VIEWER'), G = (g, ...x) => x.forEach(([k,l]) => t.push([k,l,g]));
-  if (off) G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
-  if (has('RECEIVER','ACCOUNTANT','ADMIN')) G('Daily flow', ['load','Loading'], ['ret','Return']);
-  G('Daily flow', ['days','Van days']);
-  if (has('RECEIVER','ACCOUNTANT','ADMIN','VIEWER')) G('Daily flow', ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count']);
-  if (has('ACCOUNTANT','ADMIN')) G('Daily flow', ['imp','Sales import']);
-  if (has('SALESMAN','RECEIVER','ACCOUNTANT','ADMIN')) G('Daily flow', ['req','Requirement']);
-  if (off) G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
-  if (off) G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
-  if (has('ADMIN')) G('Admin', ['stf','Staff & access']);
-  if (off) G('Admin', ['dc','Data check']);
+  const t = [], G = (g, ...x) => x.forEach(([k,l]) => { if (canV(k)) t.push([k,l,g]); });
+  G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
+  G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
+  G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
+  G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
+  if (has('ADMIN')) t.push(['stf','Staff & access','Admin'], ['acc','Role access','Admin']);
+  G('Admin', ['dc','Data check']);
+  if (!t.length) t.push(['none','No access','']);
   return t;
 }
 
@@ -185,7 +191,7 @@ function render(){
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
-    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', stf:'Roles, branch and login access for each staff member.', dc:'Items, salesmen and van days that need attention.' };
+    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', stf:'Roles, branch and login access for each staff member.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
@@ -202,7 +208,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, dc:vCheck })[S.tab](); }
+function view(){ clearCache(); ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && s.branch_id === S.br);
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -318,7 +324,7 @@ async function vDay(id){
     q(sb.from('v_van_day_cash').select('*').eq('van_day_id', id)).then(r=>r[0]||{}),
     q(sb.from('expenses').select('*').eq('van_day_id', id)), q(sb.from('collections').select('*').eq('van_day_id', id))]);
   if (!S.customers.length) S.customers = await q(sb.from('customers').select('id,itrade_code,name').eq('active', true).order('name'));
-  const editMoney = ['OPEN','LOADED','RETURNED'].includes(day.status) && has('SALESMAN','ACCOUNTANT','ADMIN');
+  const editMoney = ['OPEN','LOADED','RETURNED'].includes(day.status) && canE('days');
   const exp = day.cash_expected ?? cash.cash_to_hand_over;
   const sm = S.staff.find(s=>s.id===day.salesman_id)?.name;
   const ET = ['FUEL','PARKING','CARTON BIG','CARTON SMALL','SHELF RENT','CREDIT NOTE','OTHER'];
@@ -347,9 +353,9 @@ async function vDay(id){
     <div class="card"><h3>Collections</h3><div id="co"></div>${editMoney?'<div class="row" style="margin-top:6px"><button id="coa">+ Add</button><button class="p" id="cos">Save collections</button></div>':''}</div>
 
     <div class="card"><div class="row">
-      ${day.status==='RETURNED' && has('ACCOUNTANT','ADMIN') ? `<label>Cash counted<input type="number" step="0.01" id="cc" style="width:120px"></label><button class="p" id="settle">Settle cash</button>` : ''}
-      ${day.status==='SETTLED' && has('ACCOUNTANT','ADMIN') ? `<button class="p" id="close">Close day</button>` : ''}
-      ${['SETTLED','CLOSED'].includes(day.status) && has('ADMIN') ? `<input id="rr" placeholder="Reason to reopen" style="min-width:220px"><button class="d" id="reopen">Reopen</button>` : ''}
+      ${day.status==='RETURNED' && canE('settle') ? `<label>Cash counted<input type="number" step="0.01" id="cc" style="width:120px"></label><button class="p" id="settle">Settle cash</button>` : ''}
+      ${day.status==='SETTLED' && canE('close') ? `<button class="p" id="close">Close day</button>` : ''}
+      ${['SETTLED','CLOSED'].includes(day.status) && canE('reopen') ? `<input id="rr" placeholder="Reason to reopen" style="min-width:220px"><button class="d" id="reopen">Reopen</button>` : ''}
     </div></div>`;
 
   const exRow = e => `<div class="row er"><select class="t" ${editMoney?'':'disabled'}>${ET.map(t=>`<option ${t===e.expense_type?'selected':''}>${t}</option>`).join('')}</select>
@@ -475,7 +481,7 @@ async function vStock(){
   const c = hist.find(h => h.count_date === S.date && h.count_type === S.sct);
   const L = c ? await q(sb.from('stock_count_lines').select('*').eq('count_id', c.id)) : [];
   const nm = id => S.staff.find(s => s.id === id)?.name || '';
-  const hasSys = c && c.system_loaded_at, canUp = has('ACCOUNTANT','ADMIN') && c;
+  const hasSys = c && c.system_loaded_at, canUp = canE('itstock') && c;
   const rows = L.map(l => ({ ...l, it:item(l.item_id) })).filter(l => num(l.good) || num(l.damage) || l.system_qty != null)
     .sort((a,b) => (a.it.display_order||0) - (b.it.display_order||0));
   const grp = [['FG','Finished goods (packs)'],['RAW_EGG','Raw egg (pieces)'],['MATERIAL','Packing material (pieces)']];
@@ -854,7 +860,7 @@ async function vPetty(){
     q(sb.from('petty_cash').select('*').eq('branch_id', S.br).eq('entry_date', S.date).order('line_no')),
     rpc('petty_opening', { p_branch:S.br, p_date:S.date }),
     fetchAll(() => sb.from('petty_cash').select('entry_date,line_type,party,ref,amount').eq('branch_id', S.br).in('line_type', ['SUSPENSE','SUSPENSE CLEARED']).lte('entry_date', S.date).order('entry_date'))]);
-  const E = has('ADMIN','ACCOUNTANT');
+  const E = canE('pc');
   let lines = L.map(l => ({ line_type:l.line_type, ref:l.ref || '', party:l.party, note:l.note || '', for_date:l.for_date || '', amount:num(l.amount) }));
   const openSus = aggregate(sus, r => r.party.trim().toUpperCase(), r => ({ party:r.party, given:'', amount:0 }), (o,r) => { if (r.line_type === 'SUSPENSE') { o.amount += num(r.amount); o.given = o.given || r.entry_date; } else o.amount -= num(r.amount); })
     .filter(o => r2(o.amount) > 0);
@@ -896,6 +902,33 @@ async function vStaff(){
     await q(sb.from('staff').update({ role:v('role').value, branch_id:v('branch_id').value ? +v('branch_id').value : null, can_login:v('can_login').checked, active:v('active').checked }).eq('id', +tr.dataset.s));
     toast('Saved ' + tr.cells[0].textContent); });
   bindTools('Staff', [['Staff', [{k:'name',l:'Name'},{k:'role',l:'Role'},{l:'Branch',f:s=>S.branches.find(b=>b.id===s.branch_id)?.name||'Both'},{l:'Can log in',f:s=>s.can_login?'Yes':'No'},{l:'Active',f:s=>s.active?'Yes':'No'}], st]]);
+}
+
+
+// ---------- ROLE ACCESS (ADMIN) ----------
+async function vAccess(){
+  loading();
+  const [M, A] = await Promise.all([sb.from('role_modules').select('*').order('sort'), sb.from('role_access').select('*')]);
+  if (M.error || A.error) { $('#v').innerHTML = `<div class="card"><div class="notice">Role access is not installed in the database yet. Run <b>docs/sql/ROLE ACCESS - CREATE.sql</b> in the Supabase SQL editor once (after PETTY CASH - CREATE.sql), then reload this page.</div></div>`; return; }
+  const roles = ['ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
+  const get = (r, m) => A.data.find(a => a.role === r && a.module === m) || { can_view:false, can_edit:false };
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Role access</h3><div class="row" style="margin:0"><button id="rs">Undo changes</button><button class="p" id="sv">Save access</button></div></div>
+    <p class="muted" style="margin-bottom:12px">View = the page shows. Edit = can post or change (Edit includes View). ADMIN always has full access. Branch rules and "salesman sees only his own day" always apply. Every change is kept in the audit log.</p>
+    <div class="tw"><table><tr><th class="l" rowspan="2">Page / action</th><th rowspan="2">ADMIN</th>${roles.map(r => `<th colspan="2">${r}</th>`).join('')}</tr>
+      <tr>${roles.map(() => '<th>View</th><th>Edit</th>').join('')}</tr>
+      ${M.data.map((m,i) => (i === 0 || M.data[i-1].grp !== m.grp ? `<tr class="tot"><td class="l" colspan="${2 + roles.length*2}">${esc(m.grp)}</td></tr>` : '') + `<tr><td class="l">${esc(m.label)}</td><td>Full</td>
+        ${roles.map(r => { const a = get(r, m.module); return `<td><input type="checkbox" data-r="${r}" data-m="${m.module}" data-k="can_view" ${a.can_view?'checked':''}></td>
+          <td>${m.has_edit ? `<input type="checkbox" data-r="${r}" data-m="${m.module}" data-k="can_edit" ${a.can_edit?'checked':''}>` : '—'}</td>`; }).join('')}</tr>`).join('')}
+    </table></div></div>`;
+  $('#v').querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+    const sib = k => $(`input[data-r="${cb.dataset.r}"][data-m="${cb.dataset.m}"][data-k="${k}"]`, $('#v'));
+    if (cb.dataset.k === 'can_edit' && cb.checked) sib('can_view').checked = true;
+    if (cb.dataset.k === 'can_view' && !cb.checked && sib('can_edit')) sib('can_edit').checked = false; });
+  $('#rs').onclick = vAccess;
+  $('#sv').onclick = async () => {
+    const rows = []; roles.forEach(r => M.data.forEach(m => { const v = k => !!$(`input[data-r="${r}"][data-m="${m.module}"][data-k="${k}"]`, $('#v'))?.checked;
+      rows.push({ role:r, module:m.module, can_view:v('can_view'), can_edit:v('can_edit') }); }));
+    const n = await rpc('save_role_access', { p_rows:rows }); toast(n ? `Saved · ${n} change(s). Users see them after signing in again.` : 'No changes'); vAccess(); };
 }
 
 // ---------- DATA CHECK ----------
