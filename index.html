@@ -92,6 +92,32 @@
   .os{border-collapse:collapse;font-size:12.5px;width:100%} .os td{border:1px solid #d9dcd6;padding:4px 7px;white-space:nowrap} .os td.n{text-align:right;font-family:'IBM Plex Mono',monospace}
   .os tr.h td{background:var(--accent-ink);color:#fff;font-weight:600} .os tr.b td{font-weight:600} .os tr.t td{background:var(--soft);font-weight:600;color:var(--accent-ink)} .os tr.g td{border:0;height:10px} .os tr.s td{border:0;padding-top:34px}
   .rtabs{display:flex;gap:6px;flex-wrap:wrap} .rtabs button.on{background:var(--accent-ink);color:#fff;border-color:var(--accent-ink)}
+#osh button.primary{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff}
+#osh button.primary:hover{background:#15474d}
+#osh .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px}
+#osh .filter-primary{display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end}
+#osh .section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+#osh .section-head h2{font-size:15px}
+#osh .section-head p{font-size:12.5px;color:var(--muted);margin-top:4px}
+#osh .report>.section-head{padding:0 20px}
+#osh .report-type-tabs{display:inline-flex;gap:2px;background:#eceeea;padding:3px;border-radius:8px;margin-bottom:16px}
+#osh .report-type-tabs button{border:0;background:none;padding:7px 14px;border-radius:6px;color:#3c4442}
+#osh .report-type-tabs button.primary{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+#osh .report-filters{display:grid;grid-template-columns:minmax(0,260px) minmax(0,200px) auto;gap:12px;align-items:end;margin-bottom:16px;justify-content:start}
+#osh .saved-actions{display:flex;gap:8px}
+#osh .mobile-report-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+#osh .mobile-report{border-collapse:collapse;min-width:100%;font-family:'IBM Plex Mono',monospace;font-size:12px}
+#osh .mobile-report td{padding:6px 10px;border-bottom:1px solid #f0f1ee;white-space:nowrap}
+#osh #workbookReports h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 8px;font-weight:500}
+#osh .cash-position{max-width:460px;border:1px solid var(--line);border-radius:8px}
+#osh .cash-position div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px}
+#osh .cash-position div:last-child{border:0;font-weight:600}
+#osh .cash-position strong{font-family:'IBM Plex Mono',monospace;font-weight:500}
+#osh .login-card input,#osh .login-card select,#osh .login-card button.primary{height:40px}
+#osh .add-user-dialog .section-head{margin-bottom:2px}
+#osh .report-filters button,#osh .report-type-tabs button{white-space:nowrap}
+#osh .section-head button{white-space:nowrap;flex:none}
+#osh .skel{display:block;background:linear-gradient(90deg,#eceeea 25%,#f6f7f4 37%,#eceeea 63%);background-size:400% 100%;animation:skel 1.3s ease infinite;border-radius:7px}
   @media print{ @page{size:A4;margin:10mm} body{background:#fff} .sidebar,.header-actions,.noprint,footer,.msg,#xl,#pr{display:none!important}
     main{margin:0;padding:0;max-width:none;gap:10px} .card{border:0;padding:0} .sheet{break-after:page} .tw{overflow:visible;border:0;max-height:none!important}
     table{font-size:10.5px} th,td{padding:4px 6px} th{position:static;-webkit-print-color-adjust:exact;print-color-adjust:exact} input,select{border:0;padding:0} }
@@ -100,7 +126,7 @@
 </head>
 <body>
 <div id="app"></div>
-<script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=4"></script>
+<script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=4"></script><script src="old-sheets.js?v=1"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -734,33 +760,23 @@ async function vDash(){
 
 // ---------- DAILY SHEETS (A4) ----------
 async function vSheets(){
-  const TY = [['LOADING SHEET','Loading sheet'],['SALESMAN SUMMARY','Salesman summary'],['CASH SHEET','Cash sheet'],['PICKING SHEET','Picking sheet']];
-  S.dst = S.dst || 'LOADING SHEET'; const noMan = S.dst === 'CASH SHEET' || S.dst === 'PICKING SHEET';
-  const men = salesmen().sort((x, y) => x.name.localeCompare(y.name)); if (!noMan && !men.some(m => m.name === S.dsn)) S.dsn = men[0]?.name || '';
-  const unitOf = id => S.branches.find(b => b.id === id)?.code === 'MGT' ? 'AJMAN' : 'AL QUOZ';
-  const jobs = noMan ? S.brs.slice() : [men.find(m => m.name === S.dsn)?.branch_id].filter(Boolean);
-  $('#v').innerHTML = `<div class="card noprint"><div class="row" style="margin:0;justify-content:space-between"><div class="rtabs">${TY.map(([k,l]) => `<button data-st="${k}" class="${k===S.dst?'on':''}">${l}</button>`).join('')}</div>
-      <div class="row" style="margin:0">${noMan ? '' : `<label>Salesman<select id="dsn">${men.map(m => `<option ${m.name===S.dsn?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>`}${tools()}</div></div>
-      <p class="muted" style="margin:8px 0 0">${S.dst === 'PICKING SHEET' ? 'Requirement for the selected date (required date).' : 'Same sheet as the old portal, built live from the database.'}</p></div>
-    ${jobs.map((b, i) => `<div class="card sheet" id="osheet${i}"><p class="muted">Loading…</p></div>`).join('') || '<div class="card"><p class="muted">No salesman.</p></div>'}`;
-  document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { S.dst = b.dataset.st; vSheets(); });
-  $('#dsn') && ($('#dsn').onchange = e => { S.dsn = e.target.value; vSheets(); });
-  const xl = [];
-  for (let i = 0; i < jobs.length; i++) {
-    const box = $('#osheet' + i); let d;
-    try { d = await window.MJ_REPORTS.report(unitOf(jobs[i]), S.dst, S.date, noMan ? '' : S.dsn); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message || e)}</p>`; continue; }
-    const brn = S.branches.find(b => b.id === jobs[i])?.name || '', H = new Set(d.head), B = new Set(d.bold), T = new Set(d.titles || []), G = new Set(d.sign || []), M = new Set(d.money || []);
-    const cell = (v, j) => typeof v === 'number' ? `<td class="n">${M.has(j + 1) ? v.toFixed(2) : (Math.round(v * 100) / 100)}</td>` : `<td>${esc(v)}</td>`;
-    const body = d.rows.map((r, k) => { if (r.every(v => v === '' || v == null)) return '<tr class="g"><td colspan="' + r.length + '"></td></tr>';
-      if (H.has(k)) { const sg = (d.segs && d.segs[k]) || [[1, r.length]]; let out = '', at = 1;
-        sg.forEach(([a2, b2]) => { for (; at < a2; at++) out += '<td style="border:0;background:none"></td>'; for (; at <= b2; at++) out += `<td>${esc(r[at - 1])}</td>`; });
-        for (; at <= r.length; at++) out += '<td style="border:0;background:none"></td>'; return `<tr class="h">${out}</tr>`; }
-      return `<tr class="${T.has(k) ? 't' : G.has(k) ? 's' : B.has(k) ? 'b' : ''}">${r.map(cell).join('')}</tr>`; }).join('');
-    box.innerHTML = `<div class="sheet-head"><b>${esc(brn.toUpperCase())}</b><span>${esc(d.name)}${d.salesman ? ' · ' + esc(d.salesman) : ''} · ${esc(d.date)}</span></div><div class="tw"><table class="os">${body}</table></div>`;
-    const w = d.rows.reduce((x, r) => Math.max(x, r.length), 0);
-    xl.push([(unitOf(jobs[i]) + ' ' + d.name).slice(0, 30), Array.from({ length: w }, (_, j) => ({ l: '', f: r => r[j] ?? '' })), d.rows]);
-  }
-  bindTools([S.dst, noMan ? '' : S.dsn, S.date].filter(Boolean).join(' '), xl);
+  // Old SALES_PORTAL daily sheets screen (old-sheets.js): same layout, print A4, Save PDF, Excel and CSV — data live from the database.
+  const CO = { MGAZ: 'MAHRJAN GENERAL TRADING LLC-ALQUOZ', MGT: 'MAHRJAN GENERAL TRADING LLC-AJMAN' };
+  const code = id => S.branches.find(b => b.id === id)?.code || 'MGAZ', unit = id => code(id) === 'MGT' ? 'AJMAN' : 'AL QUOZ';
+  const one = async (id, type, day, man) => { const d = await window.MJ_REPORTS.report(unit(id), type, day, man); d.company = CO[code(id)]; return d; };
+  window.PortalSession = { username: S.me.name, role: S.me.role, unit: unit(S.br), unitName: CO[code(S.br)] };
+  window.MJ_SHEET_CTX = {
+    roster: () => salesmen().sort((x, y) => x.name.localeCompare(y.name)).map(s => ({ name: s.name })),
+    report: async (type, day, man) => {
+      if (man) { const sm = salesmen().find(s => s.name === man); const d = await one(sm ? sm.branch_id : S.br, type, day, man); window.PortalSession.unitName = d.company; return d; }
+      const ds = []; for (const id of S.brs) ds.push(await one(id, type, day, ''));
+      if (ds.length === 1) { window.PortalSession.unitName = ds[0].company; return ds[0]; }
+      const rows = []; ds.forEach((d, i) => { if (i) rows.push([]); rows.push([d.company]); d.rows.forEach(r => rows.push(r)); });
+      return { ok: true, name: type, date: day, salesman: '', parts: ds, rows, head: [], bold: [], position: null, cash: null };
+    }
+  };
+  $('#v').innerHTML = '<div id="osh"><section id="workbookReports"></section></div>';
+  window.MahrjanReports.reset(); window.MahrjanReports.render('');
 }
 
 // ---------- range item rows (van days in range) ----------
