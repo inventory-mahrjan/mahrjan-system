@@ -46,6 +46,7 @@ insert into public.role_modules (module, label, grp, has_edit, sort) values
   ('dc','Data check','Admin',false,24);
 
 create table public.role_access (
+  id         bigint generated always as identity unique,   -- for the audit log
   role       text not null check (role in ('ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER')),
   module     text not null references public.role_modules(module),
   can_view   boolean not null default false,
