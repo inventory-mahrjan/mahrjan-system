@@ -2,7 +2,9 @@
 
 Van sales app and office portal for Mahrjan General Trading (Al Quoz MGAZ, Ajman MGT).
 
-- **Frontend:** `index.html` (single page, no build step), hosted on GitHub Pages.
+- **PDT app:** `app.html` — same look and flow as the van-sales app (Day board, Board, Return, Summary, Requirement, Collection, Expense). Barcode scanner + keypad.
+- **Office portal:** `index.html` — same look as the Sales Portal (Loading, Return, Van days: settle / close / reopen, Sales import, Requirement).
+- Both use the same login and are hosted on GitHub Pages.
 - **Backend:** Supabase (PostgreSQL). All business rules live in the database:
   `post_loading`, `post_return`, `save_requirement`, `save_expenses`, `save_collections`,
   `import_sales`, `settle_day`, `close_day`, `reopen_day`.
