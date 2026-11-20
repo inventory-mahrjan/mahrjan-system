@@ -234,7 +234,7 @@ function render(){
       <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.role)} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
     <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${SUB[S.tab]||''}</p></div>
       <div class="header-actions">${S.me.branch_id ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
-        ${RANGE.has(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label></div></header>
+        ${RANGE.has(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}${S.tab === 'ds' ? '' : `<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label>`}</div></header>
       <div id="v"></div>
       <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
   $('#out').onclick = () => sb.auth.signOut();
@@ -242,7 +242,7 @@ function render(){
     S.brs = v; S.br = v[0]; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   document.addEventListener('click', e => { const d = $('#cosel'); if (d && d.open && !d.contains(e.target)) d.open = false; }, { once: true });
   $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
-  $('#dt').onchange = e => { S.date = e.target.value; if (S.from > S.date) { S.from = S.date; if ($('#df')) $('#df').value = S.date; } S.dayId = null; view(); };
+  $('#dt') && ($('#dt').onchange = e => { S.date = e.target.value; if (S.from > S.date) { S.from = S.date; if ($('#df')) $('#df').value = S.date; } S.dayId = null; view(); });
   $('#df') && ($('#df').onchange = e => { S.from = e.target.value; if (S.from > S.date) { S.date = S.from; $('#dt').value = S.from; } view(); });
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
