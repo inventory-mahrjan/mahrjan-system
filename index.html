@@ -93,6 +93,8 @@ function today(off=0){ const d=new Date(Date.now()+off*864e5); return d.toLocale
 function toast(t, ok=true){ const m=document.createElement('div'); m.className='msg '+(ok?'ok':'er'); m.textContent=t; document.body.appendChild(m); setTimeout(()=>m.remove(), ok?2500:6000); }
 async function q(p){ const { data, error } = await p; if (error) { toast(error.message, false); throw error; } return data; }
 const rpc = (fn, args) => q(sb.rpc(fn, args));
+// errors are already shown on screen by q(); don't also report them as uncaught
+window.addEventListener('unhandledrejection', e => { if (e.reason && (e.reason.message || e.reason.code)) e.preventDefault(); });
 const has = (...r) => r.includes(S.me?.role);
 const item = id => S.items.find(i => i.id === id) || {};
 const per = it => it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 1) : (it.packs_per_carton || 1);

@@ -1,0 +1,30 @@
+# Nightly backup of the Mahrjan Supabase database.
+# Put this file in a PRIVATE repository (e.g. inventory-mahrjan/mahrjan-backup) at
+#   .github/workflows/nightly-backup.yml
+# and add one repository secret named SUPABASE_DB_URL (the Session pooler connection
+# string from Supabase > Connect, with your database password filled in).
+name: Nightly database backup
+
+on:
+  schedule:
+    - cron: '30 22 * * *'      # 02:30 Dubai time, every night
+  workflow_dispatch:           # "Run workflow" button for a manual backup
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    container: postgres:17
+    steps:
+      - name: Dump database (public schema: all business data)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          STAMP=$(date -u +%Y-%m-%d)
+          pg_dump "$DB_URL" --schema=public --no-owner --no-privileges -Fc -f "mahrjan-$STAMP.dump"
+          ls -lh mahrjan-*.dump
+      - name: Keep the backup for 30 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: mahrjan-db-${{ github.run_number }}
+          path: mahrjan-*.dump
+          retention-days: 30
