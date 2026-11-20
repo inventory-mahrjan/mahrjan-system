@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Mahrjan - load unit sheets</title>
+<style>body{font:14px Arial;margin:24px;max-width:900px}button{padding:8px 14px}pre{background:#f4f6f3;padding:10px;white-space:pre-wrap;font-size:12px}.bad{color:#b0432e}</style></head>
+<body>
+<h2>Load app data from the unit sheets (admin)</h2>
+<p>Choose the unit sheet (STORE ISSUE .xlsx). Data from the date below is loaded: VAN LOG, BOARD, RETURN, EXPENSE, COLLECTION, REQUIREMENT, DELETE, SUMMARY, PETTY CASH and RAW SALES. Re-running replaces the same days.</p>
+<p>From <input type="date" id="from" value="2026-11-01"> &nbsp; Unit file <input type="file" id="f" accept=".xlsx"> <button id="go">Load</button></p>
+<pre id="log">Signed-in admin session of the portal is used.</pre>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
+const sb = createClient('https://xhndwjkqfqmmpfcglqzu.supabase.co', 'sb_publishable_emOqI1PWaSA7B5s56v-ERg_RrxZ9weu');
+const log = t => { document.getElementById('log').textContent += '\n' + t; window.MIGLOG = document.getElementById('log').textContent; };
+const ymd = v => { if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); const s = String(v || '').trim(); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ''; };
+const hm = v => { if (v instanceof Date) return String(v.getHours()).padStart(2, '0') + ':' + String(v.getMinutes()).padStart(2, '0'); if (typeof v === 'number' && v < 1) { const m = Math.round(v * 1440); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); } const s = String(v || '').trim(); return /^\d{1,2}:\d{2}/.test(s) ? s.slice(0, 5) : ''; };
+const code = v => v === null || v === undefined ? '' : typeof v === 'number' ? String(Math.round(v)) : String(v).trim();
+const n = v => { const x = parseFloat(String(v ?? '').replace(/,/g, '')); return isNaN(x) ? 0 : x; };
+const rows = (wb, name) => wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '', raw: true }).map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [String(k).trim().toUpperCase(), v]))) : [];
+async function rpc(fn, args) { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(fn + ': ' + error.message); return data; }
+window.runMig = async () => {
+  const file = document.getElementById('f').files[0], from = document.getElementById('from').value; if (!file) return log('Choose the file');
+  const { data: { session } } = await sb.auth.getSession(); if (!session) return log('Not signed in. Sign in to the portal first (same browser), then reload this page.');
+  const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+  const sales = rows(wb, 'RAW SALES').filter(r => r['INVOICE NO'] && r['ITEM CODE']);
+  const prefix = String(sales[0]?.['INVOICE NO'] || '').split('-')[0].toUpperCase();
+  const { data: brs } = await sb.from('branches').select('*'); const br = brs.find(b => b.code === prefix);
+  if (!br) return log('Could not tell the branch from RAW SALES invoice numbers (' + prefix + ')');
+  log(`File ${file.name} → ${br.name} (${br.code}), from ${from}`);
+  const D = {
+    boards: rows(wb, 'BOARD').map(r => ({ date: ymd(r['BOARD DATE']), sm: String(r['SALESMAN']).trim(), van: code(r['VEHCLE NUMBER'] || r['VEHICLE NUMBER']), code: code(r['BARCODE']), qty: n(r['QTY']) })).filter(x => x.date && x.sm),
+    rets: rows(wb, 'RETURN').map(r => ({ date: ymd(r['RETURN DATE']), sm: String(r['SALESMAN']).trim(), van: code(r['VEHCLE NUMBER'] || r['VEHICLE NUMBER']), code: code(r['BARCODE']), good: n(r['GOOD']), dmg: n(r['DMG']), exp: n(r['EXP']), wst: n(r['WST']), foc: n(r['FOC']) })).filter(x => x.date && x.sm),
+    vanlog: rows(wb, 'VAN LOG').map(r => ({ date: ymd(r['DATE']), sm: String(r['SALESMAN']).trim(), van: code(r['VAN'] || r['VEHICLE NUMBER']), lt: hm(r['LOADING TIME']), ltemp: r['LOADING TEMP'] === '' ? '' : n(r['LOADING TEMP']), ut: hm(r['UNLOADING TIME']), utemp: r['UNLOADING TEMP'] === '' ? '' : n(r['UNLOADING TEMP']), skm: r['START KM'] === '' ? '' : n(r['START KM']), ekm: r['END KM'] === '' ? '' : n(r['END KM']) })).filter(x => x.date && x.sm),
+    exps: rows(wb, 'EXPENSE').map(r => ({ date: ymd(r['EXPENSE DATE']), sm: String(r['SALESMAN']).trim(), van: code(r['VEHCLE NUMBER']), type: String(r['TYPE']).trim(), amount: n(r['AMOUNT']), note: String(r['NOTE'] || '').trim(), customer: String(r['CUSTOMER NAME'] || '').trim(), head: code(r['HEAD NO']) })).filter(x => x.date && x.sm),
+    cols: rows(wb, 'COLLECTION').map(r => ({ date: ymd(r['COLLECTION DATE'] || r['DATE']), sm: String(r['SALESMAN']).trim(), tran: code(r['RECEIPT NO'] || r['TRAN NO']), invoice: code(r['INVOICE NUMBER']), head: code(r['HEAD NO']), customer: String(r['CUSTOMER NAME'] || '').trim(), mode: String(r['MODE OF PAYMENT'] || 'CASH').trim().toUpperCase(), amount: n(r['AMOUNT']) })).filter(x => x.date && x.sm),
+    sums: rows(wb, 'SUMMARY').map(r => ({ date: ymd(r['DATE']), sm: String(r['SALESMAN']).trim(), board: n(r['BOARD']), sales: n(r['SALES']), good: n(r['GOOD']), damage: n(r['DAMAGE']), expiry: n(r['EXPIRY']), waste: n(r['WASTE']), foc: n(r['FOC']), variance: n(r['VARIANCE']), reason: String(r['REASON'] || '') })).filter(x => x.date && x.sm),
+    dels: rows(wb, 'DELETE').map(r => ({ date: ymd(r['DATE']), invoice: code(r['INVOICE NUMBER']), user: String(r['USER'] || '').trim() })).filter(x => x.date && x.invoice),
+    petty: rows(wb, 'PETTY CASH').map(r => ({ date: ymd(r['CASH DATE'] || r['DATE']), ref: code(r['REF']), party: String(r['PARTICULARS'] || '').trim(), type: String(r['NATURE'] || '').trim().toUpperCase(), amount: n(r['AMOUNT']), note: String(r['NARRATION'] || '').trim(), forDate: ymd(r['FOR DATE']) })).filter(x => x.date && x.amount),
+    reqs: []
+  };
+  // REQUIREMENT is wide: a column per short name
+  const { data: items } = await sb.from('items').select('barcode,itrade_code,short_name,name');
+  const byShort = Object.fromEntries(items.filter(i => i.short_name).map(i => [i.short_name.toUpperCase(), i.barcode || i.itrade_code]));
+  rows(wb, 'REQUIREMENT').forEach(r => { const d = ymd(r['REQUIRED DATE']), sm = String(r['SALESMAN'] || '').trim(); if (!d || !sm) return;
+    Object.keys(r).forEach(k => { if (byShort[k] && n(r[k])) D.reqs.push({ date: d, sm, code: byShort[k], ctn: n(r[k]) }); }); });
+  const unknownShort = [...new Set(rows(wb, 'REQUIREMENT').flatMap(r => Object.keys(r)).filter(k => !['DATE','REQUIRED DATE','SALESMAN','ID','VEHCLE NUMBER','ROUTE'].includes(k) && !byShort[k]))];
+  if (unknownShort.length) log('Requirement columns with no short name in items: ' + unknownShort.join(', '));
+  const days = [...new Set([...D.boards, ...D.rets, ...D.vanlog, ...D.exps, ...D.cols, ...D.sums, ...D.reqs, ...D.petty].map(x => x.date).filter(d => d >= from))].sort();
+  log(`Days: ${days.length} (${days[0]} to ${days.at(-1)}) · board ${D.boards.filter(x => x.date >= from).length} · return ${D.rets.filter(x => x.date >= from).length} · expense ${D.exps.filter(x => x.date >= from).length} · collection ${D.cols.filter(x => x.date >= from).length} · requirement ${D.reqs.filter(x => x.date >= from).length} · delete ${D.dels.length} · petty ${D.petty.filter(x => x.date >= from).length}`);
+  let last = null;
+  for (const d of days) {
+    const part = Object.fromEntries(Object.entries(D).map(([k, v]) => [k, k === 'dels' ? (d === days[0] ? v : []) : v.filter(x => x.date === d)]));
+    last = await rpc('migrate_app_data', { p_branch: br.id, p_from: from, p_data: part });
+    log(`${d}: ok`);
+  }
+  log('App data: ' + JSON.stringify(last));
+  // RAW SALES, one day at a time (full day replaced, as the Sales import does)
+  const iso = ymd, sd = {};
+  sales.forEach(r => { const d = iso(r['TRAN DATE']); if (d && d >= from) (sd[d] ||= []).push(r); });
+  for (const d of Object.keys(sd).sort()) {
+    const rs = sd[d].map(r => ({ 'Tran Date': d, 'Tran No': code(r['TRAN NO']), 'Invoice No': String(r['INVOICE NO']).trim(), 'User': r['USER'], 'Sales Executive': r['SALES EXECUTIVE'],
+      'Tran Type': r['TRAN TYPE'], 'Tender Type': r['TENDER TYPE'], 'Head No': code(r['HEAD NO']), 'Account Name': r['ACCOUNT NAME'], 'Item Code': code(r['ITEM CODE']), 'Item Name': r['ITEM NAME'],
+      'CF': n(r['CF']), 'Unit': r['UNIT'], 'Qty': n(r['QTY']), 'Rate': n(r['RATE']), 'Gross': n(r['GROSS']), 'Disc': n(r['DISC']), 'Net': n(r['NET']), 'VAT': n(r['VAT']), 'Net Incl VAT': n(r['NET INCL VAT']), 'Profit': n(r['PROFIT']) }));
+    const x = await rpc('import_sales', { p_branch: br.id, p_rows: rs, p_full_export: true });
+    log(`Sales ${d}: ${x.rows} lines · new ${x.new} · already ${x.already_there} · cancelled ${x.cancelled}${x.unknown_items ? ' · unknown items ' + x.unknown_items : ''}${x.not_salesman_sales_executives ? ' · not salesman: ' + x.not_salesman_sales_executives : ''}`);
+  }
+  log('DONE ' + br.name);
+};
+document.getElementById('go').onclick = () => window.runMig().catch(e => log('ERROR: ' + e.message));
+</script></body></html>
