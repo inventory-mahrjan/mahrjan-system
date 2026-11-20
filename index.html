@@ -94,7 +94,7 @@ const SB_KEY = 'sb_publishable_emOqI1PWaSA7B5s56v-ERg_RrxZ9weu';   // public key
 const EMAIL_DOMAIN = '@mahrjan.app';
 const sb = createClient(SB_URL, SB_KEY);
 
-const S = { me:null, items:[], staff:[], vans:[], customers:[], branches:[], date:today(), tab:null, dayId:null };
+const S = { me:null, items:[], staff:[], vans:[], customers:[], branches:[], date:today(), tab:null, dayId:null, br:null };
 const $ = (s, el=document) => el.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isNaN(n) ? 0 : n; };
@@ -143,6 +143,7 @@ async function boot(){
     q(sb.from('items').select('*')), q(sb.from('staff').select('id,name,role,branch_id,active').order('name')),
     q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
   Object.assign(S, { items, staff, vans, branches });
+  S.br = S.me.branch_id || (+localStorage.getItem('mj_branch') || null) || branches.find(b => b.code === 'MGAZ')?.id;
   const tabs = tabsFor(); S.tab = tabs[0][0];
   render();
 }
@@ -151,6 +152,7 @@ function tabsFor(){
   const t = [];
   if (has('RECEIVER','ACCOUNTANT','ADMIN')) t.push(['load','Loading'], ['ret','Return']);
   t.push(['days','Van days']);
+  if (has('RECEIVER','ACCOUNTANT','ADMIN','VIEWER')) t.push(['wh','Warehouse']);
   if (has('ACCOUNTANT','ADMIN')) t.push(['imp','Sales import']);
   if (has('SALESMAN','RECEIVER','ACCOUNTANT','ADMIN')) t.push(['req','Requirement']);
   return t;
@@ -162,23 +164,25 @@ function render(){
   const unitName = S.me.branch_id ? br.toUpperCase() : 'SALES PORTAL';
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
     days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
-    req:'Next-day order by salesman, in cartons.' };
+    req:'Next-day order by salesman, in cartons.', wh:'Production and cleaning batches: issue, return, differences and output.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav><div class="navlabel">Daily flow</div>${T.map(([k,l]) => `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
       <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.role)} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
     <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${SUB[S.tab]||''}</p></div>
-      <div class="header-actions"><label>Date<input type="date" id="dt" value="${S.date}"></label></div></header>
+      <div class="header-actions">${S.me.branch_id ? '' : `<label>Company<select id="brs">${S.branches.map(b => `<option value="${b.id}" ${b.id===S.br?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label>`}
+        <label>Date<input type="date" id="dt" value="${S.date}"></label></div></header>
       <div id="v"></div>
       <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
   $('#out').onclick = () => sb.auth.signOut();
+  $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   $('#dt').onchange = e => { S.date = e.target.value; S.dayId = null; view(); };
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement })[S.tab](); }
+function view(){ ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse })[S.tab](); }
 
-const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active);
+const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && s.branch_id === S.br);
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
 
 // ---------- quantity grid (cartons + loose) ----------
@@ -202,7 +206,7 @@ async function vLoading(){
   const v = $('#v');
   v.innerHTML = `<div class="card"><h3>Loading (board) — ${S.date}</h3>
     <div class="row"><label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.lsm)}</select></label>
-      <label>Van<select id="van"><option value="">-</option>${S.vans.map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
+      <label>Van<select id="van"><option value="">-</option>${S.vans.filter(x => x.branch_id === S.br).map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
       <label>Start KM<input type="number" id="km" style="width:110px"></label>
       <label>Load temp<input type="number" id="tp" step="0.1"></label></div><div id="g"></div></div>`;
   $('#sm').onchange = async e => { S.lsm = +e.target.value || null; await fill(); };
@@ -233,7 +237,7 @@ async function vLoading(){
 
 // ---------- RETURN ----------
 async function vReturn(){
-  const days = await q(sb.from('van_day').select('id,salesman_id,status').eq('business_date', S.date).in('status',['LOADED','RETURNED']));
+  const days = await q(sb.from('van_day').select('id,salesman_id,status').eq('business_date', S.date).eq('branch_id', S.br).in('status',['LOADED','RETURNED']));
   const v = $('#v');
   v.innerHTML = `<div class="card"><h3>Return — ${S.date}</h3>
     <div class="row"><label>Salesman<select id="d"><option value="">Select</option>${days.map(d=>`<option value="${d.id}">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)} (${d.status})</option>`).join('')}</select></label></div>
@@ -272,7 +276,7 @@ async function vReturn(){
 // ---------- VAN DAYS ----------
 async function vDays(){
   if (S.dayId) return vDay(S.dayId);
-  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).order('id'));
+  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).eq('branch_id', S.br).order('id'));
   const cash = days.length ? await q(sb.from('v_van_day_cash').select('*').in('van_day_id', days.map(d => d.id))) : [];
   $('#v').innerHTML = `<div class="card"><h3>Van days — ${S.date}</h3>${days.length ? `<div class="tw"><table>
     <tr><th class="l">Salesman</th><th>Van</th><th>Status</th><th>Cash sales</th><th>Credit sales</th><th>Cash to hand over</th><th>Counted</th><th></th></tr>
@@ -409,6 +413,37 @@ async function vImport(){
       toast('Import finished');
     } finally { $('#out').innerHTML += out.join(''); }
   };
+}
+
+
+// ---------- WAREHOUSE ----------
+async function vWarehouse(){
+  const bs = await q(sb.from('wh_batches').select('*').eq('branch_id', S.br).eq('work_date', S.date).order('id'));
+  const nm = id => S.staff.find(s => s.id === id)?.name || '';
+  const sum = (p, k) => bs.filter(b => b.process === p && b.status === 'CLOSED').reduce((a,b) => a + num(b[k]), 0);
+  $('#v').innerHTML = `<div class="card"><h3>Summary</h3><div class="tw"><table>
+      <tr><th class="l">Process</th><th>Batches</th><th>Open</th><th>Issued eggs</th><th>FG packs</th><th>Good / near exp</th><th>Broken</th><th>Waste</th><th>Egg diff</th><th>Material diff</th></tr>
+      ${['PRODUCTION','CLEANING'].map(p => `<tr><td class="l">${p === 'PRODUCTION' ? 'Production' : 'Cleaning'}</td><td>${bs.filter(b=>b.process===p&&b.status!=='CANCELLED').length}</td>
+        <td>${bs.filter(b=>b.process===p&&b.status==='ISSUED').length}</td><td>${sum(p,'issued_egg_pcs')}</td><td>${p==='PRODUCTION'?sum(p,'fg_packs'):''}</td>
+        <td>${p==='CLEANING'?sum(p,'good_egg_pcs')+' / '+sum(p,'near_pcs'):''}</td><td>${sum(p,'broken_pcs')}</td><td>${sum(p,'waste_pcs')}</td>
+        <td class="${sum(p,'egg_diff')?'bad':''}">${sum(p,'egg_diff')}</td><td class="${sum(p,'mat_diff')?'bad':''}">${p==='PRODUCTION'?sum(p,'mat_diff'):''}</td></tr>`).join('')}
+    </table></div></div>
+    <div class="card"><h3>Batches — work date ${S.date}</h3>${bs.length ? `<div class="tw"><table>
+      <tr><th class="l">Batch</th><th>Shift</th><th>Status</th><th class="l">Packing staff</th><th class="l">Issued by</th><th>Issued eggs</th><th>FG packs</th><th>Broken</th><th>Waste</th><th>Egg diff</th><th>Hours</th><th>Output / staff-hour</th><th></th></tr>
+      ${bs.map(b => `<tr><td class="l">${esc(b.batch_no)}</td><td>${b.shift}</td><td><span class="st ${b.status==='CLOSED'?'CLOSED':b.status==='ISSUED'?'LOADED':''}">${b.status}</span></td>
+        <td class="l">${b.staff_ids.map(nm).join(', ')}</td><td class="l">${esc(nm(b.issued_by))}</td><td>${num(b.issued_egg_pcs)}</td><td>${b.fg_packs!=null?num(b.fg_packs):''}</td>
+        <td>${b.broken_pcs!=null?num(b.broken_pcs):''}</td><td>${b.waste_pcs!=null?num(b.waste_pcs):''}</td><td class="${num(b.egg_diff)?'bad':''}">${b.egg_diff!=null?num(b.egg_diff):''}</td>
+        <td>${b.hours!=null?num(b.hours):''}</td><td>${b.output_per_staff_hour!=null?num(b.output_per_staff_hour):''}</td><td><button data-b="${b.id}">Lines</button></td></tr>`).join('')}
+    </table></div>` : '<p class="muted">No batches for this work date.</p>'}</div><div id="wl"></div>`;
+  $('#v').querySelectorAll('[data-b]').forEach(btn => btn.onclick = async () => {
+    const b = bs.find(x => x.id === +btn.dataset.b), L = await q(sb.from('wh_lines').select('*').eq('batch_id', b.id).order('id'));
+    $('#wl').innerHTML = `<div class="card"><h3>${esc(b.batch_no)} — lines</h3><div class="tw"><table>
+      <tr><th>Slip</th><th class="l">Line</th><th class="l">For product</th><th class="l">Item</th><th>Qty</th><th>Egg pcs</th><th>Calculated</th><th>Difference</th><th class="l">Reason</th><th>EXP</th><th class="l">Origin</th></tr>
+      ${L.map(l => `<tr><td>${b.batch_no}-${l.slip}</td><td class="l">${esc(l.line_type)}</td><td class="l">${esc(item(l.for_item_id).short_name||item(l.for_item_id).name||'')}</td>
+        <td class="l">${esc(item(l.item_id).short_name||item(l.item_id).name)}</td><td>${num(l.qty)}</td><td>${num(l.egg_pcs)||''}</td><td>${l.calculated!=null?num(l.calculated):''}</td>
+        <td class="${num(l.difference)?'bad':''}">${l.difference!=null?num(l.difference):''}</td><td class="l">${esc(l.reason||'')}</td><td>${l.exp_date||''}</td><td class="l">${esc(l.origin||'')}</td></tr>`).join('')}
+    </table></div>${b.cancel_reason?`<p class="muted">Cancelled: ${esc(b.cancel_reason)}</p>`:''}</div>`;
+  });
 }
 
 // ---------- REQUIREMENT ----------

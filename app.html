@@ -109,6 +109,20 @@
   .fld{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.fld span{font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--mut);text-transform:uppercase}
   .fld input,.fld select{height:48px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:15px;background:#fff;width:100%}
   .st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;background:#eef0ec}
+  .brsw{display:flex;gap:4px;margin-top:6px;justify-content:flex-end}
+  .brsw button{border:1px solid rgba(255,255,255,.45);background:none;color:#fff;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:600}
+  .brsw button.on{background:#fff;color:var(--dk);border-color:#fff}
+  .chipset{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+  .chipset button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-weight:600;font-size:13px}
+  .chipset button.on{background:var(--dk);color:#fff;border-color:var(--dk)}
+  .big2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .big2 button{height:84px;border-radius:14px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:16px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 14px;gap:4px}
+  .big2 button small{font-weight:400;color:var(--mut);font-size:11.5px}
+  .big2 button.on{background:var(--dk);color:#fff;border-color:var(--dk)}.big2 button.on small{color:#cfe3d5}
+  .grid-in{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:6px;align-items:center;margin-top:6px}
+  .grid-in input{height:42px;border:1px solid var(--line);border-radius:10px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:14px;width:100%;min-width:0}
+  .grid-in .lbl{font-size:12.5px;font-weight:600}.grid-in .lbl small{display:block;color:var(--mut);font-weight:400;font-size:11px}
+  .gh{font-size:9.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);text-align:center;text-transform:uppercase}
   .msg{position:fixed;bottom:18px;left:12px;right:12px;padding:13px 16px;border-radius:12px;color:#fff;z-index:50;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
   .msg.ok{background:var(--dk)}.msg.er{background:var(--neg)}
 </style>
@@ -121,7 +135,7 @@ const sb = createClient('https://xhndwjkqfqmmpfcglqzu.supabase.co', 'sb_publisha
 const EMAIL_DOMAIN = '@mahrjan.app';
 const LOGO = 'mahrjan-logo.jpeg';
 
-const S = { me:null, items:[], staff:[], vans:[], branches:[], date:today(), sm:null, mod:null, stats:{} };
+const S = { me:null, items:[], staff:[], vans:[], branches:[], date:today(), sm:null, mod:null, stats:{}, br:null };
 const $ = (s, el=document) => el.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isNaN(n) ? 0 : n; };
@@ -137,7 +151,9 @@ const has = (...r) => r.includes(S.me?.role);
 const itemById = id => S.items.find(i => i.id === id) || {};
 const itemByCode = c => S.items.find(i => i.active && i.item_type !== 'MATERIAL' && (i.barcode === c || i.itrade_code === c));
 const iname = it => it.short_name || it.name || '';
-const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active);
+const inBr = b => b == null || b === S.br;
+const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && s.branch_id === S.br);
+const brVans = () => S.vans.filter(v => v.branch_id === S.br);
 const smName = id => S.staff.find(s => s.id === id)?.name || '';
 
 sb.auth.onAuthStateChange(e => { if (e === 'SIGNED_OUT') renderLogin(); });
@@ -168,13 +184,14 @@ async function boot(){
     q(sb.from('items').select('*')), q(sb.from('staff').select('id,name,role,branch_id,active').order('name')),
     q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
   Object.assign(S, { items, staff, vans, branches });
+  S.br = S.me.branch_id || (+localStorage.getItem('mj_branch') || null) || branches.find(b => b.code === 'MGAZ')?.id;
   if (S.me.role === 'SALESMAN') S.sm = S.me.id;
   home();
 }
 
 // ---------------- DAY BOARD ----------------
 async function loadStats(){
-  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date));
+  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).eq('branch_id', S.br));
   const rec = days.length ? await q(sb.from('v_van_day_items').select('*').in('van_day_id', days.map(d=>d.id))) : [];
   const cash = days.length ? await q(sb.from('v_van_day_cash').select('*').in('van_day_id', days.map(d=>d.id))) : [];
   S.stats = {};
@@ -191,10 +208,12 @@ async function home(){
   const route = id => { const r = salesmen().find(s=>s.id===id); return r ? '' : ''; };
   const vanOf = id => S.vans.find(v => v.id === S.stats[id]?.day?.van_id)?.van_no || '';
   const canStock = has('RECEIVER','ACCOUNTANT','ADMIN');
-  const br = S.branches.find(b => b.id === S.me.branch_id)?.name || 'Both branches';
+  const brName = S.branches.find(b => b.id === S.br)?.name || '';
+  const brSwitch = S.me.branch_id ? `<div class="ok">${esc(brName)} · Linked</div>`
+    : `<div class="brsw">${S.branches.map(b => `<button data-br="${b.id}" class="${b.id===S.br?'on':''}">${esc(b.name)}</button>`).join('')}</div>`;
   $('#app').innerHTML = `
   <div class="hd"><div class="r1"><div><div class="cap" style="color:#cfe3d5">Mahrjan General Trading</div><h1>Day board</h1></div>
-    <div><div class="dt">${dLabel(S.date)}</div><div class="ok">${esc(br)} · Linked</div></div></div>
+    <div><div class="dt">${dLabel(S.date)}</div>${brSwitch}</div></div>
     ${S.me.role === 'SALESMAN' ? '' : `<div class="pick"><button class="pickbtn" id="pk"><span>${S.sm ? esc(smName(S.sm)) : 'Select a salesman'}</span><span>⌄</span></button><div id="pl"></div></div>`}
     <div class="r3"><span>${S.sm ? 'Choose a module' : 'Pick a salesman, then choose a module'}</span>
       <button class="pill" id="out">${esc(S.me.name)} · Sign out</button></div></div>
@@ -213,6 +232,7 @@ async function home(){
       <button class="tile amb" data-m="exp" ${st?'':'disabled'}><b>Expense</b><span class="n">${money(st?.cash?.expenses)}</span><small>${num(st?.cash?.expenses)?'spent':'nothing yet'}</small></button></div>
     <button class="row ${S.sm?'':'dash'}" data-m="sum" ${st?'':'disabled'}><div><b>Summary</b><small>Item check · cash to hand over</small></div><span class="end">Open →</span></button>
     <button class="row dash" data-m="req" ${S.sm?'':'disabled'}><div><b>Requirement</b><small>for ${dLabel(today(1))}</small></div><span class="end">Open →</span></button>
+    ${canStock ? `<button class="row" id="whb"><div><b>Warehouse</b><small>Production · Cleaning</small></div><span class="end">Open →</span></button>` : ''}
     ${S.me.role === 'SALESMAN' ? '' : `
     <div class="cap" style="display:flex;justify-content:space-between;margin:14px 0 8px"><span>${Object.values(S.stats).filter(x=>x.day.status==='CLOSED').length} of ${salesmen().length} closed</span><span>PCS</span></div>
     <table class="sm"><tr><th>Salesman</th><th>Board</th><th>Sales</th><th>Open</th></tr>
@@ -222,10 +242,12 @@ async function home(){
     <input type="date" id="dti" value="${S.date}" style="position:absolute;opacity:0;pointer-events:none">
   </div>`;
   $('#out').onclick = () => sb.auth.signOut();
+  document.querySelectorAll('[data-br]').forEach(b => b.onclick = () => { S.br = +b.dataset.br; localStorage.setItem('mj_branch', S.br); S.sm = null; S.duty = null; home(); });
   $('#rf').onclick = home;
   $('#dtb').onclick = () => { const i=$('#dti'); i.showPicker ? i.showPicker() : i.click(); };
   $('#dti').onchange = e => { S.date = e.target.value; home(); };
   document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => openMod(b.dataset.m));
+  const whb = $('#whb'); if (whb) whb.onclick = () => whHome();
   document.querySelectorAll('tr[data-s]').forEach(tr => tr.onclick = () => { S.sm = +tr.dataset.s; home(); });
   const pk = $('#pk'); if (pk) pk.onclick = () => {
     const pl = $('#pl'); if (pl.innerHTML) { pl.innerHTML = ''; return; }
@@ -252,7 +274,7 @@ function shell(mod, body){
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => openMod(b.dataset.t));
 }
 async function openMod(m){ await loadStats(); ({ board:mBoard, ret:mReturn, sum:mSummary, req:mReq, col:mCol, exp:mExp })[m](); }
-history.pushState(null,''); window.addEventListener('popstate', () => { history.pushState(null,''); if (S.mod) home(); });
+history.pushState(null,''); window.addEventListener('popstate', () => { history.pushState(null,''); if (S.mod === 'wh') whHome(); else if (S.mod) home(); });
 
 // keypad helper
 function keypad(nextLabel){ return `<div class="kp">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}
@@ -275,7 +297,7 @@ async function mBoard(){
     <button class="okb" id="ok" disabled>OK — add to board</button>
     <div class="lines"><div class="hdr"><span class="cap">Boarded lines</span><span class="mono" id="tot"></span></div><div id="ls"></div></div>
     <div class="foot" style="margin:12px -12px -12px">
-      <div class="f4"><label>Vehicle<select id="van"><option value="">—</option>${S.vans.map(v=>`<option value="${v.id}" ${v.id===d?.van_id?'selected':''}>${esc(v.van_no)}</option>`).join('')}</select></label>
+      <div class="f4"><label>Vehicle<select id="van"><option value="">—</option>${brVans().map(v=>`<option value="${v.id}" ${v.id===d?.van_id?'selected':''}>${esc(v.van_no)}</option>`).join('')}</select></label>
         <label>Load KM<input id="km" type="number" inputmode="numeric" placeholder="KM" value="${d?.start_km??''}"></label>
         <label>Load temp °C<input id="tp" type="number" inputmode="decimal" placeholder="Temp °C" value="${d?.load_temp??''}"></label>
         <label>Load time<input value="${d?.load_time?.slice(0,5) || nowHM()}" disabled></label></div>
@@ -445,9 +467,167 @@ async function mExp(){
   };
 }
 
+// ---------------- WAREHOUSE: PRODUCTION & CLEANING ----------------
+const W = { proc:'PRODUCTION' };
+const fgItems = () => S.items.filter(i => i.active && i.item_type === 'FG').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+let BOM = null;
+async function bom(){ if (!BOM) BOM = await q(sb.from('v_fg_bom').select('*')); return BOM; }
+function whShell(title, body, back){
+  S.mod = 'wh';
+  const duty = S.staff.find(s => s.id === S.duty)?.name;
+  $('#app').innerHTML = `<div class="mh"><div class="r1"><button class="back" id="bk">←</button>
+      <div><h2>${title}</h2><div class="sub">${esc(S.branches.find(b=>b.id===S.br)?.name||'')}${duty?' · on duty '+esc(duty):''} · ${dLabel(S.date)}</div></div></div>
+    <div class="tabs">${['PRODUCTION','CLEANING'].map(p => `<button data-p="${p}" class="${p===W.proc?'on':''}">${p==='PRODUCTION'?'Production':'Cleaning'}</button>`).join('')}</div></div>
+    <div class="wrap" id="mb">${body}</div>`;
+  $('#bk').onclick = back || home;
+  document.querySelectorAll('.tabs [data-p]').forEach(b => b.onclick = () => { W.proc = b.dataset.p; whHome(); });
+}
+async function whHome(){
+  if (!S.duty) return whDuty();
+  const bs = await q(sb.from('wh_batches').select('*').eq('branch_id', S.br).eq('process', W.proc).gte('issued_at', new Date(Date.now()-3*864e5).toISOString()).order('id', { ascending:false }));
+  const name = id => S.staff.find(s => s.id === id)?.name || '';
+  whShell('Warehouse', `
+    <div class="big2"><button id="iss" class="on">${W.proc==='PRODUCTION'?'Production':'Cleaning'} issue<small>${W.proc==='PRODUCTION'?'Raw egg · tray · label to packing staff':'Finished goods given for cleaning'}</small></button>
+      <button id="ret">${W.proc==='PRODUCTION'?'Production':'Cleaning'} return<small>Close an open batch</small></button></div>
+    <div class="cap" style="margin:6px 0 8px">${W.proc==='PRODUCTION'?'Production':'Cleaning'} batches · last 3 days</div>
+    ${bs.map(b => `<button class="row" data-b="${b.id}"><div><b>${esc(b.batch_no)} <span class="st">${b.status}</span></b>
+      <small>${b.work_date} ${b.shift} · ${b.staff_ids.map(name).join(', ')} · eggs ${num(b.issued_egg_pcs)}${b.status==='CLOSED'?` · diff ${num(b.egg_diff)}`:''}</small></div>
+      <span class="end">${b.status==='ISSUED'?'Return →':'View →'}</span></button>`).join('') || '<div class="empty">No batches yet.</div>'}
+    <button class="btn" id="chd" style="width:100%;margin-top:8px">Change supervisor on duty</button>`);
+  $('#iss').onclick = whIssue; $('#ret').onclick = () => { const o = bs.find(b => b.status === 'ISSUED'); o ? whReturn(o.id) : toast('No open batch', false); };
+  $('#chd').onclick = () => { S.duty = null; whDuty(); };
+  document.querySelectorAll('[data-b]').forEach(el => el.onclick = () => { const b = bs.find(x => x.id === +el.dataset.b); b.status === 'ISSUED' ? whReturn(b.id) : whView(b); });
+}
+function whDuty(){
+  const sup = S.staff.filter(s => s.active && ['ACCOUNTANT','RECEIVER'].includes(s.role) && (s.branch_id == null || s.branch_id === S.br));
+  whShell('Supervisor on duty', `<div class="cap" style="margin-bottom:8px">Select your name</div>
+    ${sup.map(s => `<button class="row" data-d="${s.id}"><div><b>${esc(s.name)}</b><small>${s.role}</small></div><span class="end">→</span></button>`).join('')
+      || '<div class="empty">No ACCOUNTANT / RECEIVER for this branch.</div>'}`);
+  document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { S.duty = +b.dataset.d; whHome(); });
+}
+async function whIssue(){
+  const B = await bom(); const packers = S.staff.filter(s => s.active && s.role === 'PACKER' && (s.branch_id == null || s.branch_id === S.br));
+  const pick = new Set(); const cards = [];   // {fg, packs, lines:[{item_id, qty, exp, origin}]}
+  const prod = W.proc === 'PRODUCTION';
+  whShell(prod ? 'Production issue' : 'Cleaning issue', `
+    <div class="cap">Packing staff</div><div class="chipset" id="pk">${packers.map(p => `<button data-k="${p.id}">${esc(p.name)}</button>`).join('') || '<span class="muted">No packers for this branch</span>'}</div>
+    <div class="scan"><span class="cap">Scan the finished good</span><button class="addb on" id="add">ADD</button></div>
+    <input class="bc" id="bc" inputmode="none" autocomplete="off">
+    <div id="cards" style="margin-top:10px"></div>
+    <div class="foot" style="margin:12px -12px -12px"><button class="post" id="sv">Save issue</button></div>`, whHome);
+  $('#pk').onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; const id = +b.dataset.k; pick.has(id) ? pick.delete(id) : pick.add(id); b.classList.toggle('on'); };
+  const draw = () => {
+    $('#cards').innerHTML = cards.map((c,ci) => { const fg = itemById(c.fg);
+      return `<div class="card2"><div style="display:flex;justify-content:space-between;align-items:center"><b>${esc(iname(fg))}</b><button class="del" data-x="${ci}" style="border:0;background:none;color:var(--neg);font-size:18px">✕</button></div>
+        <div class="grid-in"><span class="lbl">${prod?'Packs to produce':'Packs for cleaning'}</span><input data-c="${ci}" data-f="packs" type="number" inputmode="numeric" value="${c.packs||''}" style="grid-column:span 3"></div>
+        ${prod ? c.lines.map((l,li) => { const it = itemById(l.item_id), egg = it.item_type === 'RAW_EGG';
+          return `<div class="grid-in"><span class="lbl">${esc(iname(it))}<small>${egg?'raw egg · pcs':'material · pcs'}</small></span>
+            <input data-c="${ci}" data-l="${li}" data-f="qty" type="number" inputmode="numeric" value="${l.qty||''}" placeholder="pcs">
+            ${egg ? `<input data-c="${ci}" data-l="${li}" data-f="exp" type="date" value="${l.exp||''}" title="EXP" style="font-size:11px"><input data-c="${ci}" data-l="${li}" data-f="origin" value="${esc(l.origin||'')}" placeholder="Origin">` : '<span></span><span></span>'}</div>`; }).join('') : ''}
+      </div>`; }).join('') || '<div class="empty">Scan a finished good to start.</div>';
+    document.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { cards.splice(+b.dataset.x,1); draw(); });
+    document.querySelectorAll('#cards input').forEach(inp => inp.oninput = () => {
+      const c = cards[+inp.dataset.c];
+      if (inp.dataset.f === 'packs') { c.packs = num(inp.value); if (prod) c.lines.forEach(l => { l.qty = Math.round(c.packs * l.per); });
+        if (prod) c.lines.forEach((l,li) => { const el = document.querySelector(`#cards input[data-c="${inp.dataset.c}"][data-l="${li}"][data-f="qty"]`); if (el) el.value = l.qty || ''; }); }
+      else { const l = c.lines[+inp.dataset.l]; l[inp.dataset.f] = inp.dataset.f === 'qty' ? num(inp.value) : inp.value; }
+    });
+  };
+  const addFg = it => {
+    if (!it || it.item_type !== 'FG') return toast('Not a finished good', false);
+    if (cards.some(c => c.fg === it.id)) return toast('Already in the list', false);
+    const lines = B.filter(b => b.fg_item_id === it.id).sort((a,b) => (a.item_type === 'RAW_EGG' ? 0 : 1) - (b.item_type === 'RAW_EGG' ? 0 : 1))
+      .map(b => ({ item_id:b.item_id, per:num(b.per_pack), qty:0, exp:'', origin:'' }));
+    if (prod && !lines.length) return toast('No bill of materials for this item', false);
+    cards.push({ fg:it.id, packs:0, lines }); draw(); $('#bc').value = '';
+  };
+  $('#bc').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addFg(itemByCode($('#bc').value.trim())); } });
+  $('#add').onclick = () => itemPicker(addFg, true);
+  $('#sv').onclick = async () => {
+    if (!pick.size) return toast('Pick the packing staff', false);
+    const lines = prod ? cards.flatMap(c => c.lines.filter(l => l.qty > 0).map(l => ({ fg_item_id:c.fg, item_id:l.item_id, qty:l.qty, exp_date:l.exp||null, origin:l.origin||null })))
+                       : cards.filter(c => c.packs > 0).map(c => ({ fg_item_id:c.fg, qty:c.packs }));
+    if (!lines.length) return toast('Enter at least one qty', false);
+    $('#sv').disabled = true;
+    try { const r = await rpc('wh_issue', { p_branch:S.br, p_process:W.proc, p_duty:S.duty, p_staff:[...pick], p_lines:lines });
+          toast('Saved · ' + r.batch_no + ' (' + r.shift + ')'); whHome(); } catch(e) { $('#sv').disabled = false; }
+  };
+  draw(); $('#bc').focus();
+}
+async function whReturn(id){
+  const [[b], L, B] = await Promise.all([q(sb.from('wh_batches').select('*').eq('id', id)), q(sb.from('wh_lines').select('*').eq('batch_id', id)), bom()]);
+  const iss = L.filter(l => l.slip === 'I1'), prod = b.process === 'PRODUCTION';
+  let body = '';
+  if (prod) {
+    const fgs = [...new Set(iss.map(l => l.for_item_id))];
+    const mats = Object.values(iss.reduce((a,l) => { (a[l.item_id] ||= { item_id:l.item_id, egg:l.line_type==='ISSUE RAW', issued:0 }).issued += num(l.qty); return a; }, {}));
+    body = `<div class="cap">Finished goods made (packs)</div>
+      ${fgs.map(f => `<div class="grid-in"><span class="lbl">${esc(iname(itemById(f)))}</span><input data-fg="${f}" type="number" inputmode="numeric" style="grid-column:span 3"></div>`).join('')}
+      <div class="cap" style="margin-top:14px">Material balance (pcs)</div>
+      <div class="grid-in"><span></span><span class="gh">Broken</span><span class="gh">Waste</span><span class="gh">Counted</span></div>
+      ${mats.map(m => `<div class="grid-in" data-m="${m.item_id}"><span class="lbl">${esc(iname(itemById(m.item_id)))}<small>issued ${m.issued} · calc <b class="calc">${m.issued}</b> · diff <b class="df">0</b></small></span>
+        ${m.egg ? `<input data-k="broken" type="number" inputmode="numeric">` : '<span></span>'}
+        <input data-k="${m.egg?'waste':'mwaste'}" type="number" inputmode="numeric"><input data-k="counted" type="number" inputmode="numeric"></div>
+        <input data-r="${m.item_id}" placeholder="Reason for difference" style="display:none;width:100%;height:40px;border:1px solid #f0c6bd;border-radius:10px;padding:0 10px;margin-top:4px">`).join('')}`;
+    var recalc = () => {
+      const used = {};
+      document.querySelectorAll('[data-fg]').forEach(i => B.filter(x => x.fg_item_id === +i.dataset.fg).forEach(x => used[x.item_id] = (used[x.item_id]||0) + num(i.value) * num(x.per_pack)));
+      mats.forEach(m => { const row = document.querySelector(`[data-m="${m.item_id}"]`), v = k => num(row.querySelector(`[data-k="${k}"]`)?.value);
+        const calc = Math.round(m.issued - (used[m.item_id]||0) - v('broken') - v('waste') - v('mwaste')), cnt = row.querySelector('[data-k="counted"]').value;
+        row.querySelector('.calc').textContent = calc; const df = cnt === '' ? 0 : num(cnt) - calc; row.querySelector('.df').textContent = df;
+        row.querySelector('.df').style.color = df ? 'var(--neg)' : ''; document.querySelector(`[data-r="${m.item_id}"]`).style.display = df ? 'block' : 'none'; });
+    };
+  } else {
+    const given = {}, unw = {};
+    iss.forEach(l => B.filter(x => x.fg_item_id === l.item_id).forEach(x => { const t = x.item_type === 'RAW_EGG' ? given : unw; t[x.item_id] = (t[x.item_id]||0) + num(l.qty) * num(x.per_pack); }));
+    body = `<div class="cap">Eggs returned (pcs)</div>
+      <div class="grid-in" style="grid-template-columns:1.4fr repeat(4,1fr)"><span></span><span class="gh">Good</span><span class="gh">Near exp</span><span class="gh">Broken</span><span class="gh">Waste</span></div>
+      ${Object.entries(given).map(([r,g]) => `<div class="grid-in" data-m="${r}" data-g="${Math.round(g)}" style="grid-template-columns:1.4fr repeat(4,1fr)"><span class="lbl">${esc(iname(itemById(+r)))}<small>given ${Math.round(g)} · diff <b class="df">0</b></small></span>
+        <input data-k="good" type="number" inputmode="numeric"><input data-k="near" type="number" inputmode="numeric"><input data-k="broken" type="number" inputmode="numeric"><input data-k="waste" type="number" inputmode="numeric"></div>
+        <input data-r="${r}" placeholder="Reason for difference" style="display:none;width:100%;height:40px;border:1px solid #f0c6bd;border-radius:10px;padding:0 10px;margin-top:4px">`).join('')}
+      <div class="cap" style="margin-top:14px">Packing material reusable (pcs) · the rest is waste</div>
+      ${Object.entries(unw).map(([m,u]) => `<div class="grid-in"><span class="lbl">${esc(iname(itemById(+m)))}<small>unwrapped ${Math.round(u)}</small></span><input data-reuse="${m}" type="number" inputmode="numeric" style="grid-column:span 3"></div>`).join('')}`;
+    var recalc = () => document.querySelectorAll('[data-g]').forEach(row => { const tot = ['good','near','broken','waste'].reduce((a,k)=>a+num(row.querySelector(`[data-k="${k}"]`).value),0);
+      const df = tot ? tot - num(row.dataset.g) : 0; row.querySelector('.df').textContent = df; row.querySelector('.df').style.color = df ? 'var(--neg)' : '';
+      document.querySelector(`[data-r="${row.dataset.m}"]`).style.display = df ? 'block' : 'none'; });
+  }
+  whShell(`${prod?'Production':'Cleaning'} return`, `<div class="card2"><b>${esc(b.batch_no)}</b> <span class="st">${b.status}</span>
+      <div class="muted" style="font-size:12px;margin-top:4px">${b.work_date} ${b.shift} · issued eggs ${num(b.issued_egg_pcs)}</div></div>${body}
+    <div class="foot" style="margin:12px -12px -12px"><button class="post" id="sv">Save return · close batch</button>
+      <button class="btn d" id="cx" style="width:100%;margin-top:8px">Cancel this batch</button></div>`, whHome);
+  document.querySelectorAll('#mb input').forEach(i => i.addEventListener('input', recalc));
+  $('#sv').onclick = async () => {
+    const obj = sel => Object.fromEntries([...document.querySelectorAll(sel)].filter(i => i.value !== '').map(i => [i.dataset.fg || i.dataset.reuse, num(i.value)]));
+    const reason = Object.fromEntries([...document.querySelectorAll('[data-r]')].filter(i => i.value.trim()).map(i => [i.dataset.r, i.value.trim()]));
+    const per = k => Object.fromEntries([...document.querySelectorAll('[data-m]')].map(r => [r.dataset.m, r.querySelector(`[data-k="${k}"]`)?.value]).filter(([,v]) => v !== undefined && v !== '').map(([a,v]) => [a, num(v)]));
+    const data = prod ? { fg:obj('[data-fg]'), broken:per('broken'), waste:per('waste'), mwaste:per('mwaste'), counted:per('counted'), reason }
+                      : { good:per('good'), near:per('near'), broken:per('broken'), waste:per('waste'), reuse:obj('[data-reuse]'), reason };
+    $('#sv').disabled = true;
+    try { const r = await rpc('wh_return', { p_batch:b.id, p_duty:S.duty, p_data:data }); toast('Closed · ' + r.batch_no + (num(r.egg_diff) ? ' · egg diff ' + r.egg_diff : '')); whHome(); }
+    catch(e) { $('#sv').disabled = false; }
+  };
+  $('#cx').onclick = () => {
+    $('#cx').outerHTML = `<input id="cr" placeholder="Reason to cancel" style="width:100%;height:46px;border:1px solid var(--line);border-radius:10px;padding:0 12px;margin-top:8px"><button class="btn d" id="cx2" style="width:100%;margin-top:6px">Confirm cancel</button>`;
+    $('#cx2').onclick = async () => { if (!$('#cr').value.trim()) return toast('Enter the reason', false);
+      await rpc('wh_cancel', { p_batch:b.id, p_reason:$('#cr').value.trim() }); toast('Batch cancelled'); whHome(); };
+  };
+}
+async function whView(b){
+  const L = await q(sb.from('wh_lines').select('*').eq('batch_id', b.id).order('id'));
+  whShell(b.batch_no, `<div class="card2"><div class="kv"><span>Status</span><span class="st">${b.status}</span></div>
+      <div class="kv"><span>Work date / shift</span><b>${b.work_date} ${b.shift}</b></div><div class="kv"><span>Issued eggs</span><b>${num(b.issued_egg_pcs)}</b></div>
+      ${b.process==='PRODUCTION'?`<div class="kv"><span>FG packs</span><b>${num(b.fg_packs)}</b></div>`:`<div class="kv"><span>Good / near exp</span><b>${num(b.good_egg_pcs)} / ${num(b.near_pcs)}</b></div>`}
+      <div class="kv"><span>Broken / waste</span><b>${num(b.broken_pcs)} / ${num(b.waste_pcs)}</b></div>
+      <div class="kv"><span>Egg difference</span><b style="color:${num(b.egg_diff)?'var(--neg)':'inherit'}">${num(b.egg_diff)}</b></div>
+      <div class="kv"><span>Hours · output / staff-hour</span><b>${num(b.hours)} · ${num(b.output_per_staff_hour)}</b></div>
+      ${b.cancel_reason?`<div class="kv"><span>Cancelled</span><b>${esc(b.cancel_reason)}</b></div>`:''}</div>
+    ${L.map(l => `<div class="ln"><div><b>${esc(l.line_type)}</b><small>${esc(iname(itemById(l.item_id)))}${l.reason?' · '+esc(l.reason):''}</small></div>
+      <span class="q">${num(l.qty)}${l.difference!=null&&num(l.difference)?`<small style="display:block;color:var(--neg);font-size:11px">${num(l.difference)}</small>`:''}</span></div>`).join('')}`, whHome);
+}
+
 // ---------------- ITEM PICKER (ADD) ----------------
-function itemPicker(cb){
-  const its = S.items.filter(i => i.active && i.item_type !== 'MATERIAL').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+function itemPicker(cb, fgOnly){
+  const its = S.items.filter(i => i.active && (fgOnly ? i.item_type === 'FG' : i.item_type !== 'MATERIAL')).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40;display:flex;align-items:flex-end';
   ov.innerHTML = `<div style="background:#fff;width:100%;max-height:80vh;overflow:auto;border-radius:16px 16px 0 0;padding:10px">
