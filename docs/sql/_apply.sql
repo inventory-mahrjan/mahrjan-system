@@ -1,42 +1,40 @@
 -- =====================================================================
--- CASH BALANCE - CREATE
--- Same as the CASH BALANCE tab of the unit sheet: one row per branch / day
--- (CLOSE DATE, EXPECTED, COUNTED, CLOSING). The cash sheet opening is worked
--- out from the latest counted or locked day, exactly like openingFor() of the
--- old portal. Revert: CASH BALANCE - REVERT.sql
+-- SALES COMPANY WAREHOUSE - CREATE
+-- The Sales Detailed Report now carries "Company Name" and "Warehouse" on each invoice.
+-- 1. sales_lines gets two columns: company, warehouse.
+-- 2. Old lines get company from their branch (warehouse stays empty until the report is imported again).
+-- 3. import_sales stores both columns, and fills them on invoices already imported.
+-- Revert: SALES COMPANY WAREHOUSE - REVERT.sql
 -- =====================================================================
-create table if not exists public.cash_balance (
-  id          bigint generated always as identity unique,
-  branch_id   bigint not null references public.branches(id),
-  close_date  date not null,
-  expected    numeric(14,2),
-  counted     numeric(14,2),
-  closing     numeric(14,2),
-  updated_at  timestamptz not null default now(),
-  updated_by  uuid default auth.uid(),
-  primary key (branch_id, close_date)
-);
-alter table public.cash_balance enable row level security;
-grant select on public.cash_balance to authenticated;
-drop policy if exists read_branch on public.cash_balance;
-create policy read_branch on public.cash_balance for select to authenticated using (public.can_branch(branch_id));
+alter table public.sales_lines add column if not exists company text, add column if not exists warehouse text;
 
--- p_rows = [{"date":"2026-11-01","expected":123.45,"counted":0,"closing":123.45}, ...]
--- p_only_new = true: rows already there are kept (used by the portal for locked days).
-create or replace function public.save_cash_balance(p_branch bigint, p_rows jsonb, p_only_new boolean default false)
-returns integer language plpgsql security definer set search_path = public as $$
-declare n integer;
+update public.sales_lines sl
+   set company = case b.code when 'MGT' then 'MAHRJAN GENERAL TRADING LLC-AJMAN' else 'MAHRJAN GENERAL TRADING LLC-ALQUOZ' end
+  from public.branches b
+ where b.id = sl.branch_id and sl.company is null;
+
+do $$
+declare d text; n text;
 begin
-  perform public.require_role(array['ADMIN','ACCOUNTANT'], p_branch);
-  insert into public.cash_balance (branch_id, close_date, expected, counted, closing)
-  select p_branch, (r->>'date')::date, nullif(r->>'expected','')::numeric, nullif(r->>'counted','')::numeric, nullif(r->>'closing','')::numeric
-  from jsonb_array_elements(p_rows) r
-  where coalesce(r->>'date','') <> ''
-  on conflict (branch_id, close_date) do update
-    set expected = excluded.expected, counted = excluded.counted, closing = excluded.closing, updated_at = now(), updated_by = auth.uid()
-    where not p_only_new;
-  get diagnostics n = row_count;
-  return n;
+  d := pg_get_functiondef('public.import_sales(bigint,jsonb,boolean)'::regprocedure);
+  if position('as company' in d) > 0 then raise notice 'import_sales already has company/warehouse'; return; end if;
+  n := regexp_replace(d, 'as profit(\s+)from jsonb_array_elements',
+        'as profit, nullif(trim(x.r->>''Company Name''),'''') as company, nullif(trim(x.r->>''Warehouse''),'''') as warehouse\1from jsonb_array_elements');
+  if n = d then raise exception 'import_sales: t_in select not found'; end if; d := n;
+  n := replace(d, 'net_incl_vat, profit, van_day_id)', 'net_incl_vat, profit, van_day_id, company, warehouse)');
+  if n = d then raise exception 'import_sales: insert column list not found'; end if; d := n;
+  n := replace(d, 't.profit, d.id',
+        't.profit, d.id, coalesce(t.company, (select case code when ''MGT'' then ''MAHRJAN GENERAL TRADING LLC-AJMAN'' else ''MAHRJAN GENERAL TRADING LLC-ALQUOZ'' end from public.branches where id = p_branch)), t.warehouse');
+  if n = d then raise exception 'import_sales: insert values not found'; end if; d := n;
+  n := replace(d, 'select count(*) into v_new from ins;',
+        'select count(*) into v_new from ins;
+  /*CW*/ update public.sales_lines sl set company = coalesce(t.company, sl.company), warehouse = coalesce(t.warehouse, sl.warehouse)
+    from (select distinct on (invoice_no) invoice_no, company, warehouse from t_in order by invoice_no, ord) t
+   where sl.invoice_no = t.invoice_no
+     and (sl.company is distinct from coalesce(t.company, sl.company) or sl.warehouse is distinct from coalesce(t.warehouse, sl.warehouse)); /*CW-END*/');
+  if n = d then raise exception 'import_sales: insert count not found'; end if; d := n;
+  execute d;
 end $$;
-revoke all on function public.save_cash_balance(bigint, jsonb, boolean) from public, anon;
-grant execute on function public.save_cash_balance(bigint, jsonb, boolean) to authenticated;
+
+select count(*) filter (where company is not null) as with_company, count(*) filter (where warehouse is not null) as with_warehouse, count(*) as lines
+  from public.sales_lines;

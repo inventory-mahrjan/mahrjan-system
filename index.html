@@ -221,7 +221,7 @@ function render(){
   const unitName = S.brs.length > 1 ? 'SALES PORTAL' : br.toUpperCase();
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
     days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
-    req:'Next-day order by salesman, in cartons.', wh:'Production and cleaning batches: issue, return, differences and output.',
+    req:'Next-day order by salesman, qty as the salesman gives it.', wh:'Production and cleaning batches: issue, return, differences and output.',
     ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Daily and weekly store count (good and damage), compared with the iTrade stock.',
     ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
@@ -442,7 +442,7 @@ async function vDay(id){
 // ---------- SALES IMPORT ----------
 async function vImport(){
   $('#v').innerHTML = `<div class="card"><h3>Sales import (iTrade Periodical Sales Detailed Report)</h3>
-    <p class="muted">Export the report from iTrade for the dates you want (Excel or CSV) and choose the file. Each branch (MGAZ / MGT) is imported separately.
+    <p class="muted">Export the report from iTrade for the dates you want (Excel or CSV) and choose the file. The company of each invoice comes from its Company Name (or the MGAZ / MGT invoice prefix). Company and Warehouse are saved with every line.
     Invoices already imported are skipped. Invoices missing from the file for its dates are marked cancelled.</p>
     <div class="row"><input type="file" id="f" accept=".xlsx,.xls,.csv"><button class="p" id="go" disabled>Import</button></div><div id="out"></div></div>`;
   let rows = [];
@@ -450,23 +450,45 @@ async function vImport(){
     const file = e.target.files[0]; if (!file) return;
     const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
     const wb = XLSX.read(await file.arrayBuffer(), { cellDates:true });
-    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'', raw:true });
+    const ws = wb.Sheets[wb.SheetNames[0]], grid = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true });
     const MON = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
     const iso = v => { if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset()*6e4).toISOString().slice(0,10);
       const s = String(v).trim(); let m;
       if ((m = s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[-\/ ](\d{4})/))) return `${m[3]}-${String(MON[m[2].toLowerCase()]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
       if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
       if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[0]; return null; };
-    rows = raw.map(r => Object.fromEntries(Object.entries(r).map(([k,v]) => [k.trim(), v])))
-      .filter(r => r['Invoice No'] && r['Item Code'])
-      .map(r => ({ ...r, 'Tran Date': iso(r['Tran Date']), 'Item Code': String(r['Item Code']).trim(), 'Head No': String(r['Head No']||'').trim(),
-                   ...Object.fromEntries(['Qty','Rate','Gross','Disc','Net','VAT','Net Incl VAT','Profit','CF'].map(k => [k, num(r[k])])) }));
+    const T = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const hi = grid.findIndex(r => r.some(v => T(v) === 'Invoice No') && r.some(v => T(v) === 'Tran Date'));
+    const nested = hi > -1 && !grid[hi].some(v => T(v) === 'Item Code');
+    if (nested) {
+      // iTrade "Periodical Sales Detailed Report": one invoice header row, then an "Sl No" row and its item rows.
+      const H = {}; grid[hi].forEach((v, i) => { const k = T(v); if (k && !(k in H)) H[k] = i; });
+      const si = grid.findIndex((r, i) => i > hi && T(r[1] ?? '') === 'Sl No' || (i > hi && r.some(v => T(v) === 'Sl No') && r.some(v => T(v) === 'Item Code')));
+      const I = {}; (grid[si] || []).forEach((v, i) => { const k = T(v); if (k && !(k in I)) I[k] = i; });
+      const g = (r, k) => r[H[k]] ?? '', gi = (r, k) => r[I[k]] ?? '';
+      let inv = null; rows = [];
+      for (let i = hi + 1; i < grid.length; i++) { const r = grid[i];
+        if (T(g(r, 'Invoice No')) && (T(g(r, 'Company Name')) || g(r, 'Tran Date') !== '')) { inv = r; continue; }
+        if (!inv || T(gi(r, 'Sl No')) === 'Sl No' || !T(gi(r, 'Item Code'))) continue;
+        rows.push({ 'Company Name': T(g(inv, 'Company Name')), 'Warehouse': T(g(inv, 'Warehouse')), 'Tran Date': iso(g(inv, 'Tran Date')), 'Tran No': T(g(inv, 'Tran No')),
+          'Invoice No': T(g(inv, 'Invoice No')), 'User': T(g(inv, 'User')), 'Sales Executive': T(g(inv, 'Sales Executive')) === 'None' ? '' : T(g(inv, 'Sales Executive')),
+          'Tran Type': T(g(inv, 'TranType') || g(inv, 'Tran Type')), 'Tender Type': T(g(inv, 'Tender Type')), 'Head No': T(g(inv, 'Head No')), 'Account Name': T(g(inv, 'Account Name')), 'Location': T(g(inv, 'Locations')),
+          'Item Code': T(gi(r, 'Item Code')), 'Item Name': T(gi(r, 'Item Name')), 'Unit': T(gi(r, 'Unit')) || 'PCS',
+          ...Object.fromEntries(['Qty','Rate','Gross','Disc','Net','VAT','Net Incl VAT','Profit','CF'].map(k => [k, num(gi(r, k))])) }); }
+    } else {
+      const raw = XLSX.utils.sheet_to_json(ws, { defval:'', raw:true });
+      rows = raw.map(r => Object.fromEntries(Object.entries(r).map(([k,v]) => [k.trim(), v])))
+        .filter(r => r['Invoice No'] && r['Item Code'])
+        .map(r => ({ ...r, 'Tran Date': iso(r['Tran Date']), 'Item Code': String(r['Item Code']).trim(), 'Head No': String(r['Head No']||'').trim(),
+                     'Company Name': T(r['Company Name']), 'Warehouse': T(r['Warehouse']),
+                     ...Object.fromEntries(['Qty','Rate','Gross','Disc','Net','VAT','Net Incl VAT','Profit','CF'].map(k => [k, num(r[k])])) }));
+    }
     const bad = rows.filter(r => !r['Tran Date']).length;
     const by = branchSplit(rows);
     $('#out').innerHTML = `<p>${rows.length} lines read${bad?` — <span class="bad">${bad} with unreadable date</span>`:''}. ${Object.entries(by).map(([b,r])=>`${b}: ${r.length}`).join(' · ')}</p>`;
     $('#go').disabled = !rows.length || bad > 0;
   };
-  const branchSplit = rs => rs.reduce((a,r) => { const b = String(r['Invoice No']).split('-')[0].toUpperCase(); (a[b] ||= []).push(r); return a; }, {});
+  const branchSplit = rs => rs.reduce((a,r) => { const c = String(r['Company Name'] || '').toUpperCase(); const b = /AJMAN/.test(c) ? 'MGT' : /QUOZ|QOUZ/.test(c) ? 'MGAZ' : String(r['Invoice No']).split('-')[0].toUpperCase(); (a[b] ||= []).push(r); return a; }, {});
   $('#go').onclick = async () => {
     $('#go').disabled = true; const out = [];
     try {
@@ -1025,7 +1047,7 @@ async function vCheck(){
 async function vRequirement(){
   const isSm = S.me.role === 'SALESMAN';
   S.rsm = isSm ? S.me.id : S.rsm; S.rdate = S.rdate || today(1);
-  $('#v').innerHTML = `<div class="card"><h3>Requirement (cartons)</h3><div class="row">
+  $('#v').innerHTML = `<div class="card"><h3>Requirement</h3><div class="row">
     ${isSm ? '' : `<label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.rsm)}</select></label>`}
     <label>For date<input type="date" id="rd" value="${S.rdate}"></label></div><div id="g"></div></div>`;
   $('#sm') && ($('#sm').onchange = e => { S.rsm = +e.target.value || null; fill(); });
@@ -1033,7 +1055,7 @@ async function vRequirement(){
   async function fill(){
     if (!S.rsm) { $('#g').innerHTML=''; return; }
     const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.rsm).eq('required_date', S.rdate));
-    $('#g').innerHTML = `<div class="tw"><table><tr><th class="l">Item</th><th>Cartons</th></tr>${sellItems().map(it => `<tr data-id="${it.id}"><td class="l">${esc(it.short_name||it.name)}</td>
+    $('#g').innerHTML = `<div class="tw"><table><tr><th class="l">Item</th><th>Qty</th></tr>${sellItems().map(it => `<tr data-id="${it.id}"><td class="l">${esc(it.short_name||it.name)}</td>
       <td><input type="number" min="0" step="0.5" value="${req.find(r=>r.item_id===it.id)?.qty_cartons ?? ''}"></td></tr>`).join('')}</table></div>
       <div class="row" style="margin-top:8px"><button class="p" id="sv">Save requirement</button></div>`;
     $('#sv').onclick = async () => {
