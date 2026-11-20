@@ -441,7 +441,7 @@
   }
 
   // ---------- read-only test hook (?mjdebug=1): reuse the portal's signed-in session ----------
-  if (/[?&]mjdebug=1/.test(location.search)) window.MJ_DEBUG = { doGet: doGet, usePortalSession: function () { sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY); }); ME = null; } };
+  if (/[?&]mjdebug=1/.test(location.search)) window.MJ_DEBUG = { doGet: doGet, portalCall: function (f, a) { return portalCall(f, a); }, usePortalSession: function () { sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY); }); ME = null; } };
 
 
   // =====================================================================
