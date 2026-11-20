@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mahrjan System</title>
+<style>
+  :root { --g:#2e7d32; --gl:#e8f5e9; --line:#d0d7de; --mut:#57606a; --red:#c62828; --amb:#ef6c00; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; color:#1f2328; background:#f6f8fa; }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:8px 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; position:sticky; top:0; z-index:5; }
+  header b { color:var(--g); margin-right:auto; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; padding:8px 12px; background:#fff; border-bottom:1px solid var(--line); }
+  nav button { background:none; border:1px solid var(--line); }
+  nav button.on { background:var(--g); color:#fff; border-color:var(--g); }
+  main { padding:12px; max-width:1100px; margin:auto; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:end; margin-bottom:8px; }
+  .row label { display:flex; flex-direction:column; font-size:12px; color:var(--mut); gap:2px; }
+  input, select, button { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  input[type=number] { width:80px; text-align:center; }
+  button { cursor:pointer; }
+  button.p { background:var(--g); color:#fff; border-color:var(--g); }
+  button.d { background:#fff; color:var(--red); border-color:var(--red); }
+  button:disabled { opacity:.5; cursor:default; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:var(--gl); font-weight:600; font-size:12px; }
+  th, td { border:1px solid var(--line); padding:4px 6px; text-align:center; }
+  td.l, th.l { text-align:left; }
+  .tw { overflow-x:auto; }
+  .st { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; background:#eee; }
+  .st.LOADED{background:#e3f2fd} .st.RETURNED{background:#fff3e0} .st.SETTLED{background:#f3e5f5} .st.CLOSED{background:var(--gl)}
+  .bad { color:var(--red); font-weight:600; } .warn { color:var(--amb); }
+  .msg { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); padding:10px 16px; border-radius:8px; color:#fff; z-index:9; max-width:90%; }
+  .msg.ok { background:var(--g); } .msg.er { background:var(--red); }
+  .login { max-width:320px; margin:12vh auto; }
+  .muted { color:var(--mut); font-size:12px; }
+  h3 { margin:0 0 8px; font-size:15px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const SB_URL = 'https://xhndwjkqfqmmpfcglqzu.supabase.co';
+const SB_KEY = 'sb_publishable_emOqI1PWaSA7B5s56v-ERg_RrxZ9weu';   // public key; data is protected by access rules
+const EMAIL_DOMAIN = '@mahrjan.app';
+const sb = createClient(SB_URL, SB_KEY);
+
+const S = { me:null, items:[], staff:[], vans:[], customers:[], branches:[], date:today(), tab:null, dayId:null };
+const $ = (s, el=document) => el.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isNaN(n) ? 0 : n; };
+const money = v => num(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+function today(off=0){ const d=new Date(Date.now()+off*864e5); return d.toLocaleDateString('en-CA',{timeZone:'Asia/Dubai'}); }
+function toast(t, ok=true){ const m=document.createElement('div'); m.className='msg '+(ok?'ok':'er'); m.textContent=t; document.body.appendChild(m); setTimeout(()=>m.remove(), ok?2500:6000); }
+async function q(p){ const { data, error } = await p; if (error) { toast(error.message, false); throw error; } return data; }
+const rpc = (fn, args) => q(sb.rpc(fn, args));
+const has = (...r) => r.includes(S.me?.role);
+const item = id => S.items.find(i => i.id === id) || {};
+const per = it => it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 1) : (it.packs_per_carton || 1);
+const unit = it => it.item_type === 'RAW_EGG' ? 'pcs' : 'pk';
+function split(it, qty){ const p=per(it); qty=num(qty); return { c: Math.floor(qty/p), r: +(qty - Math.floor(qty/p)*p).toFixed(2) }; }
+function showQty(it, qty){ qty=num(qty); if(!qty) return ''; const s=split(it,qty); return (s.c? s.c+' ctn ':'') + (s.r? s.r+' '+unit(it):''); }
+const sellItems = () => S.items.filter(i => i.active && i.item_type !== 'MATERIAL').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+
+// ---------- start ----------
+sb.auth.onAuthStateChange((_e, session) => { if (!session) renderLogin(); });
+const { data:{ session } } = await sb.auth.getSession();
+session ? boot() : renderLogin();
+
+function renderLogin(){
+  $('#app').innerHTML = `<div class="card login"><h3>Mahrjan System</h3>
+    <div class="row"><label style="flex:1">Username<input id="u" autocomplete="username"></label></div>
+    <div class="row"><label style="flex:1">Password<input id="pw" type="password" autocomplete="current-password"></label></div>
+    <button class="p" id="go" style="width:100%">Login</button></div>`;
+  const go = async () => {
+    const u = $('#u').value.trim().toLowerCase(); if (!u) return;
+    const { error } = await sb.auth.signInWithPassword({ email: u.includes('@') ? u : u + EMAIL_DOMAIN, password: $('#pw').value });
+    if (error) return toast('Wrong username or password', false);
+    boot();
+  };
+  $('#go').onclick = go; $('#pw').onkeydown = e => e.key === 'Enter' && go();
+}
+
+async function boot(){
+  S.me = await rpc('me');
+  if (!S.me || !S.me.role) { toast('This login is not linked to an active staff member', false); await sb.auth.signOut(); return; }
+  const [items, staff, vans, branches] = await Promise.all([
+    q(sb.from('items').select('*')), q(sb.from('staff').select('id,name,role,branch_id,active').order('name')),
+    q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
+  Object.assign(S, { items, staff, vans, branches });
+  const tabs = tabsFor(); S.tab = tabs[0][0];
+  render();
+}
+
+function tabsFor(){
+  const t = [];
+  if (has('RECEIVER','ACCOUNTANT','ADMIN')) t.push(['load','Loading'], ['ret','Return']);
+  t.push(['days','Van days']);
+  if (has('ACCOUNTANT','ADMIN')) t.push(['imp','Sales import']);
+  if (has('SALESMAN','RECEIVER','ACCOUNTANT','ADMIN')) t.push(['req','Requirement']);
+  return t;
+}
+
+function render(){
+  $('#app').innerHTML = `
+    <header><b>Mahrjan System</b>
+      <label class="muted">Date <input type="date" id="dt" value="${S.date}"></label>
+      <span class="muted">${esc(S.me.name)} · ${esc(S.me.role)}${S.me.branch_id ? ' · '+esc(S.branches.find(b=>b.id===S.me.branch_id)?.name) : ''}</span>
+      <button id="out">Logout</button></header>
+    <nav>${tabsFor().map(([k,l]) => `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
+    <main id="v"></main>`;
+  $('#out').onclick = () => sb.auth.signOut();
+  $('#dt').onchange = e => { S.date = e.target.value; S.dayId = null; view(); };
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
+  view();
+}
+function view(){ ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement })[S.tab](); }
+
+const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active);
+const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
+
+// ---------- quantity grid (cartons + loose) ----------
+function qtyGrid(rows){   // rows: [{it, qty, hint}]
+  return `<div class="tw"><table><tr><th class="l">Item</th><th>Ctn</th><th>Loose</th><th>Total</th><th class="muted">Ref</th></tr>
+    ${rows.map(({it,qty,hint}) => { const s = split(it, qty); return `<tr data-id="${it.id}">
+      <td class="l">${esc(it.short_name || it.name)}</td>
+      <td><input type="number" min="0" step="1" class="c" value="${s.c||''}"></td>
+      <td><input type="number" min="0" step="1" class="r" value="${s.r||''}"></td>
+      <td class="tot">${showQty(it, qty)}</td><td class="muted">${esc(hint||'')}</td></tr>`; }).join('')}</table></div>`;
+}
+function bindGrid(root){
+  root.querySelectorAll('tr[data-id]').forEach(tr => tr.oninput = () => {
+    const it = item(+tr.dataset.id); tr.querySelector('.tot').textContent = showQty(it, num($('.c',tr).value)*per(it) + num($('.r',tr).value));
+  });
+}
+const gridValue = tr => { const it=item(+tr.dataset.id); return num($('.c',tr).value)*per(it) + num($('.r',tr).value); };
+
+// ---------- LOADING ----------
+async function vLoading(){
+  const v = $('#v');
+  v.innerHTML = `<div class="card"><h3>Loading (board) — ${S.date}</h3>
+    <div class="row"><label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.lsm)}</select></label>
+      <label>Van<select id="van"><option value="">-</option>${S.vans.map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
+      <label>Start KM<input type="number" id="km" style="width:110px"></label>
+      <label>Load temp<input type="number" id="tp" step="0.1"></label></div><div id="g"></div></div>`;
+  $('#sm').onchange = async e => { S.lsm = +e.target.value || null; await fill(); };
+  async function fill(){
+    if (!S.lsm) { $('#g').innerHTML = ''; return; }
+    const day = (await q(sb.from('van_day').select('*').eq('salesman_id', S.lsm).eq('business_date', S.date)))[0];
+    const lines = day ? await q(sb.from('loading_lines').select('item_id,qty').eq('van_day_id', day.id)) : [];
+    const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.lsm).eq('required_date', S.date));
+    if (day) { $('#van').value = day.van_id || ''; $('#km').value = day.start_km ?? ''; $('#tp').value = day.load_temp ?? ''; }
+    const locked = day && !['OPEN','LOADED'].includes(day.status);
+    const rows = sellItems().map(it => {
+      const l = lines.find(x => x.item_id === it.id), r = req.find(x => x.item_id === it.id);
+      return { it, qty: l ? l.qty : (r && !day ? r.qty_cartons * per(it) : 0), hint: r ? 'Req ' + r.qty_cartons + ' ctn' : '' };
+    });
+    $('#g').innerHTML = (day ? `<p class="muted">Status <span class="st ${day.status}">${day.status}</span>${locked ? ' — loading is locked after return' : ''}</p>` : '')
+      + qtyGrid(rows) + `<div class="row" style="margin-top:8px"><button class="p" id="post" ${locked?'disabled':''}>Post loading</button></div>`;
+    bindGrid($('#g'));
+    $('#post') && ($('#post').onclick = async () => {
+      const ln = [...$('#g').querySelectorAll('tr[data-id]')].map(tr => ({ item_id:+tr.dataset.id, qty:gridValue(tr) })).filter(x => x.qty > 0);
+      if (!ln.length) return toast('Enter at least one item', false);
+      $('#post').disabled = true;
+      try { await rpc('post_loading', { p_salesman:S.lsm, p_date:S.date, p_van:+$('#van').value||null, p_start_km:+$('#km').value||null, p_load_temp:$('#tp').value===''?null:+$('#tp').value, p_lines:ln });
+            toast('Loading posted'); await fill(); } finally { $('#post') && ($('#post').disabled = false); }
+    });
+  }
+  if (S.lsm) await fill();
+}
+
+// ---------- RETURN ----------
+async function vReturn(){
+  const days = await q(sb.from('van_day').select('id,salesman_id,status').eq('business_date', S.date).in('status',['LOADED','RETURNED']));
+  const v = $('#v');
+  v.innerHTML = `<div class="card"><h3>Return — ${S.date}</h3>
+    <div class="row"><label>Salesman<select id="d"><option value="">Select</option>${days.map(d=>`<option value="${d.id}">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)} (${d.status})</option>`).join('')}</select></label></div>
+    <div id="g"></div></div>`;
+  $('#d').onchange = e => fill(+e.target.value);
+  async function fill(id){
+    if (!id) { $('#g').innerHTML=''; return; }
+    const day = (await q(sb.from('van_day').select('*').eq('id', id)))[0];
+    const [rec, ret] = await Promise.all([q(sb.from('v_van_day_items').select('*').eq('van_day_id', id)), q(sb.from('return_lines').select('*').eq('van_day_id', id))]);
+    const ids = [...new Set([...rec.map(r=>r.item_id), ...ret.map(r=>r.item_id)])];
+    const its = sellItems().filter(i => ids.includes(i.id));
+    const F = ['good','damage','expiry','waste','foc'];
+    $('#g').innerHTML = `<div class="row"><label>End KM<input type="number" id="km" style="width:110px" value="${day.end_km??''}"></label>
+      <label>Unload temp<input type="number" id="tp" step="0.1" value="${day.unload_temp??''}"></label>
+      <label>Carton small<input type="number" id="cs" value="${day.carton_small||''}"></label>
+      <label>Carton big<input type="number" id="cb" value="${day.carton_big||''}"></label></div>
+      <p class="muted">Quantities in packs (raw egg in pieces). Expected = load − sale + GRV (sales imported so far).</p>
+      <div class="tw"><table><tr><th class="l">Item</th><th>Load</th><th>Expected</th>${F.map(f=>`<th>${f}</th>`).join('')}<th>Total</th><th>Diff</th></tr>
+      ${its.map(it => { const r = rec.find(x=>x.item_id===it.id)||{}, t = ret.find(x=>x.item_id===it.id)||{};
+        return `<tr data-id="${it.id}" data-exp="${num(r.expected_return)}"><td class="l">${esc(it.short_name||it.name)}</td><td>${num(r.load)}</td><td>${num(r.expected_return)}</td>
+        ${F.map(f=>`<td><input type="number" min="0" class="${f}" value="${num(t[f])||''}"></td>`).join('')}<td class="tot"></td><td class="df"></td></tr>`; }).join('')}
+      </table></div><div class="row" style="margin-top:8px"><button class="p" id="post">Post return</button></div>`;
+    const calc = tr => { const tot = F.reduce((a,f)=>a+num($('.'+f,tr).value),0), df = tot - num(tr.dataset.exp);
+      tr.querySelector('.tot').textContent = tot; const c = tr.querySelector('.df'); c.textContent = df ? (df>0?'+':'')+df : ''; c.className = 'df ' + (df ? 'bad' : ''); };
+    $('#g').querySelectorAll('tr[data-id]').forEach(tr => { calc(tr); tr.oninput = () => calc(tr); });
+    $('#post').onclick = async () => {
+      const ln = [...$('#g').querySelectorAll('tr[data-id]')].map(tr => Object.fromEntries([['item_id',+tr.dataset.id], ...F.map(f=>[f, num($('.'+f,tr).value)])]));
+      $('#post').disabled = true;
+      try { await rpc('post_return', { p_van_day:id, p_end_km:+$('#km').value||null, p_unload_temp:$('#tp').value===''?null:+$('#tp').value,
+              p_carton_small:+$('#cs').value||0, p_carton_big:+$('#cb').value||0, p_lines:ln }); toast('Return posted'); await fill(id); }
+      finally { $('#post') && ($('#post').disabled = false); }
+    };
+  }
+}
+
+// ---------- VAN DAYS ----------
+async function vDays(){
+  if (S.dayId) return vDay(S.dayId);
+  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).order('id'));
+  const cash = days.length ? await q(sb.from('v_van_day_cash').select('*').in('van_day_id', days.map(d => d.id))) : [];
+  $('#v').innerHTML = `<div class="card"><h3>Van days — ${S.date}</h3>${days.length ? `<div class="tw"><table>
+    <tr><th class="l">Salesman</th><th>Van</th><th>Status</th><th>Cash sales</th><th>Credit sales</th><th>Cash to hand over</th><th>Counted</th><th></th></tr>
+    ${days.map(d => { const c = cash.find(x=>x.van_day_id===d.id)||{}; const exp = d.cash_expected ?? c.cash_to_hand_over;
+      return `<tr><td class="l">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)}</td><td>${esc(S.vans.find(v=>v.id===d.van_id)?.van_no||'')}</td>
+      <td><span class="st ${d.status}">${d.status}</span></td><td>${money(c.cash_sales)}</td><td>${money(c.credit_sales)}</td><td>${money(exp)}</td>
+      <td class="${d.cash_counted!=null && Math.abs(d.cash_counted-exp)>0.009?'bad':''}">${d.cash_counted!=null?money(d.cash_counted):''}</td>
+      <td><button data-d="${d.id}">Open</button></td></tr>`; }).join('')}</table></div>` : '<p class="muted">No van days for this date.</p>'}</div>`;
+  $('#v').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { S.dayId = +b.dataset.d; vDays(); });
+}
+
+async function vDay(id){
+  const [day] = await q(sb.from('van_day').select('*').eq('id', id));
+  const closed = day.status === 'CLOSED';
+  const [rec, cash, exps, cols] = await Promise.all([
+    closed ? q(sb.from('day_close_items').select('*').eq('van_day_id', id)) : q(sb.from('v_van_day_items').select('*').eq('van_day_id', id)),
+    q(sb.from('v_van_day_cash').select('*').eq('van_day_id', id)).then(r=>r[0]||{}),
+    q(sb.from('expenses').select('*').eq('van_day_id', id)), q(sb.from('collections').select('*').eq('van_day_id', id))]);
+  if (!S.customers.length) S.customers = await q(sb.from('customers').select('id,itrade_code,name').eq('active', true).order('name'));
+  const editMoney = ['OPEN','LOADED','RETURNED'].includes(day.status) && has('SALESMAN','ACCOUNTANT','ADMIN');
+  const exp = day.cash_expected ?? cash.cash_to_hand_over;
+  const sm = S.staff.find(s=>s.id===day.salesman_id)?.name;
+  const ET = ['FUEL','PARKING','CARTON BIG','CARTON SMALL','SHELF RENT','CREDIT NOTE','OTHER'];
+  const custOpts = `<datalist id="cl">${S.customers.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist>`;
+  const custVal = cid => { const c = S.customers.find(x=>x.id===cid); return c ? (c.itrade_code||'')+' | '+c.name : ''; };
+  const custId = v => S.customers.find(c => (c.itrade_code||'')+' | '+c.name === v)?.id || null;
+
+  $('#v').innerHTML = `<div class="card"><div class="row"><button id="bk">← Back</button><h3 style="margin:0">${esc(sm)} — ${day.business_date}
+      <span class="st ${day.status}">${day.status}</span></h3></div>
+    <p class="muted">KM ${day.start_km??'-'} → ${day.end_km??'-'} · Temp ${day.load_temp??'-'} / ${day.unload_temp??'-'} · Cartons small ${day.carton_small||0}, big ${day.carton_big||0}</p></div>
+
+    <div class="card"><h3>Item reconciliation ${closed?'(frozen at close)':'(live)'}</h3><div class="tw"><table>
+      <tr><th class="l">Item</th><th>Load</th><th>Sale</th><th>GRV</th><th>Good</th><th>Dmg</th><th>Exp</th><th>Wst</th><th>FOC</th><th>Return</th><th>Expected</th><th>Excess</th><th>Short</th><th class="l">Reason</th></tr>
+      ${rec.sort((a,b)=>(item(a.item_id).display_order||0)-(item(b.item_id).display_order||0)).map(r => { const need = num(r.excess)||num(r.short)||r.flag;
+        return `<tr data-i="${r.item_id}"><td class="l">${esc(item(r.item_id).short_name||item(r.item_id).name)}${r.flag?` <span class="warn">${r.flag.replace(/_/g,' ').toLowerCase()}</span>`:''}</td>
+        <td>${num(r.load)}</td><td>${num(r.sale)}</td><td>${num(r.grv)}</td><td>${num(r.good)}</td><td>${num(r.damage)}</td><td>${num(r.expiry)}</td><td>${num(r.waste)}</td><td>${num(r.foc)}</td>
+        <td>${num(r.total_return)}</td><td>${num(r.expected_return)}</td><td class="${num(r.excess)?'bad':''}">${num(r.excess)||''}</td><td class="${num(r.short)?'bad':''}">${num(r.short)||''}</td>
+        <td class="l">${closed ? esc(r.reason||'') : (need && day.status==='SETTLED' ? '<input class="rs" placeholder="Reason required" style="width:100%">' : '')}</td></tr>`; }).join('')}
+    </table></div></div>
+
+    <div class="card"><h3>Cash</h3><div class="tw"><table><tr><th>Cash sales</th><th>Cash returns</th><th>Collections</th><th>Expenses</th><th>Cash to hand over</th><th>Counted</th><th>Difference</th></tr>
+      <tr><td>${money(cash.cash_sales)}</td><td>${money(cash.cash_returns)}</td><td>${money(cash.collections)}</td><td>${money(cash.expenses)}</td><td><b>${money(exp)}</b></td>
+      <td>${day.cash_counted!=null?money(day.cash_counted):''}</td><td class="bad">${day.cash_counted!=null&&Math.abs(day.cash_counted-exp)>0.009?money(day.cash_counted-exp):''}</td></tr></table></div></div>
+
+    <div class="card"><h3>Expenses</h3>${custOpts}<div id="ex"></div>${editMoney?'<div class="row" style="margin-top:6px"><button id="exa">+ Add</button><button class="p" id="exs">Save expenses</button></div>':''}</div>
+    <div class="card"><h3>Collections</h3><div id="co"></div>${editMoney?'<div class="row" style="margin-top:6px"><button id="coa">+ Add</button><button class="p" id="cos">Save collections</button></div>':''}</div>
+
+    <div class="card"><div class="row">
+      ${day.status==='RETURNED' && has('ACCOUNTANT','ADMIN') ? `<label>Cash counted<input type="number" step="0.01" id="cc" style="width:120px"></label><button class="p" id="settle">Settle cash</button>` : ''}
+      ${day.status==='SETTLED' && has('ACCOUNTANT','ADMIN') ? `<button class="p" id="close">Close day</button>` : ''}
+      ${['SETTLED','CLOSED'].includes(day.status) && has('ADMIN') ? `<input id="rr" placeholder="Reason to reopen" style="min-width:220px"><button class="d" id="reopen">Reopen</button>` : ''}
+    </div></div>`;
+
+  const exRow = e => `<div class="row er"><select class="t" ${editMoney?'':'disabled'}>${ET.map(t=>`<option ${t===e.expense_type?'selected':''}>${t}</option>`).join('')}</select>
+      <input type="number" step="0.01" class="a" value="${e.amount??''}" ${editMoney?'':'disabled'} style="width:100px">
+      <input class="c" list="cl" placeholder="Customer (shelf rent / credit note)" value="${esc(custVal(e.customer_id))}" ${editMoney?'':'disabled'} style="min-width:240px">
+      <input class="n" placeholder="Note" value="${esc(e.note||'')}" ${editMoney?'':'disabled'}></div>`;
+  const coRow = c => `<div class="row cr"><input class="r" placeholder="Receipt no" value="${esc(c.receipt_no||'')}" ${editMoney?'':'disabled'} style="width:110px">
+      <input class="i" placeholder="Invoice no" value="${esc(c.invoice_no||'')}" ${editMoney?'':'disabled'} style="width:150px">
+      <input class="c" list="cl" placeholder="Customer" value="${esc(custVal(c.customer_id))}" ${editMoney?'':'disabled'} style="min-width:240px">
+      <select class="m" ${editMoney?'':'disabled'}>${['CASH','CHEQUE','TRANSFER'].map(m=>`<option ${m===c.mode?'selected':''}>${m}</option>`).join('')}</select>
+      <input type="number" step="0.01" class="a" value="${c.amount??''}" ${editMoney?'':'disabled'} style="width:100px"></div>`;
+  $('#ex').innerHTML = exps.map(exRow).join('') || (editMoney ? '' : '<p class="muted">None</p>');
+  $('#co').innerHTML = cols.map(coRow).join('') || (editMoney ? '' : '<p class="muted">None</p>');
+  $('#bk').onclick = () => { S.dayId = null; vDays(); };
+  if (editMoney) {
+    $('#exa').onclick = () => $('#ex').insertAdjacentHTML('beforeend', exRow({expense_type:'FUEL'}));
+    $('#coa').onclick = () => $('#co').insertAdjacentHTML('beforeend', coRow({mode:'CASH'}));
+    $('#exs').onclick = async () => {
+      const ln = [...$('#ex').querySelectorAll('.er')].map(r => ({ expense_type:$('.t',r).value, amount:num($('.a',r).value), customer_id:custId($('.c',r).value), note:$('.n',r).value }));
+      await rpc('save_expenses', { p_van_day:id, p_lines:ln }); toast('Expenses saved'); vDay(id);
+    };
+    $('#cos').onclick = async () => {
+      const ln = [...$('#co').querySelectorAll('.cr')].map(r => ({ receipt_no:$('.r',r).value, invoice_no:$('.i',r).value, customer_id:custId($('.c',r).value), mode:$('.m',r).value, amount:num($('.a',r).value) }));
+      if (ln.some(l => l.amount && (!l.receipt_no || !l.customer_id))) return toast('Each collection needs receipt no and a customer from the list', false);
+      await rpc('save_collections', { p_van_day:id, p_lines:ln }); toast('Collections saved'); vDay(id);
+    };
+  }
+  $('#settle') && ($('#settle').onclick = async () => {
+    if ($('#cc').value === '') return toast('Enter cash counted', false);
+    const r = await rpc('settle_day', { p_van_day:id, p_cash_counted:num($('#cc').value) });
+    toast('Settled. Difference ' + money(r.difference), Math.abs(r.difference) < 0.01); vDay(id);
+  });
+  $('#close') && ($('#close').onclick = async () => {
+    const reasons = Object.fromEntries([...$('#v').querySelectorAll('tr[data-i]')].filter(tr=>$('.rs',tr)).map(tr => [tr.dataset.i, $('.rs',tr).value.trim()]));
+    await rpc('close_day', { p_van_day:id, p_reasons:reasons }); toast('Day closed'); vDay(id);
+  });
+  $('#reopen') && ($('#reopen').onclick = async () => {
+    if (!$('#rr').value.trim()) return toast('Enter the reason to reopen', false);
+    await rpc('reopen_day', { p_van_day:id, p_reason:$('#rr').value.trim() }); toast('Reopened'); vDay(id);
+  });
+}
+
+// ---------- SALES IMPORT ----------
+async function vImport(){
+  $('#v').innerHTML = `<div class="card"><h3>Sales import (iTrade Periodical Sales Detailed Report)</h3>
+    <p class="muted">Export the report from iTrade for the dates you want (Excel or CSV) and choose the file. Each branch (MGAZ / MGT) is imported separately.
+    Invoices already imported are skipped. Invoices missing from the file for its dates are marked cancelled.</p>
+    <div class="row"><input type="file" id="f" accept=".xlsx,.xls,.csv"><button class="p" id="go" disabled>Import</button></div><div id="out"></div></div>`;
+  let rows = [];
+  $('#f').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates:true });
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'', raw:true });
+    const MON = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+    const iso = v => { if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+      const s = String(v).trim(); let m;
+      if ((m = s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[-\/ ](\d{4})/))) return `${m[3]}-${String(MON[m[2].toLowerCase()]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[0]; return null; };
+    rows = raw.map(r => Object.fromEntries(Object.entries(r).map(([k,v]) => [k.trim(), v])))
+      .filter(r => r['Invoice No'] && r['Item Code'])
+      .map(r => ({ ...r, 'Tran Date': iso(r['Tran Date']), 'Item Code': String(r['Item Code']).trim(), 'Head No': String(r['Head No']||'').trim(),
+                   ...Object.fromEntries(['Qty','Rate','Gross','Disc','Net','VAT','Net Incl VAT','Profit','CF'].map(k => [k, num(r[k])])) }));
+    const bad = rows.filter(r => !r['Tran Date']).length;
+    const by = branchSplit(rows);
+    $('#out').innerHTML = `<p>${rows.length} lines read${bad?` — <span class="bad">${bad} with unreadable date</span>`:''}. ${Object.entries(by).map(([b,r])=>`${b}: ${r.length}`).join(' · ')}</p>`;
+    $('#go').disabled = !rows.length || bad > 0;
+  };
+  const branchSplit = rs => rs.reduce((a,r) => { const b = String(r['Invoice No']).split('-')[0].toUpperCase(); (a[b] ||= []).push(r); return a; }, {});
+  $('#go').onclick = async () => {
+    $('#go').disabled = true; const out = [];
+    try {
+      for (const [code, rs] of Object.entries(branchSplit(rows))) {
+        const br = S.branches.find(b => b.code === code);
+        if (!br) { out.push(`<p class="bad">${esc(code)}: unknown branch prefix, skipped</p>`); continue; }
+        const r = await rpc('import_sales', { p_branch:br.id, p_rows:rs, p_full_export:true });
+        out.push(`<div class="card"><b>${esc(br.name)}</b> ${r.from} to ${r.to}<br>Lines ${r.rows} · new ${r.new} · already there ${r.already_there} · cancelled ${r.cancelled}
+          · new customers ${r.new_customers} · customers moved ${r.customers_moved}
+          ${r.unknown_items?`<br><span class="bad">Unknown items: ${esc(r.unknown_items)}</span>`:''}
+          ${r.not_salesman_sales_executives?`<br><span class="muted">Not a salesman (store/office sales): ${esc(r.not_salesman_sales_executives)}</span>`:''}</div>`);
+      }
+      toast('Import finished');
+    } finally { $('#out').innerHTML += out.join(''); }
+  };
+}
+
+// ---------- REQUIREMENT ----------
+async function vRequirement(){
+  const isSm = S.me.role === 'SALESMAN';
+  S.rsm = isSm ? S.me.id : S.rsm; S.rdate = S.rdate || today(1);
+  $('#v').innerHTML = `<div class="card"><h3>Requirement (cartons)</h3><div class="row">
+    ${isSm ? '' : `<label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.rsm)}</select></label>`}
+    <label>For date<input type="date" id="rd" value="${S.rdate}"></label></div><div id="g"></div></div>`;
+  $('#sm') && ($('#sm').onchange = e => { S.rsm = +e.target.value || null; fill(); });
+  $('#rd').onchange = e => { S.rdate = e.target.value; fill(); };
+  async function fill(){
+    if (!S.rsm) { $('#g').innerHTML=''; return; }
+    const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.rsm).eq('required_date', S.rdate));
+    $('#g').innerHTML = `<div class="tw"><table><tr><th class="l">Item</th><th>Cartons</th></tr>${sellItems().map(it => `<tr data-id="${it.id}"><td class="l">${esc(it.short_name||it.name)}</td>
+      <td><input type="number" min="0" step="0.5" value="${req.find(r=>r.item_id===it.id)?.qty_cartons ?? ''}"></td></tr>`).join('')}</table></div>
+      <div class="row" style="margin-top:8px"><button class="p" id="sv">Save requirement</button></div>`;
+    $('#sv').onclick = async () => {
+      const ln = [...$('#g').querySelectorAll('tr[data-id]')].map(tr => ({ item_id:+tr.dataset.id, qty_cartons:num($('input',tr).value) })).filter(x=>x.qty_cartons>0);
+      await rpc('save_requirement', { p_salesman:S.rsm, p_date:S.rdate, p_lines:ln }); toast('Requirement saved');
+    };
+  }
+  await fill();
+}
+</script>
+</body>
+</html>
