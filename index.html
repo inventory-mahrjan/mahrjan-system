@@ -89,6 +89,7 @@
   .cosel summary::-webkit-details-marker{display:none} .cosel summary::after{content:'▾';position:absolute;right:10px;color:var(--muted)}
   .cosel>div{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line2);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:6px;min-width:150px}
   .cosel>div label{display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer;flex-direction:row}
+  .udlg{border:1px solid var(--line2);border-radius:10px;padding:22px;width:min(440px,92vw)} .udlg form{display:flex;flex-direction:column;gap:10px} .udlg label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)} .udlg::backdrop{background:rgba(0,0,0,.3)}
   .os{border-collapse:collapse;font-size:12.5px;width:100%} .os td{border:1px solid #d9dcd6;padding:4px 7px;white-space:nowrap} .os td.n{text-align:right;font-family:'IBM Plex Mono',monospace}
   .os tr.h td{background:var(--accent-ink);color:#fff;font-weight:600} .os tr.b td{font-weight:600} .os tr.t td{background:var(--soft);font-weight:600;color:var(--accent-ink)} .os tr.g td{border:0;height:10px} .os tr.s td{border:0;padding-top:34px}
   .rtabs{display:flex;gap:6px;flex-wrap:wrap} .rtabs button.on{background:var(--accent-ink);color:#fff;border-color:var(--accent-ink)}
@@ -209,7 +210,7 @@ function tabsFor(){
   G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
-  if (has('ADMIN')) t.push(['stf','Staff & access','Admin'], ['acc','Role access','Admin']);
+  if (has('ADMIN')) t.push(['stf','Users','Admin'], ['acc','Role access','Admin']);
   G('Admin', ['dc','Data check']);
   if (!t.length) t.push(['none','No access','']);
   return t;
@@ -227,7 +228,7 @@ function render(){
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
-    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', stf:'Roles, branch and login access for each staff member.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
+    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
@@ -990,20 +991,55 @@ async function vPetty(){
 
 // ---------- STAFF (admin) ----------
 async function vStaff(){
-  loading(); const st = await q(sb.from('staff').select('*').order('name'));
-  const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','PACKER','VIEWER'];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Staff and access</h3>${tools()}</div>
-    <div class="notice" style="margin-bottom:12px">To give someone a login: Supabase → Authentication → Add user, email <b>name${EMAIL_DOMAIN}</b> (as written here, lowercase, spaces removed). It links to the staff record automatically when "Can log in" is ticked.</div>
-    <div class="tw"><table><tr><th class="l">Name</th><th>Role</th><th>Branch</th><th>Can log in</th><th>Active</th><th></th></tr>
-    ${st.map(s => `<tr data-s="${s.id}"><td class="l">${esc(s.name)}</td><td><select data-k="role">${roles.map(r => `<option ${r===s.role?'selected':''}>${r}</option>`).join('')}</select></td>
-      <td><select data-k="branch_id"><option value="">Both</option>${S.branches.map(b => `<option value="${b.id}" ${b.id===s.branch_id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></td>
-      <td><input type="checkbox" data-k="can_login" ${s.can_login?'checked':''}></td><td><input type="checkbox" data-k="active" ${s.active?'checked':''}></td><td><button data-sv="${s.id}">Save</button></td></tr>`).join('')}</table></div></div>`;
-  $('#v').querySelectorAll('[data-sv]').forEach(b => b.onclick = async () => { const tr = b.closest('tr'), v = k => tr.querySelector(`[data-k="${k}"]`);
-    await q(sb.from('staff').update({ role:v('role').value, branch_id:v('branch_id').value ? +v('branch_id').value : null, can_login:v('can_login').checked, active:v('active').checked }).eq('id', +tr.dataset.s));
-    toast('Saved ' + tr.cells[0].textContent); });
-  bindTools('Staff', [['Staff', [{k:'name',l:'Name'},{k:'role',l:'Role'},{l:'Branch',f:s=>S.branches.find(b=>b.id===s.branch_id)?.name||'Both'},{l:'Can log in',f:s=>s.can_login?'Yes':'No'},{l:'Active',f:s=>s.active?'Yes':'No'}], st]]);
-}
+  // Users (like the old portal's Users page): add, edit, disable, set or reset the password.
+  loading(); let list;
+  try { list = await rpc('admin_user_list', {}); }
+  catch (e) { $('#v').innerHTML = `<div class="card"><div class="notice">The Users page is not installed in the database yet. Run <b>docs/sql/USER ADMIN - CREATE.sql</b> in the Supabase SQL editor once.</div><p class="muted">${esc(e.message||e)}</p></div>`; return; }
+  const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
+  const co = id => id == null ? 'Both' : (S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz');
+  S.uq = S.uq || '';
+  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + (u.username||'') + ' ' + (u.itrade_name||'')).toUpperCase().includes(S.uq.toUpperCase()));
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addu">Add user</button><label>Search<input id="uq" value="${esc(S.uq)}" placeholder="Name, role…"></label></div>${tools()}</div>
+    <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th>Company</th><th class="l">iTrade name</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
+    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(u.role)}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.itrade_name||'')}</td>
+      <td>${u.role === 'PACKER' ? '—' : u.has_login ? 'Yes' : '<span class="bad">No</span>'}</td><td>${u.last_sign_in ? esc(new Date(u.last_sign_in).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : ''}</td>
+      <td>${u.active ? 'Yes' : '<span class="bad">Disabled</span>'}</td><td><button data-ed="${u.id}">Edit</button></td></tr>`).join('')}</table></div>
+    <p class="muted" style="margin-top:8px">Username = name in small letters without spaces. The same username and password work in the app and the portal. Disabled users cannot sign in.</p></div>`;
+  $('#uq').oninput = e => { S.uq = e.target.value; const c = e.target.selectionStart; vStaff().then(() => { const i = $('#uq'); if (i) { i.focus(); i.setSelectionRange(c, c); } }); };
+  $('#addu').onclick = () => userDialog(null);
+  $('#v').querySelectorAll('[data-ed]').forEach(b => b.onclick = () => userDialog(list.find(u => u.id === +b.dataset.ed)));
+  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{k:'role',l:'Role'},{l:'Company',f:u=>co(u.branch_id)},{k:'itrade_name',l:'iTrade name'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
 
+  function userDialog(u){
+    const d = document.createElement('dialog'); d.className = 'udlg';
+    d.innerHTML = `<form method="dialog"><h3 style="margin-top:0">${u ? 'Edit user · ' + esc(u.name) : 'Add user'}</h3>
+      <label>Name<input name="name" required value="${esc(u?.name||'')}" autocomplete="off"></label>
+      <label>Role<select name="role">${roles.map(r => `<option ${r===(u?.role||'SALESMAN')?'selected':''}>${r}</option>`).join('')}</select></label>
+      <label>Company<select name="br"><option value="">Both</option>${S.branches.slice().sort((x,y)=>x.code==='MGAZ'?-1:1).map(b => `<option value="${b.id}" ${(u ? u.branch_id===b.id : b.id===S.br)?'selected':''}>${co(b.id)}</option>`).join('')}</select></label>
+      <label class="itr">iTrade Sales Executive name<input name="itrade" value="${esc(u?.itrade_name||'')}" autocomplete="off"></label>
+      <label>Email (for reports)<input name="email" type="email" value="${esc(u?.email||'')}" autocomplete="off"></label>
+      <label class="pw">${u && u.has_login ? 'New password (leave empty to keep)' : 'Password'}<input name="pw" type="password" autocomplete="new-password"></label>
+      <label class="pw">Confirm password<input name="pw2" type="password" autocomplete="new-password"></label>
+      <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="active" ${!u || u.active ? 'checked' : ''}> Active (can sign in)</label>
+      <p class="muted un"></p><p class="bad st"></p>
+      <div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="usv" value="ok">Save</button></div></form>`;
+    document.body.append(d);
+    const f = d.querySelector('form'), sync = () => { const pk = f.role.value === 'PACKER', sm = f.role.value === 'SALESMAN';
+      d.querySelectorAll('.pw').forEach(x => x.hidden = pk); d.querySelector('.itr').hidden = !sm;
+      d.querySelector('.un').textContent = pk ? 'Packers do not sign in.' : 'Username: ' + (f.name.value.toLowerCase().replace(/[^a-z0-9]/g, '') || '…'); };
+    f.role.onchange = sync; f.name.oninput = sync; sync();
+    d.querySelector('#usv').onclick = async ev => { ev.preventDefault(); const st = d.querySelector('.st'); st.textContent = '';
+      if (f.pw.value !== f.pw2.value) { st.textContent = 'The two passwords are not the same.'; return; }
+      if (!u && f.role.value !== 'PACKER' && !f.pw.value) { st.textContent = 'Type a password for the new user.'; return; }
+      ev.target.disabled = true;
+      try { const r = await rpc('admin_user_save', { p_id: u ? u.id : null, p_name: f.name.value, p_role: f.role.value, p_branch: f.br.value ? +f.br.value : null,
+          p_itrade: f.role.value === 'SALESMAN' ? f.itrade.value : (u?.itrade_name || ''), p_email: f.email.value, p_active: f.active.checked, p_password: f.role.value === 'PACKER' ? null : (f.pw.value || null) });
+        d.close(); d.remove(); toast((u ? 'Saved ' : 'Added ') + r.name + (r.username ? ' · username ' + r.username : ''));
+        S.staff = await q(sb.from('staff').select('id,name,role,branch_id,active').order('name')); vStaff(); }
+      catch (e) { st.textContent = e.message || String(e); ev.target.disabled = false; } };
+    d.addEventListener('close', () => d.remove()); d.showModal(); f.name.focus();
+  }
+}
 
 // ---------- ROLE ACCESS (ADMIN) ----------
 async function vAccess(){
