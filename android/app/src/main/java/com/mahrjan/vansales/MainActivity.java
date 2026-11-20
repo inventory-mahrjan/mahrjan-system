@@ -39,6 +39,17 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
                 if (HOST.equals(u.getHost())) return false;            // our pages stay in the app
+                String url = u.toString();
+                if (url.startsWith("intent:")) {                         // slip printing: the app hands the slip to RawBT
+                    try {
+                        Intent it = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                        it.addCategory(Intent.CATEGORY_BROWSABLE); it.setComponent(null); it.setSelector(null);
+                        startActivity(it);
+                    } catch (Exception e) {
+                        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=ru.a402d.rawbtprinter"))); } catch (Exception x) { }
+                    }
+                    return true;
+                }
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { }
                 return true;                                             // WhatsApp, maps, other sites open outside
             }
