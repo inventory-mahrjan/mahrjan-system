@@ -25,7 +25,7 @@
   /* shell */
   .sidebar{width:232px;position:fixed;inset:0 auto 0 0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 14px 18px;overflow:auto}
   .brand{display:flex;flex-direction:column;gap:8px;padding:0 8px 10px;font-weight:600;font-size:15px}
-  .brandlogo{height:46px;width:auto;border-radius:7px;display:block}
+  .brandlogo{height:46px;width:auto;max-width:100%;border-radius:7px;display:block;align-self:flex-start;object-fit:contain}
   .brand small{display:block;font-size:10.5px;font-weight:400;color:var(--muted);letter-spacing:.02em;margin-top:2px}
   nav{display:flex;flex-direction:column;gap:1px}
   .navlabel{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:16px 10px 6px}
@@ -234,7 +234,7 @@ async function vLoading(){
   const v = $('#v');
   v.innerHTML = `<div class="card"><h3>Loading (board) — ${S.date}</h3>
     <div class="row"><label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.lsm)}</select></label>
-      <label>Van<select id="van"><option value="">-</option>${S.vans.filter(x => x.branch_id === S.br).map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
+      <label>Van (plate no.)<select id="van"><option value="">Select van</option>${S.vans.filter(x => x.branch_id === S.br).map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
       <label>Start KM<input type="number" id="km" style="width:110px"></label>
       <label>Load temp<input type="number" id="tp" step="0.1"></label></div><div id="g"></div></div>`;
   $('#sm').onchange = async e => { S.lsm = +e.target.value || null; await fill(); };
@@ -244,6 +244,8 @@ async function vLoading(){
     const lines = day ? await q(sb.from('loading_lines').select('item_id,qty').eq('van_day_id', day.id)) : [];
     const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.lsm).eq('required_date', S.date));
     if (day) { $('#van').value = day.van_id || ''; $('#km').value = day.start_km ?? ''; $('#tp').value = day.load_temp ?? ''; }
+    else { const [prev] = await q(sb.from('van_day').select('van_id,end_km').eq('salesman_id', S.lsm).lt('business_date', S.date).not('van_id', 'is', null).order('business_date', { ascending:false }).limit(1));
+      $('#van').value = prev?.van_id || ''; $('#km').value = prev?.end_km ?? ''; }   // his last van and its last KM
     const locked = day && !['OPEN','LOADED'].includes(day.status);
     const rows = sellItems().map(it => {
       const l = lines.find(x => x.item_id === it.id), r = req.find(x => x.item_id === it.id);
@@ -521,6 +523,48 @@ async function vStock(){
 }
 
 // ---------- I TRADE ENTRY (what to post in iTrade for the day: production, unwrap, broken, wastage) ----------
+// ---------- iTrade Store Issue files (same as the old portal): one .txt per salesman, all in one zip ----------
+// Line: SITE,BARCODE,,QTY (CRLF).  LOADING = issue to van: boarded qty less what the store billed for him that day;
+// raw egg = only what he billed himself.  RETURN = issue from van: good + damage + expiry + waste + FOC; raw egg = his own sales return.
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function makeZip(files){   // [{name, text}] -> Blob (stored, no compression)
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const le = (n, b) => { const a = new Uint8Array(b); for (let i = 0; i < b; i++) a[i] = (n >>> (8*i)) & 255; return a; };
+  files.forEach(f => { const nm = enc.encode(f.name), data = enc.encode(f.text), c = crc32(data);
+    const head = [le(0x04034b50,4), le(20,2), le(0,2), le(0,2), le(0,2), le(0x21,2), le(c,4), le(data.length,4), le(data.length,4), le(nm.length,2), le(0,2), nm];
+    const len = head.reduce((a,x) => a + x.length, 0) + data.length; parts.push(...head, data);
+    cen.push(le(0x02014b50,4), le(20,2), le(20,2), le(0,2), le(0,2), le(0,2), le(0x21,2), le(c,4), le(data.length,4), le(data.length,4), le(nm.length,2), le(0,2), le(0,2), le(0,2), le(0,2), le(0,4), le(off,4), nm);
+    off += len; });
+  const cl = cen.reduce((a,x) => a + x.length, 0);
+  return new Blob([...parts, ...cen, le(0x06054b50,4), le(0,2), le(0,2), le(files.length,2), le(files.length,2), le(cl,4), le(off,4), le(0,2)], { type:'application/zip' });
+}
+async function itradeZip(kind){
+  const br = S.branches.find(b => b.id === S.br) || {}, site = br.code || 'MGAZ', tag = site === 'MGT' ? 'AJMAN' : 'ALQUOZ';
+  const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'], p = S.date.split('-'), day = p[2] + ' ' + M[+p[1]-1] + ' ' + p[0];
+  const [days, st, sl] = await Promise.all([q(sb.from('van_day').select('id,salesman_id').eq('branch_id', S.br).eq('business_date', S.date)),
+    q(sb.from('staff').select('id,name,itrade_name').eq('branch_id', S.br)),
+    fetchAll(() => sb.from('sales_lines').select('salesman_id,itrade_user,item_id,tran_type,qty').eq('branch_id', S.br).eq('tran_date', S.date).eq('cancelled', false))]);
+  const lines = days.length ? await byIds(kind === 'LOADING' ? 'loading_lines' : 'return_lines', '*', 'van_day_id', days.map(d => d.id)) : [];
+  const own = (r, s) => !r.itrade_user || !s.itrade_name || r.itrade_user.trim().toUpperCase() === s.itrade_name.trim().toUpperCase();
+  const code = it => it.barcode || it.itrade_code, files = [];
+  st.forEach(s => {
+    const dm = days.filter(d => d.salesman_id === s.id).map(d => d.id), q1 = {};
+    lines.filter(l => dm.includes(l.van_day_id)).forEach(l => { const it = item(l.item_id); if (it.item_type === 'RAW_EGG') return;
+      q1[l.item_id] = (q1[l.item_id] || 0) + (kind === 'LOADING' ? num(l.qty) : num(l.good) + num(l.damage) + num(l.expiry) + num(l.waste) + num(l.foc)); });
+    sl.filter(r => r.salesman_id === s.id && r.item_id).forEach(r => { const it = item(r.item_id), mine = own(r, s);
+      if (it.item_type === 'RAW_EGG') { if (mine && (kind === 'LOADING' ? r.tran_type === 'CR' : r.tran_type !== 'CR')) q1[r.item_id] = (q1[r.item_id] || 0) + Math.abs(num(r.qty)); }
+      else if (kind === 'LOADING' && !mine && r.tran_type === 'CR') q1[r.item_id] = (q1[r.item_id] || 0) - num(r.qty); });   // billed by the store: already moved
+    const L = Object.entries(q1).map(([id, v]) => [item(+id), Math.round(v * 1000) / 1000]).filter(([it, v]) => v > 0 && code(it))
+      .sort((a,b) => (a[0].display_order||0) - (b[0].display_order||0)).map(([it, v]) => `${site},${code(it)},,${v}`);
+    if (L.length) files.push({ name:`${s.name.replace(/[\\\/:*?"<>|]+/g,' ').trim().toUpperCase()}_${kind}_${day}.txt`, text:L.join('\r\n') + '\r\n' });
+  });
+  if (!files.length) return toast(`No ${kind.toLowerCase()} found for ${day}.`, false);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(makeZip(files)); a.download = `${tag} ${kind} ${day}.zip`; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast(`Downloaded ${a.download} · ${files.length} salesman file${files.length === 1 ? '' : 's'}`);
+}
+
 async function vItrade(){
   S.ito = S.ito && S.ito >= S.date ? S.ito : S.date;
   const [bs, days] = await Promise.all([
@@ -543,7 +587,7 @@ async function vItrade(){
   const open = bs.filter(b => b.status === 'ISSUED').length;
   S.itx = sec;
   $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
-      <button class="p" id="xl">Download Excel</button>
+      <button class="p" id="xl">Download Excel</button>${canE('imp') ? '<button id="zl">Loading zip (Store Issue)</button><button id="zr">Return zip (Store Issue)</button>' : ''}
       <span class="muted">${closed.length} closed batch(es), ${days.length} van day(s).${open ? ` <b class="bad">${open} batch(es) still open — not included.</b>` : ''}</span></div></div>
     ${sec.map(([t, sub, m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
       const tot = c => ids.reduce((a,id) => a + num(m[id][c]), 0), multi = cols.length > 1;
@@ -553,6 +597,7 @@ async function vItrade(){
           ${cols.map(c => `<td>${num(m[id][c]) || ''}</td>`).join('')}${multi?`<td><b>${cols.reduce((a,c)=>a+num(m[id][c]),0)}</b></td>`:''}</tr>`; }).join('')}
         <tr class="tot"><td class="l">Total</td><td></td>${cols.map(c => `<td>${tot(c)}</td>`).join('')}${multi?`<td>${cols.reduce((a,c)=>a+tot(c),0)}</td>`:''}</tr></table></div>` : '<p class="muted">Nothing for this period.</p>'}</div>`; }).join('')}`;
   $('#to').onchange = e => { S.ito = e.target.value; vItrade(); };
+  $('#zl') && ($('#zl').onclick = () => itradeZip('LOADING')); $('#zr') && ($('#zr').onclick = () => itradeZip('RETURN'));
   $('#xl').onclick = async () => {
     const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm'), wb = XLSX.utils.book_new(), brn = S.branches.find(b => b.id === S.br)?.name || '';
     sec.forEach(([t, , m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
