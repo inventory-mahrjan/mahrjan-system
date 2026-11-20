@@ -252,21 +252,16 @@ function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','sc','pc'].in
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
 
-// ---------- quantity grid (cartons + loose) ----------
+// ---------- quantity grid (one Qty per item, no carton conversion) ----------
 function qtyGrid(rows){   // rows: [{it, qty, hint}]
-  return `<div class="tw"><table><tr><th class="l">Item</th><th>Ctn</th><th>Loose</th><th>Total</th><th class="muted">Ref</th></tr>
-    ${rows.map(({it,qty,hint}) => { const s = split(it, qty); return `<tr data-id="${it.id}">
+  return `<div class="tw"><table><tr><th class="l">Item</th><th>Qty</th><th class="muted">Ref</th></tr>
+    ${rows.map(({it,qty,hint}) => `<tr data-id="${it.id}">
       <td class="l">${esc(it.short_name || it.name)}</td>
-      <td><input type="number" min="0" step="1" class="c" value="${s.c||''}"></td>
-      <td><input type="number" min="0" step="1" class="r" value="${s.r||''}"></td>
-      <td class="tot">${showQty(it, qty)}</td><td class="muted">${esc(hint||'')}</td></tr>`; }).join('')}</table></div>`;
+      <td><input type="number" min="0" step="1" class="c" value="${num(qty)||''}"></td>
+      <td class="muted">${esc(hint||'')}</td></tr>`).join('')}</table></div>`;
 }
-function bindGrid(root){
-  root.querySelectorAll('tr[data-id]').forEach(tr => tr.oninput = () => {
-    const it = item(+tr.dataset.id); tr.querySelector('.tot').textContent = showQty(it, num($('.c',tr).value)*per(it) + num($('.r',tr).value));
-  });
-}
-const gridValue = tr => { const it=item(+tr.dataset.id); return num($('.c',tr).value)*per(it) + num($('.r',tr).value); };
+function bindGrid(root){}
+const gridValue = tr => num($('.c',tr).value);
 
 // ---------- LOADING ----------
 async function vLoading(){
@@ -288,7 +283,7 @@ async function vLoading(){
     const locked = day && !['OPEN','LOADED'].includes(day.status);
     const rows = sellItems().map(it => {
       const l = lines.find(x => x.item_id === it.id), r = req.find(x => x.item_id === it.id);
-      return { it, qty: l ? l.qty : (r && !day ? r.qty_cartons * per(it) : 0), hint: r ? 'Req ' + r.qty_cartons + ' ctn' : '' };
+      return { it, qty: l ? l.qty : 0, hint: r ? 'Req ' + (+r.qty_cartons) : '' };
     });
     $('#g').innerHTML = (day ? `<p class="muted">Status <span class="st ${day.status}">${day.status}</span>${locked ? ' — loading is locked after return' : ''}</p>` : '')
       + qtyGrid(rows) + `<div class="row" style="margin-top:8px"><button class="p" id="post" ${locked?'disabled':''}>Post loading</button></div>`;
