@@ -37,6 +37,11 @@ window.runMig = async () => {
     petty: rows(wb, 'PETTY CASH').map(r => ({ date: ymd(r['CASH DATE'] || r['DATE']), ref: code(r['REF']), party: String(r['PARTICULARS'] || '').trim(), type: String(r['NATURE'] || '').trim().toUpperCase(), amount: n(r['AMOUNT']), note: String(r['NARRATION'] || '').trim(), forDate: ymd(r['FOR DATE']) })).filter(x => x.date && x.amount),
     reqs: []
   };
+  // SUMMARY rows of non-salesmen (nightly store summary) are not van days
+  const { data: sms } = await sb.from('staff').select('name,itrade_name').eq('role', 'SALESMAN');
+  const isSm = x => sms.some(s => [s.name, s.itrade_name].filter(Boolean).some(nm => { const a = nm.toUpperCase(), b = x.toUpperCase(); return a === b || b.startsWith(a + ' '); }));
+  const skipped = [...new Set(D.sums.filter(x => !isSm(x.sm)).map(x => x.sm))]; if (skipped.length) log('Summary rows not loaded (not a salesman): ' + skipped.join(', '));
+  D.sums = D.sums.filter(x => isSm(x.sm));
   // REQUIREMENT is wide: a column per short name
   const { data: items } = await sb.from('items').select('barcode,itrade_code,short_name,name');
   const byShort = Object.fromEntries(items.filter(i => i.short_name).map(i => [i.short_name.toUpperCase(), i.barcode || i.itrade_code]));
