@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mahrjan Sales Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#f6f6f4;--surface:#fff;--ink:#1b1f1e;--muted:#6b7370;--line:#e7e8e4;--line2:#d8dad5;--accent:#0f5f57;--accent-ink:#0c363b;--soft:#eef3f1;--neg:#b0432e;--amb:#a8650f;
+    font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;-webkit-font-smoothing:antialiased}
+  *{box-sizing:border-box} body{margin:0}
+  h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em} h1{font-size:26px} h3{font-size:15px;margin:0 0 12px}
+  button,input,select{font:inherit;font-size:13.5px}
+  button{cursor:pointer;border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:6px;padding:8px 13px;font-weight:500;line-height:1.2;white-space:nowrap}
+  button:hover{background:#f2f3f0} button:disabled{opacity:.45;cursor:default}
+  button.p{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff} button.p:hover{background:#15474d}
+  button.d{color:var(--neg);border-color:var(--neg)}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  input,select{min-width:0;height:36px;padding:0 10px;border:1px solid var(--line2);border-radius:6px;background:#fff;color:var(--ink)}
+  input[type=number]{width:84px;text-align:center;font-family:'IBM Plex Mono',monospace}
+  input[type=file]{height:auto;padding:7px}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px}
+  .row label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
+  /* shell */
+  .sidebar{width:232px;position:fixed;inset:0 auto 0 0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 14px 18px;overflow:auto}
+  .brand{display:flex;flex-direction:column;gap:8px;padding:0 8px 10px;font-weight:600;font-size:15px}
+  .brandlogo{height:46px;width:auto;max-width:100%;border-radius:7px;display:block;align-self:flex-start;object-fit:contain}
+  .brand small{display:block;font-size:10.5px;font-weight:400;color:var(--muted);letter-spacing:.02em;margin-top:2px}
+  nav{display:flex;flex-direction:column;gap:1px}
+  .navlabel{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:16px 10px 6px}
+  nav button{border:0;background:none;text-align:left;padding:8px 10px;border-radius:6px;color:#3c4442;font-weight:400;width:100%}
+  nav button:hover{background:#f3f4f1} nav button.on{background:var(--soft);color:var(--accent-ink);font-weight:600}
+  .sidebar-bottom{margin-top:auto;border-top:1px solid var(--line);padding:14px 8px 0;display:flex;flex-direction:column;gap:10px}
+  .who{display:flex;flex-direction:column;gap:2px;font-size:13px} .who span{color:var(--muted);font-size:12px}
+  main{margin-left:232px;padding:32px 40px 40px;max-width:1500px;display:flex;flex-direction:column;gap:20px}
+  .top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .top label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
+  #v{display:flex;flex-direction:column;gap:20px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px}
+  /* tables: light green heading row, thin lines, numbers centred */
+  .tw{overflow:auto;border:1px solid var(--line);border-radius:8px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{position:sticky;top:0;background:#e8f3ee;font-weight:500;color:var(--accent-ink);font-size:12px;border-bottom:1px solid var(--line2);padding:9px 12px;white-space:nowrap;text-align:center}
+  td{padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}
+  th+th,td+td{border-left:1px solid var(--line)}
+  td.l,th.l{text-align:left}
+  tbody tr:hover td,tr:hover td{background:#fafbf9}
+  .st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;background:#eef0ec;color:#3c4442}
+  .st.LOADED{background:#e6eef8;color:#1f4f86}.st.RETURNED{background:#fbf0de;color:var(--amb)}.st.SETTLED{background:#efe8f6;color:#5b3c86}.st.CLOSED{background:var(--soft);color:var(--accent-ink)}
+  .bad{color:var(--neg);font-weight:600} tr.tot td{font-weight:700;background:#f4f7f2}.warn{color:var(--amb);font-size:12px}
+  .muted{color:var(--muted);font-size:12.5px}
+  .msg{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:8px;color:#fff;z-index:9;max-width:90%;font-size:13.5px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+  .msg.ok{background:var(--accent-ink)}.msg.er{background:var(--neg)}
+  /* login */
+  .login-wrap{min-height:100vh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr)}
+  .login-side{background:var(--accent-ink);color:#fff;padding:44px 48px;display:flex;flex-direction:column;justify-content:space-between;gap:40px}
+  .login-side .brandlogo{height:72px;border-radius:10px}
+  .login-side .brand small{color:#9fbdb9}
+  .login-side h2{font-size:30px;font-weight:500;line-height:1.25;max-width:440px}
+  .login-side p{color:#c3d6d3;font-size:14px;max-width:400px;line-height:1.6;margin-top:14px}
+  .login-side>small{color:#9fbdb9;font-size:12px}
+  .login-main{display:grid;place-items:center;padding:40px}
+  .login-card{width:min(380px,100%);display:flex;flex-direction:column;gap:14px}
+  .login-card h1{font-size:24px} .login-card .lead{color:var(--muted);font-size:14px;margin:-8px 0 12px}
+  .login-card label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
+  .login-card input,.login-card button{height:40px;width:100%}
+  @media (max-width:900px){
+    .sidebar{position:static;width:auto;border-right:0;border-bottom:1px solid var(--line);padding:12px}
+    nav{flex-direction:row;flex-wrap:wrap}.navlabel{display:none}nav button{width:auto}
+    .sidebar-bottom{flex-direction:row;flex-wrap:wrap;align-items:center}
+    main{margin:0;padding:16px}.login-wrap{grid-template-columns:1fr}.login-side{display:none}
+  }
+  main>header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .eyebrow{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  #subtitle{color:var(--muted);margin-top:6px;font-size:14px}
+  .header-actions{display:flex;gap:8px;align-items:flex-end}
+  .header-actions label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
+  .card>h3,.card .row>h3{font-size:15px;margin:0 0 16px}
+  .card>.muted:first-of-type{margin-top:-10px}
+  footer{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding-top:8px}
+  .notice{font-size:13px;color:#5f5233;background:#faf6ea;border:1px solid #efe5c8;border-radius:8px;padding:10px 14px;line-height:1.5}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+  .kpi span{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.kpi b{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}.kpi small{color:var(--muted);font-size:12px}
+  .sheet-head{display:flex;justify-content:space-between;border-bottom:2px solid var(--accent-ink);padding-bottom:6px;margin-bottom:8px;font-size:14px}
+  .signs{display:flex;justify-content:space-between;gap:20px;margin-top:46px}.signs span{flex:1;border-top:1px solid var(--ink);padding-top:6px;text-align:center;font-size:12px;color:var(--muted)}
+  @media print{ @page{size:A4;margin:10mm} body{background:#fff} .sidebar,.header-actions,.noprint,footer,.msg,#xl,#pr{display:none!important}
+    main{margin:0;padding:0;max-width:none;gap:10px} .card{border:0;padding:0} .sheet{break-after:page} .tw{overflow:visible;border:0;max-height:none!important}
+    table{font-size:10.5px} th,td{padding:4px 6px} th{position:static;-webkit-print-color-adjust:exact;print-color-adjust:exact} input,select{border:0;padding:0} }
+  .link-btn{border:0;background:none;color:var(--muted);padding:0;text-decoration:underline;text-underline-offset:2px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const LOGO = 'data:image/jpeg;base64,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';
+const SB_URL = 'https://xhndwjkqfqmmpfcglqzu.supabase.co';
+const SB_KEY = 'sb_publishable_emOqI1PWaSA7B5s56v-ERg_RrxZ9weu';   // public key; data is protected by access rules
+const EMAIL_DOMAIN = '@mahrjan.app';
+const sb = createClient(SB_URL, SB_KEY);
+
+const S = { me:null, items:[], staff:[], vans:[], customers:[], branches:[], date:today(), tab:null, dayId:null, br:null };
+const $ = (s, el=document) => el.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isNaN(n) ? 0 : n; };
+const money = v => num(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n*864e5).toISOString().slice(0,10);
+function today(off=0){ const d=new Date(Date.now()+off*864e5); return d.toLocaleDateString('en-CA',{timeZone:'Asia/Dubai'}); }
+function toast(t, ok=true){ const m=document.createElement('div'); m.className='msg '+(ok?'ok':'er'); m.textContent=t; document.body.appendChild(m); setTimeout(()=>m.remove(), ok?2500:6000); }
+async function q(p){ const { data, error } = await p; if (error) { toast(error.message, false); throw error; } return data; }
+const rpc = (fn, args) => q(sb.rpc(fn, args));
+// errors are already shown on screen by q(); don't also report them as uncaught
+window.addEventListener('unhandledrejection', e => { if (e.reason && (e.reason.message || e.reason.code)) e.preventDefault(); });
+const has = (...r) => r.includes(S.me?.role);
+// ---------- role access (Admin → Role access). Falls back to the built-in defaults until the table exists ----------
+const ACC_DEF = { V:{ ACCOUNTANT:'ov dd load ret days settle close wh ite sc itstock imp req ds pc se wo qs sa lr vl co ex dc', RECEIVER:'load ret days wh ite sc req', SALESMAN:'days req', VIEWER:'ov dd days wh ite sc ds pc se wo qs sa lr vl co ex dc', PACKER:'' },
+                  E:{ ACCOUNTANT:'load ret days settle close wh sc itstock imp req pc', RECEIVER:'load ret wh sc req', SALESMAN:'days req', VIEWER:'', PACKER:'' } };
+async function loadAccess(){ const { data, error } = await sb.from('role_access').select('module,can_view,can_edit').eq('role', S.me.role);
+  S.acc = error || !data?.length ? null : Object.fromEntries(data.map(a => [a.module, a])); }
+const canE = m => S.me?.role === 'ADMIN' || (S.acc ? !!S.acc[m]?.can_edit : (ACC_DEF.E[S.me?.role] || '').split(' ').includes(m));
+const canV = m => S.me?.role === 'ADMIN' || canE(m) || (S.acc ? !!S.acc[m]?.can_view : (ACC_DEF.V[S.me?.role] || '').split(' ').includes(m));
+
+const item = id => S.items.find(i => i.id === id) || {};
+const per = it => it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 1) : (it.packs_per_carton || 1);
+const unit = it => it.item_type === 'FG' ? 'pk' : 'pcs';
+function split(it, qty){ const p=per(it); qty=num(qty); return { c: Math.floor(qty/p), r: +(qty - Math.floor(qty/p)*p).toFixed(2) }; }
+function showQty(it, qty){ qty=num(qty); if(!qty) return ''; if(per(it)<=1) return qty+' '+unit(it); const s=split(it,qty); return (s.c? s.c+' ctn ':'') + (s.r? s.r+' '+unit(it):''); }
+const sellItems = () => S.items.filter(i => i.active && i.item_type !== 'MATERIAL').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+
+// ---------- start ----------
+sb.auth.onAuthStateChange(e => { if (e === 'SIGNED_OUT') renderLogin(); });   // only on real logout, so typing is never wiped
+const { data:{ session } } = await sb.auth.getSession();
+session ? boot() : renderLogin();
+
+function renderLogin(){
+  $('#app').innerHTML = `<div class="login-wrap">
+    <div class="login-side"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">SALES PORTAL</small></div></div>
+      <div><h2>Mahrjan Sales Portal</h2><p>Loading, returns, sales, collections and daily cash settlement in one place.</p></div>
+      <small>For Mahrjan staff only.</small></div>
+    <div class="login-main"><div class="login-card"><h1>Sign in to the Sales Portal</h1><div class="lead">Use the account your administrator created for you.</div>
+      <label>Username<input id="u" name="mj-user" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+      <label>Password<input id="pw" name="mj-pass" type="password" autocomplete="new-password"></label>
+      <button class="p" id="go">Sign in</button></div></div></div>`;
+  const go = async () => {
+    const u = $('#u').value.trim().toLowerCase(); if (!u) return;
+    const { error } = await sb.auth.signInWithPassword({ email: u.includes('@') ? u : u + EMAIL_DOMAIN, password: $('#pw').value.trim() });
+    if (error) return toast('Login failed: ' + error.message, false);
+    boot();
+  };
+  $('#go').onclick = go; $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+}
+
+async function boot(){
+  S.me = await rpc('me');
+  if (!S.me || !S.me.role) { toast('This login is not linked to an active staff member', false); await sb.auth.signOut(); return; }
+  const [items, staff, vans, branches] = await Promise.all([
+    q(sb.from('items').select('*')), q(sb.from('staff').select('id,name,role,branch_id,active').order('name')),
+    q(sb.from('vans').select('*').eq('active', true).order('van_no')), q(sb.from('branches').select('*'))]);
+  Object.assign(S, { items, staff, vans, branches });
+  await loadAccess();
+  S.br = S.me.branch_id || (+localStorage.getItem('mj_branch') || null) || branches.find(b => b.code === 'MGAZ')?.id;
+  S.from = S.date.slice(0,8) + '01';
+  const tabs = tabsFor(); S.tab = tabs[0][0];
+  render();
+}
+
+function tabsFor(){
+  const t = [], G = (g, ...x) => x.forEach(([k,l]) => { if (canV(k)) t.push([k,l,g]); });
+  G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
+  G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
+  G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
+  G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
+  if (has('ADMIN')) t.push(['stf','Staff & access','Admin'], ['acc','Role access','Admin']);
+  G('Admin', ['dc','Data check']);
+  if (!t.length) t.push(['none','No access','']);
+  return t;
+}
+
+function render(){
+  const T = tabsFor(), title = (T.find(t => t[0] === S.tab) || [])[1] || '';
+  const br = S.branches.find(b => b.id === S.me.branch_id)?.name || 'Both branches';
+  const unitName = S.me.branch_id ? br.toUpperCase() : 'SALES PORTAL';
+  const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
+    days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
+    req:'Next-day order by salesman, in cartons.', wh:'Production and cleaning batches: issue, return, differences and output.',
+    ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Daily and weekly store count (good and damage), compared with the iTrade stock.',
+    ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
+    ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
+    se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
+    sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
+    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', stf:'Roles, branch and login access for each staff member.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
+  $('#app').innerHTML = `
+    <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
+      <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
+      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.role)} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
+    <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${SUB[S.tab]||''}</p></div>
+      <div class="header-actions">${S.me.branch_id ? '' : `<label>Company<select id="brs">${S.branches.map(b => `<option value="${b.id}" ${b.id===S.br?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label>`}
+        ${RANGE.has(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label></div></header>
+      <div id="v"></div>
+      <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
+  $('#out').onclick = () => sb.auth.signOut();
+  $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
+  $('#dt').onchange = e => { S.date = e.target.value; if (S.from > S.date) { S.from = S.date; if ($('#df')) $('#df').value = S.date; } S.dayId = null; view(); };
+  $('#df') && ($('#df').onchange = e => { S.from = e.target.value; if (S.from > S.date) { S.date = S.from; $('#dt').value = S.from; } view(); });
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
+  view();
+}
+function view(){ clearCache(); ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+
+const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && s.branch_id === S.br);
+const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
+
+// ---------- quantity grid (cartons + loose) ----------
+function qtyGrid(rows){   // rows: [{it, qty, hint}]
+  return `<div class="tw"><table><tr><th class="l">Item</th><th>Ctn</th><th>Loose</th><th>Total</th><th class="muted">Ref</th></tr>
+    ${rows.map(({it,qty,hint}) => { const s = split(it, qty); return `<tr data-id="${it.id}">
+      <td class="l">${esc(it.short_name || it.name)}</td>
+      <td><input type="number" min="0" step="1" class="c" value="${s.c||''}"></td>
+      <td><input type="number" min="0" step="1" class="r" value="${s.r||''}"></td>
+      <td class="tot">${showQty(it, qty)}</td><td class="muted">${esc(hint||'')}</td></tr>`; }).join('')}</table></div>`;
+}
+function bindGrid(root){
+  root.querySelectorAll('tr[data-id]').forEach(tr => tr.oninput = () => {
+    const it = item(+tr.dataset.id); tr.querySelector('.tot').textContent = showQty(it, num($('.c',tr).value)*per(it) + num($('.r',tr).value));
+  });
+}
+const gridValue = tr => { const it=item(+tr.dataset.id); return num($('.c',tr).value)*per(it) + num($('.r',tr).value); };
+
+// ---------- LOADING ----------
+async function vLoading(){
+  const v = $('#v');
+  v.innerHTML = `<div class="card"><h3>Loading (board) — ${S.date}</h3>
+    <div class="row"><label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.lsm)}</select></label>
+      <label>Van (plate no.)<select id="van"><option value="">Select van</option>${S.vans.filter(x => x.branch_id === S.br).map(x=>`<option value="${x.id}">${esc(x.van_no)}</option>`).join('')}</select></label>
+      <label>Start KM<input type="number" id="km" style="width:110px"></label>
+      <label>Load temp<input type="number" id="tp" step="0.1"></label></div><div id="g"></div></div>`;
+  $('#sm').onchange = async e => { S.lsm = +e.target.value || null; await fill(); };
+  async function fill(){
+    if (!S.lsm) { $('#g').innerHTML = ''; return; }
+    const day = (await q(sb.from('van_day').select('*').eq('salesman_id', S.lsm).eq('business_date', S.date)))[0];
+    const lines = day ? await q(sb.from('loading_lines').select('item_id,qty').eq('van_day_id', day.id)) : [];
+    const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.lsm).eq('required_date', S.date));
+    if (day) { $('#van').value = day.van_id || ''; $('#km').value = day.start_km ?? ''; $('#tp').value = day.load_temp ?? ''; }
+    else { const [prev] = await q(sb.from('van_day').select('van_id,end_km').eq('salesman_id', S.lsm).lt('business_date', S.date).not('van_id', 'is', null).order('business_date', { ascending:false }).limit(1));
+      $('#van').value = prev?.van_id || ''; $('#km').value = prev?.end_km ?? ''; }   // his last van and its last KM
+    const locked = day && !['OPEN','LOADED'].includes(day.status);
+    const rows = sellItems().map(it => {
+      const l = lines.find(x => x.item_id === it.id), r = req.find(x => x.item_id === it.id);
+      return { it, qty: l ? l.qty : (r && !day ? r.qty_cartons * per(it) : 0), hint: r ? 'Req ' + r.qty_cartons + ' ctn' : '' };
+    });
+    $('#g').innerHTML = (day ? `<p class="muted">Status <span class="st ${day.status}">${day.status}</span>${locked ? ' — loading is locked after return' : ''}</p>` : '')
+      + qtyGrid(rows) + `<div class="row" style="margin-top:8px"><button class="p" id="post" ${locked?'disabled':''}>Post loading</button></div>`;
+    bindGrid($('#g'));
+    $('#post') && ($('#post').onclick = async () => {
+      const ln = [...$('#g').querySelectorAll('tr[data-id]')].map(tr => ({ item_id:+tr.dataset.id, qty:gridValue(tr) })).filter(x => x.qty > 0);
+      if (!ln.length) return toast('Enter at least one item', false);
+      $('#post').disabled = true;
+      try { await rpc('post_loading', { p_salesman:S.lsm, p_date:S.date, p_van:+$('#van').value||null, p_start_km:+$('#km').value||null, p_load_temp:$('#tp').value===''?null:+$('#tp').value, p_lines:ln });
+            toast('Loading posted'); await fill(); } finally { $('#post') && ($('#post').disabled = false); }
+    });
+  }
+  if (S.lsm) await fill();
+}
+
+// ---------- RETURN ----------
+async function vReturn(){
+  const days = await q(sb.from('van_day').select('id,salesman_id,status').eq('business_date', S.date).eq('branch_id', S.br).in('status',['LOADED','RETURNED']));
+  const v = $('#v');
+  v.innerHTML = `<div class="card"><h3>Return — ${S.date}</h3>
+    <div class="row"><label>Salesman<select id="d"><option value="">Select</option>${days.map(d=>`<option value="${d.id}">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)} (${d.status})</option>`).join('')}</select></label></div>
+    <div id="g"></div></div>`;
+  $('#d').onchange = e => fill(+e.target.value);
+  async function fill(id){
+    if (!id) { $('#g').innerHTML=''; return; }
+    const day = (await q(sb.from('van_day').select('*').eq('id', id)))[0];
+    const [rec, ret] = await Promise.all([q(sb.from('v_van_day_items').select('*').eq('van_day_id', id)), q(sb.from('return_lines').select('*').eq('van_day_id', id))]);
+    const ids = [...new Set([...rec.map(r=>r.item_id), ...ret.map(r=>r.item_id)])];
+    const its = sellItems().filter(i => ids.includes(i.id));
+    const F = ['good','damage','expiry','waste','foc'];
+    $('#g').innerHTML = `<div class="row"><label>End KM<input type="number" id="km" style="width:110px" value="${day.end_km??''}"></label>
+      <label>Unload temp<input type="number" id="tp" step="0.1" value="${day.unload_temp??''}"></label>
+      <label>Carton small<input type="number" id="cs" value="${day.carton_small||''}"></label>
+      <label>Carton big<input type="number" id="cb" value="${day.carton_big||''}"></label></div>
+      <p class="muted">Quantities in packs (raw egg in pieces). Expected = load − sale + GRV (sales imported so far).</p>
+      <div class="tw"><table><tr><th class="l">Item</th><th>Load</th><th>Expected</th>${F.map(f=>`<th>${f}</th>`).join('')}<th>Total</th><th>Diff</th></tr>
+      ${its.map(it => { const r = rec.find(x=>x.item_id===it.id)||{}, t = ret.find(x=>x.item_id===it.id)||{};
+        return `<tr data-id="${it.id}" data-exp="${num(r.expected_return)}"><td class="l">${esc(it.short_name||it.name)}</td><td>${num(r.load)}</td><td>${num(r.expected_return)}</td>
+        ${F.map(f=>`<td><input type="number" min="0" class="${f}" value="${num(t[f])||''}"></td>`).join('')}<td class="tot"></td><td class="df"></td></tr>`; }).join('')}
+      </table></div><div class="row" style="margin-top:8px"><button class="p" id="post">Post return</button></div>`;
+    const calc = tr => { const tot = F.reduce((a,f)=>a+num($('.'+f,tr).value),0), df = tot - num(tr.dataset.exp);
+      tr.querySelector('.tot').textContent = tot; const c = tr.querySelector('.df'); c.textContent = df ? (df>0?'+':'')+df : ''; c.className = 'df ' + (df ? 'bad' : ''); };
+    $('#g').querySelectorAll('tr[data-id]').forEach(tr => { calc(tr); tr.oninput = () => calc(tr); });
+    $('#post').onclick = async () => {
+      const ln = [...$('#g').querySelectorAll('tr[data-id]')].map(tr => Object.fromEntries([['item_id',+tr.dataset.id], ...F.map(f=>[f, num($('.'+f,tr).value)])]));
+      $('#post').disabled = true;
+      try { await rpc('post_return', { p_van_day:id, p_end_km:+$('#km').value||null, p_unload_temp:$('#tp').value===''?null:+$('#tp').value,
+              p_carton_small:+$('#cs').value||0, p_carton_big:+$('#cb').value||0, p_lines:ln }); toast('Return posted'); await fill(id); }
+      finally { $('#post') && ($('#post').disabled = false); }
+    };
+  }
+}
+
+// ---------- VAN DAYS ----------
+async function vDays(){
+  if (S.dayId) return vDay(S.dayId);
+  const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).eq('branch_id', S.br).order('id'));
+  const cash = days.length ? await q(sb.from('v_van_day_cash').select('*').in('van_day_id', days.map(d => d.id))) : [];
+  $('#v').innerHTML = `<div class="card"><h3>Van days — ${S.date}</h3>${days.length ? `<div class="tw"><table>
+    <tr><th class="l">Salesman</th><th>Van</th><th>Status</th><th>Cash sales</th><th>Credit sales</th><th>Cash to hand over</th><th>Counted</th><th></th></tr>
+    ${days.map(d => { const c = cash.find(x=>x.van_day_id===d.id)||{}; const exp = d.cash_expected ?? c.cash_to_hand_over;
+      return `<tr><td class="l">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)}</td><td>${esc(S.vans.find(v=>v.id===d.van_id)?.van_no||'')}</td>
+      <td><span class="st ${d.status}">${d.status}</span></td><td>${money(c.cash_sales)}</td><td>${money(c.credit_sales)}</td><td>${money(exp)}</td>
+      <td class="${d.cash_counted!=null && Math.abs(d.cash_counted-exp)>0.009?'bad':''}">${d.cash_counted!=null?money(d.cash_counted):''}</td>
+      <td><button data-d="${d.id}">Open</button></td></tr>`; }).join('')}</table></div>` : '<p class="muted">No van days for this date.</p>'}</div>`;
+  $('#v').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { S.dayId = +b.dataset.d; vDays(); });
+}
+
+async function vDay(id){
+  const [day] = await q(sb.from('van_day').select('*').eq('id', id));
+  const closed = day.status === 'CLOSED';
+  const [rec, cash, exps, cols] = await Promise.all([
+    closed ? q(sb.from('day_close_items').select('*').eq('van_day_id', id)) : q(sb.from('v_van_day_items').select('*').eq('van_day_id', id)),
+    q(sb.from('v_van_day_cash').select('*').eq('van_day_id', id)).then(r=>r[0]||{}),
+    q(sb.from('expenses').select('*').eq('van_day_id', id)), q(sb.from('collections').select('*').eq('van_day_id', id))]);
+  if (!S.customers.length) S.customers = await q(sb.from('customers').select('id,itrade_code,name').eq('active', true).order('name'));
+  const editMoney = ['OPEN','LOADED','RETURNED'].includes(day.status) && canE('days');
+  const exp = day.cash_expected ?? cash.cash_to_hand_over;
+  const sm = S.staff.find(s=>s.id===day.salesman_id)?.name;
+  const ET = ['FUEL','PARKING','CARTON BIG','CARTON SMALL','SHELF RENT','CREDIT NOTE','OTHER'];
+  const custOpts = `<datalist id="cl">${S.customers.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist>`;
+  const custVal = cid => { const c = S.customers.find(x=>x.id===cid); return c ? (c.itrade_code||'')+' | '+c.name : ''; };
+  const custId = v => S.customers.find(c => (c.itrade_code||'')+' | '+c.name === v)?.id || null;
+
+  $('#v').innerHTML = `<div class="card"><div class="row"><button id="bk">← Back</button><h3 style="margin:0">${esc(sm)} — ${day.business_date}
+      <span class="st ${day.status}">${day.status}</span></h3></div>
+    <p class="muted">KM ${day.start_km??'-'} → ${day.end_km??'-'} · Temp ${day.load_temp??'-'} / ${day.unload_temp??'-'} · Cartons small ${day.carton_small||0}, big ${day.carton_big||0}</p></div>
+
+    <div class="card"><h3>Item reconciliation ${closed?'(frozen at close)':'(live)'}</h3><div class="tw"><table>
+      <tr><th class="l">Item</th><th>Load</th><th>Sale</th><th>GRV</th><th>Good</th><th>Dmg</th><th>Exp</th><th>Wst</th><th>FOC</th><th>Return</th><th>Expected</th><th>Excess</th><th>Short</th><th class="l">Reason</th></tr>
+      ${rec.sort((a,b)=>(item(a.item_id).display_order||0)-(item(b.item_id).display_order||0)).map(r => { const need = num(r.excess)||num(r.short)||r.flag;
+        return `<tr data-i="${r.item_id}"><td class="l">${esc(item(r.item_id).short_name||item(r.item_id).name)}${r.flag?` <span class="warn">${r.flag.replace(/_/g,' ').toLowerCase()}</span>`:''}</td>
+        <td>${num(r.load)}</td><td>${num(r.sale)}</td><td>${num(r.grv)}</td><td>${num(r.good)}</td><td>${num(r.damage)}</td><td>${num(r.expiry)}</td><td>${num(r.waste)}</td><td>${num(r.foc)}</td>
+        <td>${num(r.total_return)}</td><td>${num(r.expected_return)}</td><td class="${num(r.excess)?'bad':''}">${num(r.excess)||''}</td><td class="${num(r.short)?'bad':''}">${num(r.short)||''}</td>
+        <td class="l">${closed ? esc(r.reason||'') : (need && day.status==='SETTLED' ? '<input class="rs" placeholder="Reason required" style="width:100%">' : '')}</td></tr>`; }).join('')}
+    </table></div></div>
+
+    <div class="card"><h3>Cash</h3><div class="tw"><table><tr><th>Cash sales</th><th>Cash returns</th><th>Collections</th><th>Expenses</th><th>Cash to hand over</th><th>Counted</th><th>Difference</th></tr>
+      <tr><td>${money(cash.cash_sales)}</td><td>${money(cash.cash_returns)}</td><td>${money(cash.collections)}</td><td>${money(cash.expenses)}</td><td><b>${money(exp)}</b></td>
+      <td>${day.cash_counted!=null?money(day.cash_counted):''}</td><td class="bad">${day.cash_counted!=null&&Math.abs(day.cash_counted-exp)>0.009?money(day.cash_counted-exp):''}</td></tr></table></div></div>
+
+    <div class="card"><h3>Expenses</h3>${custOpts}<div id="ex"></div>${editMoney?'<div class="row" style="margin-top:6px"><button id="exa">+ Add</button><button class="p" id="exs">Save expenses</button></div>':''}</div>
+    <div class="card"><h3>Collections</h3><div id="co"></div>${editMoney?'<div class="row" style="margin-top:6px"><button id="coa">+ Add</button><button class="p" id="cos">Save collections</button></div>':''}</div>
+
+    <div class="card"><div class="row">
+      ${day.status==='RETURNED' && canE('settle') ? `<label>Cash counted<input type="number" step="0.01" id="cc" style="width:120px"></label><button class="p" id="settle">Settle cash</button>` : ''}
+      ${day.status==='SETTLED' && canE('close') ? `<button class="p" id="close">Close day</button>` : ''}
+      ${['SETTLED','CLOSED'].includes(day.status) && canE('reopen') ? `<input id="rr" placeholder="Reason to reopen" style="min-width:220px"><button class="d" id="reopen">Reopen</button>` : ''}
+    </div></div>`;
+
+  const exRow = e => `<div class="row er"><select class="t" ${editMoney?'':'disabled'}>${ET.map(t=>`<option ${t===e.expense_type?'selected':''}>${t}</option>`).join('')}</select>
+      <input type="number" step="0.01" class="a" value="${e.amount??''}" ${editMoney?'':'disabled'} style="width:100px">
+      <input class="c" list="cl" placeholder="Customer (shelf rent / credit note)" value="${esc(custVal(e.customer_id))}" ${editMoney?'':'disabled'} style="min-width:240px">
+      <input class="n" placeholder="Note" value="${esc(e.note||'')}" ${editMoney?'':'disabled'}></div>`;
+  const coRow = c => `<div class="row cr"><input class="r" placeholder="Receipt no" value="${esc(c.receipt_no||'')}" ${editMoney?'':'disabled'} style="width:110px">
+      <input class="i" placeholder="Invoice no" value="${esc(c.invoice_no||'')}" ${editMoney?'':'disabled'} style="width:150px">
+      <input class="c" list="cl" placeholder="Customer" value="${esc(custVal(c.customer_id))}" ${editMoney?'':'disabled'} style="min-width:240px">
+      <select class="m" ${editMoney?'':'disabled'}>${['CASH','CHEQUE','TRANSFER'].map(m=>`<option ${m===c.mode?'selected':''}>${m}</option>`).join('')}</select>
+      <input type="number" step="0.01" class="a" value="${c.amount??''}" ${editMoney?'':'disabled'} style="width:100px"></div>`;
+  $('#ex').innerHTML = exps.map(exRow).join('') || (editMoney ? '' : '<p class="muted">None</p>');
+  $('#co').innerHTML = cols.map(coRow).join('') || (editMoney ? '' : '<p class="muted">None</p>');
+  $('#bk').onclick = () => { S.dayId = null; vDays(); };
+  if (editMoney) {
+    $('#exa').onclick = () => $('#ex').insertAdjacentHTML('beforeend', exRow({expense_type:'FUEL'}));
+    $('#coa').onclick = () => $('#co').insertAdjacentHTML('beforeend', coRow({mode:'CASH'}));
+    $('#exs').onclick = async () => {
+      const ln = [...$('#ex').querySelectorAll('.er')].map(r => ({ expense_type:$('.t',r).value, amount:num($('.a',r).value), customer_id:custId($('.c',r).value), note:$('.n',r).value }));
+      await rpc('save_expenses', { p_van_day:id, p_lines:ln }); toast('Expenses saved'); vDay(id);
+    };
+    $('#cos').onclick = async () => {
+      const ln = [...$('#co').querySelectorAll('.cr')].map(r => ({ receipt_no:$('.r',r).value, invoice_no:$('.i',r).value, customer_id:custId($('.c',r).value), mode:$('.m',r).value, amount:num($('.a',r).value) }));
+      if (ln.some(l => l.amount && (!l.receipt_no || !l.customer_id))) return toast('Each collection needs receipt no and a customer from the list', false);
+      await rpc('save_collections', { p_van_day:id, p_lines:ln }); toast('Collections saved'); vDay(id);
+    };
+  }
+  $('#settle') && ($('#settle').onclick = async () => {
+    if ($('#cc').value === '') return toast('Enter cash counted', false);
+    const r = await rpc('settle_day', { p_van_day:id, p_cash_counted:num($('#cc').value) });
+    toast('Settled. Difference ' + money(r.difference), Math.abs(r.difference) < 0.01); vDay(id);
+  });
+  $('#close') && ($('#close').onclick = async () => {
+    const reasons = Object.fromEntries([...$('#v').querySelectorAll('tr[data-i]')].filter(tr=>$('.rs',tr)).map(tr => [tr.dataset.i, $('.rs',tr).value.trim()]));
+    await rpc('close_day', { p_van_day:id, p_reasons:reasons }); toast('Day closed'); vDay(id);
+  });
+  $('#reopen') && ($('#reopen').onclick = async () => {
+    if (!$('#rr').value.trim()) return toast('Enter the reason to reopen', false);
+    await rpc('reopen_day', { p_van_day:id, p_reason:$('#rr').value.trim() }); toast('Reopened'); vDay(id);
+  });
+}
+
+// ---------- SALES IMPORT ----------
+async function vImport(){
+  $('#v').innerHTML = `<div class="card"><h3>Sales import (iTrade Periodical Sales Detailed Report)</h3>
+    <p class="muted">Export the report from iTrade for the dates you want (Excel or CSV) and choose the file. Each branch (MGAZ / MGT) is imported separately.
+    Invoices already imported are skipped. Invoices missing from the file for its dates are marked cancelled.</p>
+    <div class="row"><input type="file" id="f" accept=".xlsx,.xls,.csv"><button class="p" id="go" disabled>Import</button></div><div id="out"></div></div>`;
+  let rows = [];
+  $('#f').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates:true });
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'', raw:true });
+    const MON = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+    const iso = v => { if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+      const s = String(v).trim(); let m;
+      if ((m = s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[-\/ ](\d{4})/))) return `${m[3]}-${String(MON[m[2].toLowerCase()]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[0]; return null; };
+    rows = raw.map(r => Object.fromEntries(Object.entries(r).map(([k,v]) => [k.trim(), v])))
+      .filter(r => r['Invoice No'] && r['Item Code'])
+      .map(r => ({ ...r, 'Tran Date': iso(r['Tran Date']), 'Item Code': String(r['Item Code']).trim(), 'Head No': String(r['Head No']||'').trim(),
+                   ...Object.fromEntries(['Qty','Rate','Gross','Disc','Net','VAT','Net Incl VAT','Profit','CF'].map(k => [k, num(r[k])])) }));
+    const bad = rows.filter(r => !r['Tran Date']).length;
+    const by = branchSplit(rows);
+    $('#out').innerHTML = `<p>${rows.length} lines read${bad?` — <span class="bad">${bad} with unreadable date</span>`:''}. ${Object.entries(by).map(([b,r])=>`${b}: ${r.length}`).join(' · ')}</p>`;
+    $('#go').disabled = !rows.length || bad > 0;
+  };
+  const branchSplit = rs => rs.reduce((a,r) => { const b = String(r['Invoice No']).split('-')[0].toUpperCase(); (a[b] ||= []).push(r); return a; }, {});
+  $('#go').onclick = async () => {
+    $('#go').disabled = true; const out = [];
+    try {
+      for (const [code, rs] of Object.entries(branchSplit(rows))) {
+        const br = S.branches.find(b => b.code === code);
+        if (!br) { out.push(`<p class="bad">${esc(code)}: unknown branch prefix, skipped</p>`); continue; }
+        const r = await rpc('import_sales', { p_branch:br.id, p_rows:rs, p_full_export:true });
+        out.push(`<div class="card"><b>${esc(br.name)}</b> ${r.from} to ${r.to}<br>Lines ${r.rows} · new ${r.new} · already there ${r.already_there} · cancelled ${r.cancelled}
+          · new customers ${r.new_customers} · customers moved ${r.customers_moved}
+          ${r.unknown_items?`<br><span class="bad">Unknown items: ${esc(r.unknown_items)}</span>`:''}
+          ${r.not_salesman_sales_executives?`<br><span class="muted">Not a salesman (store/office sales): ${esc(r.not_salesman_sales_executives)}</span>`:''}</div>`);
+      }
+      toast('Import finished');
+    } finally { $('#out').innerHTML += out.join(''); }
+  };
+}
+
+
+// ---------- WAREHOUSE ----------
+async function vWarehouse(){
+  const bs = await q(sb.from('wh_batches').select('*').eq('branch_id', S.br).eq('work_date', S.date).order('id'));
+  const nm = id => S.staff.find(s => s.id === id)?.name || '';
+  const sum = (p, k) => bs.filter(b => b.process === p && b.status === 'CLOSED').reduce((a,b) => a + num(b[k]), 0);
+  $('#v').innerHTML = `<div class="card"><h3>Summary</h3><div class="tw"><table>
+      <tr><th class="l">Process</th><th>Batches</th><th>Open</th><th>Issued eggs</th><th>FG packs</th><th>Good / near exp</th><th>Broken</th><th>Waste</th><th>Egg diff</th><th>Material diff</th></tr>
+      ${['PRODUCTION','CLEANING'].map(p => `<tr><td class="l">${p === 'PRODUCTION' ? 'Production' : 'Cleaning'}</td><td>${bs.filter(b=>b.process===p&&b.status!=='CANCELLED').length}</td>
+        <td>${bs.filter(b=>b.process===p&&b.status==='ISSUED').length}</td><td>${sum(p,'issued_egg_pcs')}</td><td>${p==='PRODUCTION'?sum(p,'fg_packs'):''}</td>
+        <td>${p==='CLEANING'?sum(p,'good_egg_pcs')+' / '+sum(p,'near_pcs'):''}</td><td>${sum(p,'broken_pcs')}</td><td>${sum(p,'waste_pcs')}</td>
+        <td class="${sum(p,'egg_diff')?'bad':''}">${sum(p,'egg_diff')}</td><td class="${sum(p,'mat_diff')?'bad':''}">${p==='PRODUCTION'?sum(p,'mat_diff'):''}</td></tr>`).join('')}
+    </table></div></div>
+    <div class="card"><h3>Batches — work date ${S.date}</h3>${bs.length ? `<div class="tw"><table>
+      <tr><th class="l">Batch</th><th>Shift</th><th>Status</th><th class="l">Packing staff</th><th class="l">Issued by</th><th>Issued eggs</th><th>FG packs</th><th>Broken</th><th>Waste</th><th>Egg diff</th><th>Hours</th><th>Output / staff-hour</th><th></th></tr>
+      ${bs.map(b => `<tr><td class="l">${esc(b.batch_no)}</td><td>${b.shift}</td><td><span class="st ${b.status==='CLOSED'?'CLOSED':b.status==='ISSUED'?'LOADED':''}">${b.status}</span></td>
+        <td class="l">${b.staff_ids.map(nm).join(', ')}</td><td class="l">${esc(nm(b.issued_by))}</td><td>${num(b.issued_egg_pcs)}</td><td>${b.fg_packs!=null?num(b.fg_packs):''}</td>
+        <td>${b.broken_pcs!=null?num(b.broken_pcs):''}</td><td>${b.waste_pcs!=null?num(b.waste_pcs):''}</td><td class="${num(b.egg_diff)?'bad':''}">${b.egg_diff!=null?num(b.egg_diff):''}</td>
+        <td>${b.hours!=null?num(b.hours):''}</td><td>${b.output_per_staff_hour!=null?num(b.output_per_staff_hour):''}</td><td><button data-b="${b.id}">Lines</button></td></tr>`).join('')}
+    </table></div>` : '<p class="muted">No batches for this work date.</p>'}</div><div id="wl"></div>`;
+  $('#v').querySelectorAll('[data-b]').forEach(btn => btn.onclick = async () => {
+    const b = bs.find(x => x.id === +btn.dataset.b), L = await q(sb.from('wh_lines').select('*').eq('batch_id', b.id).order('id'));
+    $('#wl').innerHTML = `<div class="card"><h3>${esc(b.batch_no)} — lines</h3><div class="tw"><table>
+      <tr><th>Slip</th><th class="l">Line</th><th class="l">For product</th><th class="l">Item</th><th>Qty</th><th>Egg pcs</th><th>Calculated</th><th>Difference</th><th class="l">Reason</th><th>EXP</th><th class="l">Origin</th></tr>
+      ${L.map(l => `<tr><td>${b.batch_no}-${l.slip}</td><td class="l">${esc(l.line_type)}</td><td class="l">${esc(item(l.for_item_id).short_name||item(l.for_item_id).name||'')}</td>
+        <td class="l">${esc(item(l.item_id).short_name||item(l.item_id).name)}</td><td>${num(l.qty)}</td><td>${num(l.egg_pcs)||''}</td><td>${l.calculated!=null?num(l.calculated):''}</td>
+        <td class="${num(l.difference)?'bad':''}">${l.difference!=null?num(l.difference):''}</td><td class="l">${esc(l.reason||'')}</td><td>${l.exp_date||''}</td><td class="l">${esc(l.origin||'')}</td></tr>`).join('')}
+    </table></div>${b.cancel_reason?`<p class="muted">Cancelled: ${esc(b.cancel_reason)}</p>`:''}</div>`;
+  });
+}
+
+// ---------- STOCK COUNT ----------
+async function vStock(){
+  S.sct = S.sct || 'WEEKLY';
+  const hist = await q(sb.from('stock_counts').select('*').eq('branch_id', S.br).gte('count_date', addDays(S.date, -35)).lte('count_date', S.date).order('count_date', { ascending:false }));
+  const c = hist.find(h => h.count_date === S.date && h.count_type === S.sct);
+  const L = c ? await q(sb.from('stock_count_lines').select('*').eq('count_id', c.id)) : [];
+  const nm = id => S.staff.find(s => s.id === id)?.name || '';
+  const hasSys = c && c.system_loaded_at, canUp = canE('itstock') && c;
+  const rows = L.map(l => ({ ...l, it:item(l.item_id) })).filter(l => num(l.good) || num(l.damage) || l.system_qty != null)
+    .sort((a,b) => (a.it.display_order||0) - (b.it.display_order||0));
+  const grp = [['FG','Finished goods (packs)'],['RAW_EGG','Raw egg (pieces)'],['MATERIAL','Packing material (pieces)']];
+  $('#v').innerHTML = `<div class="card"><h3>Count</h3><div class="row">
+      <label>Type<select id="ty">${['DAILY','WEEKLY'].map(t => `<option ${t===S.sct?'selected':''}>${t}</option>`).join('')}</select></label>
+      ${canUp ? `<label>iTrade stock (.xlsx)<input type="file" id="sf" accept=".xlsx,.xls,.csv"></label>` : ''}
+      ${c ? `<span class="muted">Counted by <b>${esc(nm(c.counted_by))}</b> · ${new Date(c.posted_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})}${hasSys?' · iTrade stock loaded '+new Date(c.system_loaded_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):''}</span>` : `<span class="muted">No ${S.sct.toLowerCase()} count for ${S.date}.</span>`}
+    </div>${rows.length ? grp.map(([t,l]) => { const g = rows.filter(r => r.it.item_type === t); if (!g.length) return '';
+      const tot = k => g.reduce((a,r) => a + num(r[k]), 0), tsys = g.reduce((a,r) => a + num(r.system_qty), 0);
+      return `<h3 style="margin-top:14px">${l}</h3><div class="tw"><table><tr><th class="l">Item</th><th>Good</th><th>Damage</th><th>Total</th>${hasSys?'<th>iTrade</th><th>Difference</th>':''}</tr>
+        ${g.map(r => { const t = num(r.good) + num(r.damage), df = t - num(r.system_qty); return `<tr><td class="l">${esc(r.it.short_name||r.it.name)}</td>
+          <td>${showQty(r.it, r.good) || 0}</td><td>${num(r.damage) || ''}</td><td>${showQty(r.it, t) || 0}</td>
+          ${hasSys ? `<td>${r.system_qty!=null?showQty(r.it, r.system_qty)||0:'—'}</td><td class="${r.system_qty!=null&&df?'bad':''}">${r.system_qty==null?'—':(df>0?'+':'')+(+df.toFixed(2))}</td>` : ''}</tr>`; }).join('')}
+        <tr class="tot"><td class="l">Total</td><td>${tot('good')}</td><td>${tot('damage')}</td><td>${tot('good')+tot('damage')}</td>${hasSys?`<td>${tsys}</td><td>${+(tot('good')+tot('damage')-tsys).toFixed(2)}</td>`:''}</tr></table></div>`; }).join('') : ''}</div>
+    <div class="card"><h3>Counts — last 5 weeks</h3>${hist.length ? `<div class="tw"><table><tr><th>Date</th><th>Type</th><th class="l">Counted by</th><th>Posted</th><th>iTrade compare</th><th></th></tr>
+      ${hist.map(h => `<tr><td>${h.count_date}</td><td>${h.count_type}</td><td class="l">${esc(nm(h.counted_by))}</td><td>${new Date(h.posted_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'})}</td>
+        <td>${h.system_loaded_at?'Yes':''}</td><td><button data-h="${h.count_date}|${h.count_type}">Open</button></td></tr>`).join('')}</table></div>` : '<p class="muted">No counts yet. The receiver posts counts from the PDT app (Stock count).</p>'}</div>`;
+  $('#ty').onchange = e => { S.sct = e.target.value; vStock(); };
+  $('#v').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { const [d,t] = b.dataset.h.split('|'); S.date = d; S.sct = t; $('#dt').value = d; vStock(); });
+  $('#sf') && ($('#sf').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+    const grid = XLSX.utils.sheet_to_json((wb => wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer())), { header:1, defval:'' });
+    const hi = grid.findIndex(r => r.some(x => /code/i.test(x)) && r.some(x => /qty|quantity|stock|balance|closing/i.test(x)));
+    if (hi < 0) return toast('Could not find the item code and quantity columns', false);
+    const H = grid[hi].map(x => String(x).trim()), ci = H.findIndex(x => /code/i.test(x)),
+          qi = H.findIndex(x => /closing|balance/i.test(x)) >= 0 ? H.findIndex(x => /closing|balance/i.test(x)) : H.findIndex(x => /qty|quantity|stock/i.test(x)),
+          ui = H.findIndex(x => /^(unit|uom)/i.test(x));
+    const rows = grid.slice(hi + 1).filter(r => String(r[ci]).trim() && r[qi] !== '').map(r => {
+      const it = S.items.find(i => i.itrade_code === String(r[ci]).trim()) || {}, u = ui >= 0 ? String(r[ui]).toUpperCase() : '';
+      const m = /TRAY/.test(u) ? (it.pcs_per_tray || 30) : /CTN|CARTON|BOX/.test(u) ? per(it) : 1;
+      return { item_code:String(r[ci]).trim(), qty: num(r[qi]) * m }; });
+    const res = await rpc('set_system_stock', { p_count:c.id, p_rows:rows });
+    toast(`iTrade stock loaded · ${rows.length} rows` + (res?.unknown_items ? ' · not in item master: ' + res.unknown_items : ''), !res?.unknown_items);
+    vStock();
+  });
+}
+
+// ---------- I TRADE ENTRY (what to post in iTrade for the day: production, unwrap, broken, wastage) ----------
+// ---------- iTrade Store Issue files (same as the old portal): one .txt per salesman, all in one zip ----------
+// Line: SITE,BARCODE,,QTY (CRLF).  LOADING = issue to van: boarded qty less what the store billed for him that day;
+// raw egg = only what he billed himself.  RETURN = issue from van: good + damage + expiry + waste + FOC; raw egg = his own sales return.
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function makeZip(files){   // [{name, text}] -> Blob (stored, no compression)
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const le = (n, b) => { const a = new Uint8Array(b); for (let i = 0; i < b; i++) a[i] = (n >>> (8*i)) & 255; return a; };
+  files.forEach(f => { const nm = enc.encode(f.name), data = enc.encode(f.text), c = crc32(data);
+    const head = [le(0x04034b50,4), le(20,2), le(0,2), le(0,2), le(0,2), le(0x21,2), le(c,4), le(data.length,4), le(data.length,4), le(nm.length,2), le(0,2), nm];
+    const len = head.reduce((a,x) => a + x.length, 0) + data.length; parts.push(...head, data);
+    cen.push(le(0x02014b50,4), le(20,2), le(20,2), le(0,2), le(0,2), le(0,2), le(0x21,2), le(c,4), le(data.length,4), le(data.length,4), le(nm.length,2), le(0,2), le(0,2), le(0,2), le(0,2), le(0,4), le(off,4), nm);
+    off += len; });
+  const cl = cen.reduce((a,x) => a + x.length, 0);
+  return new Blob([...parts, ...cen, le(0x06054b50,4), le(0,2), le(0,2), le(files.length,2), le(files.length,2), le(cl,4), le(off,4), le(0,2)], { type:'application/zip' });
+}
+async function itradeZip(kind){
+  const br = S.branches.find(b => b.id === S.br) || {}, site = br.code || 'MGAZ', tag = site === 'MGT' ? 'AJMAN' : 'ALQUOZ';
+  const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'], p = S.date.split('-'), day = p[2] + ' ' + M[+p[1]-1] + ' ' + p[0];
+  const [days, st, sl] = await Promise.all([q(sb.from('van_day').select('id,salesman_id').eq('branch_id', S.br).eq('business_date', S.date)),
+    q(sb.from('staff').select('id,name,itrade_name').eq('branch_id', S.br)),
+    fetchAll(() => sb.from('sales_lines').select('salesman_id,itrade_user,item_id,tran_type,qty').eq('branch_id', S.br).eq('tran_date', S.date).eq('cancelled', false))]);
+  const lines = days.length ? await byIds(kind === 'LOADING' ? 'loading_lines' : 'return_lines', '*', 'van_day_id', days.map(d => d.id)) : [];
+  const own = (r, s) => !r.itrade_user || !s.itrade_name || r.itrade_user.trim().toUpperCase() === s.itrade_name.trim().toUpperCase();
+  const code = it => it.barcode || it.itrade_code, files = [];
+  st.forEach(s => {
+    const dm = days.filter(d => d.salesman_id === s.id).map(d => d.id), q1 = {};
+    lines.filter(l => dm.includes(l.van_day_id)).forEach(l => { const it = item(l.item_id); if (it.item_type === 'RAW_EGG') return;
+      q1[l.item_id] = (q1[l.item_id] || 0) + (kind === 'LOADING' ? num(l.qty) : num(l.good) + num(l.damage) + num(l.expiry) + num(l.waste) + num(l.foc)); });
+    sl.filter(r => r.salesman_id === s.id && r.item_id).forEach(r => { const it = item(r.item_id), mine = own(r, s);
+      if (it.item_type === 'RAW_EGG') { if (mine && (kind === 'LOADING' ? r.tran_type === 'CR' : r.tran_type !== 'CR')) q1[r.item_id] = (q1[r.item_id] || 0) + Math.abs(num(r.qty)); }
+      else if (kind === 'LOADING' && !mine && r.tran_type === 'CR') q1[r.item_id] = (q1[r.item_id] || 0) - num(r.qty); });   // billed by the store: already moved
+    const L = Object.entries(q1).map(([id, v]) => [item(+id), Math.round(v * 1000) / 1000]).filter(([it, v]) => v > 0 && code(it))
+      .sort((a,b) => (a[0].display_order||0) - (b[0].display_order||0)).map(([it, v]) => `${site},${code(it)},,${v}`);
+    if (L.length) files.push({ name:`${s.name.replace(/[\\\/:*?"<>|]+/g,' ').trim().toUpperCase()}_${kind}_${day}.txt`, text:L.join('\r\n') + '\r\n' });
+  });
+  if (!files.length) return toast(`No ${kind.toLowerCase()} found for ${day}.`, false);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(makeZip(files)); a.download = `${tag} ${kind} ${day}.zip`; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast(`Downloaded ${a.download} · ${files.length} salesman file${files.length === 1 ? '' : 's'}`);
+}
+
+async function vItrade(){
+  S.ito = S.ito && S.ito >= S.date ? S.ito : S.date;
+  const [bs, days] = await Promise.all([
+    q(sb.from('wh_batches').select('id,process,status').eq('branch_id', S.br).gte('work_date', S.date).lte('work_date', S.ito)),
+    q(sb.from('van_day').select('id,salesman_id').eq('branch_id', S.br).gte('business_date', S.date).lte('business_date', S.ito))]);
+  const closed = bs.filter(b => b.status === 'CLOSED'), proc = new Set(closed.filter(b => b.process === 'PRODUCTION').map(b => b.id));
+  const [WL, RL] = await Promise.all([closed.length ? q(sb.from('wh_lines').select('batch_id,line_type,item_id,qty').in('batch_id', closed.map(b => b.id))) : [],
+    days.length ? q(sb.from('return_lines').select('van_day_id,item_id,expiry,waste').in('van_day_id', days.map(d => d.id))) : []]);
+  const agg = (f, cols) => { const m = {}; WL.forEach(l => { const k = f(l); if (k) { m[l.item_id] = m[l.item_id] || {}; m[l.item_id][k] = (m[l.item_id][k]||0) + num(l.qty); } }); return m; };
+  const P = l => proc.has(l.batch_id);
+  const sec = [
+    ['PRODUCTION', 'Finished goods produced (packs)', agg(l => P(l) && l.line_type === 'FG' && 'Packs'), ['Packs']],
+    ['UNWRAP', 'Finished goods given for cleaning (packs)', agg(l => !P(l) && l.line_type === 'ISSUE FG' && 'Packs'), ['Packs']],
+    ['BROKEN', 'Broken eggs and near expiry (pieces)', agg(l => l.line_type === 'BROKEN' ? (P(l) ? 'Production' : 'Cleaning') : l.line_type === 'NEAR EXPIRY' && 'Near expiry'), ['Production','Cleaning','Near expiry']],
+    ['WASTAGE – PRODUCTION', 'Egg and material wasted in production (pieces)', agg(l => P(l) && (l.line_type === 'WASTE' || l.line_type === 'MATERIAL WASTE') && 'Qty'), ['Qty']],
+    ['WASTAGE – CLEANING', 'Egg and material wasted in cleaning (pieces)', agg(l => !P(l) && (l.line_type === 'WASTE' || l.line_type === 'MATERIAL WASTE') && 'Qty'), ['Qty']],
+  ];
+  const sw = {}; RL.forEach(r => { if (num(r.expiry) || num(r.waste)) { const o = sw[r.item_id] = sw[r.item_id] || {}; o.EXP = (o.EXP||0) + num(r.expiry); o.WST = (o.WST||0) + num(r.waste); } });
+  sec.push(['SALESMAN WASTAGE', 'Expiry and waste returned by the vans (packs)', sw, ['EXP','WST']]);
+  const open = bs.filter(b => b.status === 'ISSUED').length;
+  S.itx = sec;
+  $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
+      <button class="p" id="xl">Download Excel</button>${canE('imp') ? '<button id="zl">Loading zip (Store Issue)</button><button id="zr">Return zip (Store Issue)</button>' : ''}
+      <span class="muted">${closed.length} closed batch(es), ${days.length} van day(s).${open ? ` <b class="bad">${open} batch(es) still open — not included.</b>` : ''}</span></div></div>
+    ${sec.map(([t, sub, m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
+      const tot = c => ids.reduce((a,id) => a + num(m[id][c]), 0), multi = cols.length > 1;
+      return `<div class="card"><h3>${t}</h3><p class="muted" style="margin:-4px 0 8px">${sub}</p>${ids.length ? `<div class="tw"><table>
+        <tr><th class="l">Item</th><th>iTrade code</th>${cols.map(c => `<th>${c}</th>`).join('')}${multi?'<th>Total</th>':''}</tr>
+        ${ids.map(id => { const it = item(id); return `<tr><td class="l">${esc(it.short_name||it.name)}</td><td>${esc(it.itrade_code||'')}</td>
+          ${cols.map(c => `<td>${num(m[id][c]) || ''}</td>`).join('')}${multi?`<td><b>${cols.reduce((a,c)=>a+num(m[id][c]),0)}</b></td>`:''}</tr>`; }).join('')}
+        <tr class="tot"><td class="l">Total</td><td></td>${cols.map(c => `<td>${tot(c)}</td>`).join('')}${multi?`<td>${cols.reduce((a,c)=>a+tot(c),0)}</td>`:''}</tr></table></div>` : '<p class="muted">Nothing for this period.</p>'}</div>`; }).join('')}`;
+  $('#to').onchange = e => { S.ito = e.target.value; vItrade(); };
+  $('#zl') && ($('#zl').onclick = () => itradeZip('LOADING')); $('#zr') && ($('#zr').onclick = () => itradeZip('RETURN'));
+  $('#xl').onclick = async () => {
+    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm'), wb = XLSX.utils.book_new(), brn = S.branches.find(b => b.id === S.br)?.name || '';
+    sec.forEach(([t, , m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
+      const aoa = [['MAHRJAN — ' + brn + ' — ' + t + ' — ' + S.date + (S.ito !== S.date ? ' to ' + S.ito : '')], ['Item','iTrade code', ...cols, ...(cols.length > 1 ? ['Total'] : [])],
+        ...ids.map(id => [item(id).short_name || item(id).name, item(id).itrade_code || '', ...cols.map(c => num(m[id][c])), ...(cols.length > 1 ? [cols.reduce((a,c)=>a+num(m[id][c]),0)] : [])])];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), t.replace(/[–\/\\?*\[\]:]/g,'-').slice(0,31)); });
+    XLSX.writeFile(wb, `I TRADE ENTRY - ${brn} - ${S.date}${S.ito !== S.date ? ' to ' + S.ito : ''}.xlsx`);
+  };
+}
+
+// =====================================================================
+// REPORTS & ANALYSIS (read-only; all from Supabase, live)
+// =====================================================================
+const RANGE = new Set(['ov','se','wo','qs','sa','lr','vl','co','ex']);
+const smNm = id => S.staff.find(s => s.id === id)?.name || '';
+const iNm = id => { const it = item(id); return it.short_name || it.name || '#' + id; };
+const ord = id => item(id).display_order || 0;
+const r2 = v => +num(v).toFixed(2);
+const nz = v => num(v) ? r2(v) : '';
+async function fetchAll(mk){ const out = []; for (let i = 0; ; i += 1000) { const d = await q(mk().range(i, i + 999)); out.push(...d); if (d.length < 1000) break; } return out; }
+async function byIds(table, cols, key, ids){ const out = []; for (let i = 0; i < ids.length; i += 150) { const part = ids.slice(i, i + 150); out.push(...await fetchAll(() => sb.from(table).select(cols).in(key, part))); } return out; }
+const RC = {};   // small cache for one page visit
+async function cached(k, f){ if (!RC[k]) RC[k] = f().catch(e => { delete RC[k]; throw e; }); return RC[k]; }
+const clearCache = () => Object.keys(RC).forEach(k => delete RC[k]);
+const rk = () => S.br + '|' + S.from + '|' + S.date;
+const getDays = () => cached('d' + rk(), () => fetchAll(() => sb.from('van_day').select('*').eq('branch_id', S.br).gte('business_date', S.from).lte('business_date', S.date).order('business_date')));
+const getSales = () => cached('s' + rk(), () => fetchAll(() => sb.from('sales_lines')
+  .select('tran_date,invoice_no,line_no,tran_type,tender_type,sales_executive,itrade_user,salesman_id,customer_code,customer_name,customer_id,item_code,item_name,item_id,qty_base,gross,disc,net,vat,net_incl_vat,profit,van_day_id')
+  .eq('branch_id', S.br).eq('cancelled', false).gte('tran_date', S.from).lte('tran_date', S.date).order('id')));
+const getItems = days => cached('i' + rk(), () => byIds('v_van_day_items', '*', 'van_day_id', days.map(d => d.id)));
+const getCash  = days => cached('c' + rk(), () => byIds('v_van_day_cash', '*', 'van_day_id', days.map(d => d.id)));
+const getColl  = days => cached('o' + rk(), () => byIds('collections', '*', 'van_day_id', days.map(d => d.id)));
+const getExp   = days => cached('e' + rk(), () => byIds('expenses', '*', 'van_day_id', days.map(d => d.id)));
+const getCust  = () => cached('cu' + S.br, () => fetchAll(() => sb.from('customers').select('id,itrade_code,name,branch_id').eq('branch_id', S.br)));
+const saleName = r => r.salesman_id ? smNm(r.salesman_id) : (r.sales_executive || r.itrade_user || 'STORE SALE');
+
+// generic table: cols = [{k, l, left, f(row)->value, sum:true, money:true, cls(row)}]
+function table(cols, rows, opt = {}){
+  const val = (c, r) => c.f ? c.f(r) : r[c.k];
+  const show = (c, v) => v === '' || v == null ? '' : c.money ? money(v) : typeof v === 'number' ? r2(v) : esc(v);
+  const tot = cols.some(c => c.sum) && rows.length ? `<tr class="tot">${cols.map((c,i) => `<td class="${c.left?'l':''}">${i === 0 ? 'Total' : c.sum ? show(c, rows.reduce((a,r) => a + num(val(c,r)), 0)) : ''}</td>`).join('')}</tr>` : '';
+  return rows.length ? `<div class="tw"${opt.max ? ` style="max-height:${opt.max}px"` : ''}><table><tr>${cols.map(c => `<th class="${c.left?'l':''}">${esc(c.l)}</th>`).join('')}</tr>
+    ${rows.map((r,ri) => `<tr${opt.click ? ` data-row="${ri}" style="cursor:pointer"` : ''}>${cols.map(c => { const v = val(c, r); return `<td class="${c.left?'l':''} ${c.cls ? c.cls(r) : ''}">${c.html ? c.html(r) : show(c, v)}</td>`; }).join('')}</tr>`).join('')}${tot}</table></div>`
+    : `<p class="muted">${opt.empty || 'No data for this period.'}</p>`;
+}
+const bindRows = (root, rows, fn) => root.querySelectorAll('[data-row]').forEach(tr => tr.onclick = () => fn(rows[+tr.dataset.row]));
+async function toExcel(name, sheets){   // sheets: [[sheetName, cols, rows]]
+  const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm'), wb = XLSX.utils.book_new(), brn = S.branches.find(b => b.id === S.br)?.name || '';
+  sheets.forEach(([sn, cols, rows]) => {
+    const val = (c, r) => { const v = c.f ? c.f(r) : r[c.k]; return typeof v === 'number' ? r2(v) : v ?? ''; };
+    const aoa = [[`MAHRJAN — ${brn} — ${sn} — ${S.from && RANGE.has(S.tab) ? S.from + ' to ' : ''}${S.date}`], cols.map(c => c.l), ...rows.map(r => cols.map(c => val(c, r)))];
+    if (cols.some(c => c.sum)) aoa.push(cols.map((c,i) => i === 0 ? 'Total' : c.sum ? r2(rows.reduce((a,r) => a + num(c.f ? c.f(r) : r[c.k]), 0)) : ''));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sn.replace(/[\/\\?*\[\]:]/g,'-').slice(0,31));
+  });
+  XLSX.writeFile(wb, `${name} - ${brn} - ${RANGE.has(S.tab) && S.from !== S.date ? S.from + ' to ' : ''}${S.date}.xlsx`);
+}
+const tools = (extra = '') => `<div class="row noprint" style="margin:0">${extra}<button id="xl">Download Excel</button><button id="pr">Print</button></div>`;
+function bindTools(name, sheets){ $('#xl') && ($('#xl').onclick = () => toExcel(name, typeof sheets === 'function' ? sheets() : sheets)); $('#pr') && ($('#pr').onclick = () => window.print()); }
+const loading = () => $('#v').innerHTML = '<div class="card"><p class="muted">Loading…</p></div>';
+const kpi = (l, v, sub = '') => `<div class="kpi"><span>${esc(l)}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+function aggregate(rows, keyF, init, add){ const m = new Map(); rows.forEach(r => { const k = keyF(r); if (k == null) return; if (!m.has(k)) m.set(k, init(r)); add(m.get(k), r); }); return [...m.values()]; }
+
+// ---------- OVERVIEW ----------
+async function vOverview(){
+  loading();
+  const [sales, days] = await Promise.all([getSales(), getDays()]);
+  const [cash, coll, exp] = await Promise.all([getCash(days), getColl(days), getExp(days)]);
+  const cr = sales.filter(r => r.tran_type === 'CR'), rt = sales.filter(r => r.tran_type !== 'CR');
+  const sum = (a, k) => a.reduce((x, r) => x + num(r[k]), 0);
+  const byDay = aggregate(sales, r => r.tran_date, r => ({ d:r.tran_date, net:0 }), (o,r) => o.net += num(r.net_incl_vat)).sort((a,b) => a.d < b.d ? -1 : 1);
+  const mx = Math.max(1, ...byDay.map(d => d.net)), W = Math.max(byDay.length * 34, 300);
+  const chart = byDay.length ? `<svg viewBox="0 0 ${W} 200" style="width:100%;max-width:${W}px;height:200px">${byDay.map((d,i) => { const h = Math.max(0, d.net) / mx * 150;
+      return `<g><rect x="${i*34+6}" y="${170-h}" width="22" height="${h}" fill="#0f5f57" rx="3"><title>${d.d}: AED ${money(d.net)}</title></rect><text x="${i*34+17}" y="188" font-size="10" text-anchor="middle" fill="#6b7370">${d.d.slice(8)}</text></g>`; }).join('')}</svg>` : '<p class="muted">No sales imported for this period.</p>';
+  const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); o.inv.add(r.invoice_no); if (r.tran_type === 'CR') o.cust.add(r.customer_code); })
+    .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size })).sort((a,b) => b.net - a.net);
+  const it = aggregate(sales, r => r.item_id || r.item_code, r => ({ name:r.item_id ? iNm(r.item_id) : r.item_name, qty:0, net:0 }), (o,r) => { o.qty += num(r.qty_base); o.net += num(r.net_incl_vat); }).sort((a,b) => b.net - a.net).slice(0, 15);
+  $('#v').innerHTML = `<div class="kpis">
+      ${kpi('Net sales', 'AED ' + money(sum(sales,'net_incl_vat')), 'incl. VAT, after returns')}
+      ${kpi('Sales', 'AED ' + money(sum(cr,'net_incl_vat')), new Set(cr.map(r => r.invoice_no)).size + ' invoices')}
+      ${kpi('Returns', 'AED ' + money(-sum(rt,'net_incl_vat')), new Set(rt.map(r => r.invoice_no)).size + ' returns')}
+      ${kpi('Cash / credit', money(sum(cr.filter(r=>r.tender_type==='Cash'),'net_incl_vat')) + ' / ' + money(sum(cr.filter(r=>r.tender_type==='Credit'),'net_incl_vat')), 'sales, AED')}
+      ${kpi('Collections', 'AED ' + money(sum(coll,'amount')), coll.length + ' receipts')}
+      ${kpi('Expenses', 'AED ' + money(sum(exp,'amount')), exp.length + ' lines')}
+      ${kpi('Cash to hand over', 'AED ' + money(sum(cash,'cash_to_hand_over')), days.length + ' van days')}
+      ${kpi('Profit', 'AED ' + money(sum(sales,'profit')), 'as per iTrade')}</div>
+    <div class="card"><h3>Daily net sales (AED)</h3>${chart}</div>
+    <div class="card"><h3>Salesman performance</h3>${table([{k:'name',l:'Salesman',left:1},{k:'customers',l:'Customers',sum:1},{k:'invoices',l:'Invoices',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], sm)}</div>
+    <div class="card"><h3>Top items</h3>${table([{k:'name',l:'Item',left:1},{k:'qty',l:'Qty (pk / pcs)',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], it)}</div>`;
+}
+
+// ---------- DAILY DASHBOARD ----------
+async function dayRows(){
+  const days = (await getDays()).filter(d => d.business_date === S.date);
+  const [its, cash] = await Promise.all([getItems(days), getCash(days)]);
+  const list = [...salesmen().map(s => s.id), ...days.map(d => d.salesman_id)].filter((v,i,a) => a.indexOf(v) === i);
+  return list.map(sid => { const d = days.find(x => x.salesman_id === sid), I = d ? its.filter(x => x.van_day_id === d.id) : [], c = d ? cash.find(x => x.van_day_id === d.id) || {} : {};
+    const s = k => I.reduce((a,x) => a + num(x[k]), 0);
+    const flags = []; if (!d) flags.push('No van day'); else {
+      if (d.status === 'OPEN') flags.push('Not loaded'); if (d.status === 'LOADED') flags.push('No return');
+      if (s('short')) flags.push('Short'); if (s('excess')) flags.push('Excess'); if (I.some(x => x.flag)) flags.push('Sale without load');
+      if (['RETURNED','LOADED'].includes(d.status)) flags.push('Not settled');
+      if (d.cash_counted != null && r2(num(d.cash_counted) - num(d.cash_expected ?? c.cash_to_hand_over))) flags.push('Cash difference'); }
+    return { sid, name:smNm(sid), day:d, van:S.vans.find(v => v.id === d?.van_id)?.van_no || '', status:d?.status || '—',
+      load:s('load'), sale:s('sale'), grv:s('grv'), ret:s('total_return'), short:s('short'), excess:s('excess'), good:s('good'), damage:s('damage'), expiry:s('expiry'), waste:s('waste'), foc:s('foc'),
+      cash_sales:num(c.cash_sales), cash_returns:num(c.cash_returns), credit:num(c.credit_sales), coll:num(c.collections), exp:num(c.expenses), hand:num(c.cash_to_hand_over),
+      counted:d?.cash_counted, diff:d?.cash_counted != null ? num(d.cash_counted) - num(d.cash_expected ?? c.cash_to_hand_over) : null, items:I, flags }; });
+}
+async function vDash(){
+  loading(); const R = await dayRows();
+  const cols = [{k:'name',l:'Salesman',left:1},{k:'van',l:'Van'},{l:'Status',html:r => `<span class="st ${r.status}">${r.status}</span>`,f:r=>r.status},{k:'load',l:'Load',sum:1},{k:'sale',l:'Sale',sum:1},{k:'grv',l:'GRV',sum:1},{k:'ret',l:'Return',sum:1},
+    {k:'short',l:'Short',sum:1,cls:r=>r.short?'bad':''},{k:'excess',l:'Excess',sum:1,cls:r=>r.excess?'bad':''},{k:'cash_sales',l:'Cash sales',money:1,sum:1},{k:'credit',l:'Credit',money:1,sum:1},
+    {k:'coll',l:'Collections',money:1,sum:1},{k:'exp',l:'Expenses',money:1,sum:1},{k:'hand',l:'To hand over',money:1,sum:1},{l:'Counted',f:r=>r.counted==null?'':num(r.counted),money:1,sum:1},
+    {l:'Cash diff',f:r=>r.diff==null?'':r.diff,money:1,sum:1,cls:r=>r.diff?'bad':''},{l:'Problems',left:1,f:r=>r.flags.join(', '),cls:r=>r.flags.length?'bad':''}];
+  const bad = R.filter(r => r.flags.length).length;
+  $('#v').innerHTML = `<div class="kpis">${kpi('Salesmen', R.length)}${kpi('Closed', R.filter(r=>r.status==='CLOSED').length)}${kpi('With problems', bad)}${kpi('Cash to hand over','AED '+money(R.reduce((a,r)=>a+r.hand,0)))}</div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Today at a glance — ${S.date}</h3>${tools()}</div>${table(cols, R, { click:1 })}
+    <p class="muted" style="margin-top:8px">Click a salesman to open the day in Van days.</p></div>`;
+  bindRows($('#v'), R, r => { if (r.day) { S.tab = 'days'; S.dayId = r.day.id; render(); } });
+  bindTools('Daily dashboard', [['Daily dashboard', cols, R]]);
+}
+
+// ---------- DAILY SHEETS (A4) ----------
+async function vSheets(){
+  loading(); const R = await dayRows(); S.dsm = S.dsm || '';
+  const one = R.filter(r => r.day && (!S.dsm || r.sid === +S.dsm));
+  const exps = await getExp((await getDays()).filter(d => d.business_date === S.date));
+  const brn = S.branches.find(b => b.id === S.br)?.name || '';
+  const head = t => `<div class="sheet-head"><b>MAHRJAN GENERAL TRADING — ${esc(brn.toUpperCase())}</b><span>${t} · ${S.date}</span></div>`;
+  const loadSheet = r => { const I = r.items.slice().sort((a,b) => ord(a.item_id) - ord(b.item_id));
+    return `<div class="card sheet">${head('LOADING SHEET')}<div class="row" style="gap:28px;margin:6px 0 10px"><span>Salesman <b>${esc(r.name)}</b></span><span>Van <b>${esc(r.van)}</b></span>
+      <span>KM <b>${r.day.start_km ?? ''} – ${r.day.end_km ?? ''}</b></span><span>Temp <b>${r.day.load_temp ?? ''} / ${r.day.unload_temp ?? ''}</b></span><span>Status <b>${r.status}</b></span></div>
+      ${table([{l:'Item',left:1,f:x=>iNm(x.item_id)},{l:'Load',f:x=>showQty(item(x.item_id),x.load)},{k:'load',l:'Load qty',sum:1},{k:'sale',l:'Sale',sum:1},{k:'grv',l:'GRV',sum:1},{k:'good',l:'Good',sum:1},{k:'damage',l:'Dmg',sum:1},{k:'expiry',l:'Exp',sum:1},{k:'waste',l:'Wst',sum:1},{k:'foc',l:'FOC',sum:1},
+        {k:'total_return',l:'Total return',sum:1},{k:'short',l:'Short',sum:1,cls:x=>x.short?'bad':''},{k:'excess',l:'Excess',sum:1,cls:x=>x.excess?'bad':''}], I)}
+      <div class="signs"><span>Salesman</span><span>Receiver</span><span>Accountant</span></div></div>`; };
+  const sumCols = [{k:'name',l:'Salesman',left:1},{k:'van',l:'Van'},{k:'load',l:'Load',sum:1},{k:'sale',l:'Sale',sum:1},{k:'grv',l:'GRV',sum:1},{k:'ret',l:'Return',sum:1},{k:'damage',l:'Dmg',sum:1},{k:'expiry',l:'Exp',sum:1},{k:'waste',l:'Wst',sum:1},{k:'foc',l:'FOC',sum:1},{k:'short',l:'Short',sum:1},{k:'excess',l:'Excess',sum:1},{l:'Net sales AED',f:r=>r.cash_sales+r.cash_returns+r.credit,money:1,sum:1}];
+  const et = [...new Set(exps.map(e => e.expense_type))];
+  const cashCols = [{k:'name',l:'Salesman',left:1},{k:'cash_sales',l:'Cash sales',money:1,sum:1},{k:'cash_returns',l:'Cash returns',money:1,sum:1},{k:'coll',l:'Collections',money:1,sum:1},
+    ...et.map(t => ({ l:t.charAt(0) + t.slice(1).toLowerCase(), money:1, sum:1, f:r => r.day ? exps.filter(e => e.van_day_id === r.day.id && e.expense_type === t).reduce((a,e) => a + num(e.amount), 0) : 0 })),
+    {k:'hand',l:'To hand over',money:1,sum:1},{l:'Counted',f:r=>r.counted==null?'':num(r.counted),money:1,sum:1},{l:'Difference',f:r=>r.diff==null?'':r.diff,money:1,sum:1,cls:r=>r.diff?'bad':''},{k:'credit',l:'Credit sales',money:1,sum:1}];
+  const withDay = R.filter(r => r.day);
+  $('#v').innerHTML = `<div class="card noprint"><div class="row" style="margin:0"><label>Salesman (loading sheet)<select id="dsm"><option value="">All salesmen</option>${withDay.map(r => `<option value="${r.sid}" ${+S.dsm===r.sid?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>${tools()}</div>
+      <p class="muted" style="margin-top:8px">Print prints each sheet on its own A4 page.</p></div>
+    ${one.map(loadSheet).join('') || '<div class="card"><p class="muted">No van days for this date.</p></div>'}
+    <div class="card sheet">${head('SALESMAN SUMMARY')}${table(sumCols, withDay)}</div>
+    <div class="card sheet">${head('DAILY CASH SHEET')}${table(cashCols, withDay)}<div class="signs"><span>Prepared by</span><span>Accountant</span><span>Manager</span></div></div>`;
+  $('#dsm').onchange = e => { S.dsm = e.target.value; vSheets(); };
+  bindTools('Daily sheets', () => [...one.map(r => [r.name.slice(0,25), [{l:'Item',f:x=>iNm(x.item_id)},{k:'load',l:'Load',sum:1},{k:'sale',l:'Sale',sum:1},{k:'grv',l:'GRV',sum:1},{k:'good',l:'Good',sum:1},{k:'damage',l:'Dmg',sum:1},{k:'expiry',l:'Exp',sum:1},{k:'waste',l:'Wst',sum:1},{k:'foc',l:'FOC',sum:1},{k:'total_return',l:'Total return',sum:1},{k:'short',l:'Short',sum:1},{k:'excess',l:'Excess',sum:1}], r.items]),
+    ['Salesman summary', sumCols, withDay], ['Cash sheet', cashCols, withDay]]);
+}
+
+// ---------- range item rows (van days in range) ----------
+async function rangeItems(){ const days = await getDays(); const its = await getItems(days); const dm = new Map(days.map(d => [d.id, d])); return its.map(x => ({ ...x, d:dm.get(x.van_day_id) })).filter(x => x.d); }
+function groupToggle(opts){ S.grp = opts.some(o => o[0] === S.grp) ? S.grp : opts[0][0];
+  return `<label>Show<select id="grp">${opts.map(([k,l]) => `<option value="${k}" ${k===S.grp?'selected':''}>${l}</option>`).join('')}</select></label>`; }
+
+// ---------- SHORT & EXCESS ----------
+async function vShort(){
+  loading(); const X = (await rangeItems()).filter(x => num(x.short) || num(x.excess));
+  const by = { sm:x => x.d.salesman_id, it:x => x.item_id, sd:x => x.d.business_date + '|' + x.d.salesman_id + '|' + x.item_id };
+  const g = groupToggle([['sm','Salesman-wise'],['it','Item-wise'],['sd','Date-wise detail']]);
+  const rows = aggregate(X, by[S.grp], x => ({ date:x.d.business_date, sm:smNm(x.d.salesman_id), item:iNm(x.item_id), io:ord(x.item_id), short:0, excess:0, val:0 }),
+    (o,x) => { o.short += num(x.short); o.excess += num(x.excess); const rate = num(x.sale) ? num(x.sale_value) / num(x.sale) : 0; o.val += (num(x.excess) - num(x.short)) * rate; })
+    .sort((a,b) => S.grp === 'it' ? a.io - b.io : S.grp === 'sd' ? (a.date < b.date ? -1 : a.date > b.date ? 1 : a.sm.localeCompare(b.sm) || a.io - b.io) : a.sm.localeCompare(b.sm));
+  const cols = [...(S.grp === 'sd' ? [{k:'date',l:'Date'}] : []), ...(S.grp !== 'it' ? [{k:'sm',l:'Salesman',left:1}] : []), ...(S.grp !== 'sm' ? [{k:'item',l:'Item',left:1}] : []),
+    {k:'short',l:'Short',sum:1,cls:r=>r.short?'bad':''},{k:'excess',l:'Excess',sum:1},{l:'Net',f:r=>r.excess-r.short,sum:1},{k:'val',l:'Value AED (sale rate)',money:1,sum:1}];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows)}
+    <p class="muted" style="margin-top:8px">Excess / short = total return − (load − sale + GRV), per van day and item. Value uses the salesman's own average sale rate for that item and day.</p></div>`;
+  $('#grp').onchange = e => { S.grp = e.target.value; vShort(); }; bindTools('Short and excess', [['Short & excess', cols, rows]]);
+}
+
+// ---------- FOC & WRITE-OFFS ----------
+async function vWriteoff(){
+  loading(); const [X, sales] = await Promise.all([rangeItems(), getSales()]);
+  const rate = {}; aggregate(sales.filter(r => r.tran_type === 'CR' && r.item_id), r => r.item_id, r => ({ id:r.item_id, q:0, v:0 }), (o,r) => { o.q += num(r.qty_base); o.v += num(r.net_incl_vat); }).forEach(o => rate[o.id] = o.q ? o.v / o.q : 0);
+  const W = X.filter(x => num(x.damage) || num(x.expiry) || num(x.waste) || num(x.foc));
+  const g = groupToggle([['sm','Salesman-wise'],['it','Item-wise'],['si','Salesman and item']]);
+  const key = { sm:x => x.d.salesman_id, it:x => x.item_id, si:x => x.d.salesman_id + '|' + x.item_id }[S.grp];
+  const rows = aggregate(W, key, x => ({ sm:smNm(x.d.salesman_id), item:iNm(x.item_id), io:ord(x.item_id), damage:0, expiry:0, waste:0, foc:0, val:0 }),
+    (o,x) => { ['damage','expiry','waste','foc'].forEach(k => o[k] += num(x[k])); o.val += (num(x.damage) + num(x.expiry) + num(x.waste) + num(x.foc)) * (rate[x.item_id] || 0); })
+    .sort((a,b) => S.grp === 'it' ? a.io - b.io : a.sm.localeCompare(b.sm) || a.io - b.io);
+  const cols = [...(S.grp !== 'it' ? [{k:'sm',l:'Salesman',left:1}] : []), ...(S.grp !== 'sm' ? [{k:'item',l:'Item',left:1}] : []),
+    {k:'damage',l:'Damage',sum:1},{k:'expiry',l:'Expiry',sum:1},{k:'waste',l:'Waste',sum:1},{k:'foc',l:'FOC',sum:1},{l:'Total',f:r=>r.damage+r.expiry+r.waste+r.foc,sum:1},{k:'val',l:'Value AED',money:1,sum:1}];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows)}
+    <p class="muted" style="margin-top:8px">Quantities from the van returns. Value = qty × the item's average selling price (incl. VAT) in this period.</p></div>`;
+  $('#grp').onchange = e => { S.grp = e.target.value; vWriteoff(); }; bindTools('FOC and write-offs', [['FOC & write-offs', cols, rows]]);
+}
+
+// ---------- QTY BY SALESMAN ----------
+async function vQty(){
+  loading(); const sales = (await getSales()).filter(r => r.item_id);
+  S.qu = S.qu || 'ctn';
+  const ids = [...new Set(sales.map(r => r.item_id))].sort((a,b) => ord(a) - ord(b));
+  const rows = aggregate(sales, saleName, r => ({ sm:saleName(r), q:{} }), (o,r) => o.q[r.item_id] = (o.q[r.item_id] || 0) + num(r.qty_base)).sort((a,b) => a.sm.localeCompare(b.sm));
+  const cv = (id, v) => S.qu === 'ctn' ? v / per(item(id)) : v;
+  const cols = [{k:'sm',l:'Salesman',left:1}, ...ids.map(id => ({ l:iNm(id), sum:1, f:r => nz(cv(id, num(r.q[id]))) })), ...(S.qu === 'ctn' ? [{ l:'Total cartons', sum:1, f:r => r2(ids.reduce((a,id) => a + cv(id, num(r.q[id])), 0)) }] : [])];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><label>Unit<select id="qu"><option value="ctn" ${S.qu==='ctn'?'selected':''}>Cartons</option><option value="pcs" ${S.qu==='pcs'?'selected':''}>Packs / pieces</option></select></label>${tools()}</div>
+    ${table(cols, rows)}<p class="muted" style="margin-top:8px">Net qty (sales less returns) from the imported iTrade sales. Raw egg in pieces, finished goods in packs.</p></div>`;
+  $('#qu').onchange = e => { S.qu = e.target.value; vQty(); }; bindTools('Qty by salesman', [['Qty by salesman', cols, rows]]);
+}
+
+// ---------- SALES ANALYSIS ----------
+async function vAnalysis(){
+  loading(); const all = await getSales();
+  const F = S.saf = S.saf || { sm:'', item:'', cust:'', tender:'', type:'NET', by:'sm' };
+  const sms = [...new Set(all.map(saleName))].sort(), its = [...new Set(all.filter(r => r.item_id).map(r => r.item_id))].sort((a,b) => ord(a) - ord(b));
+  const rows = all.filter(r => (!F.sm || saleName(r) === F.sm) && (!F.item || r.item_id === +F.item) && (!F.tender || r.tender_type === F.tender)
+    && (F.type === 'NET' || (F.type === 'CR' ? r.tran_type === 'CR' : r.tran_type !== 'CR'))
+    && (!F.cust || (r.customer_name + ' ' + r.customer_code).toLowerCase().includes(F.cust.toLowerCase())));
+  const K = { sm:[saleName, r => saleName(r), 'Salesman'], cu:[r => r.customer_code, r => r.customer_name, 'Customer'], it:[r => r.item_id || r.item_code, r => r.item_id ? iNm(r.item_id) : r.item_name, 'Item'],
+    dt:[r => r.tran_date, r => r.tran_date, 'Date'], iv:[r => r.invoice_no, r => r.invoice_no, 'Invoice'], td:[r => r.tender_type, r => r.tender_type, 'Cash / credit'] }[F.by];
+  const G = aggregate(rows, K[0], r => ({ key:K[0](r), label:K[1](r), code:F.by === 'cu' ? r.customer_code : F.by === 'it' ? r.item_code : F.by === 'iv' ? r.tran_date : '', sub:F.by === 'iv' ? r.customer_name : '', inv:new Set(), cust:new Set(), qty:0, gross:0, disc:0, net:0, vat:0, tot:0, profit:0 }),
+    (o,r) => { o.inv.add(r.invoice_no); o.cust.add(r.customer_code); o.qty += num(r.qty_base); o.gross += num(r.gross); o.disc += num(r.disc); o.net += num(r.net); o.vat += num(r.vat); o.tot += num(r.net_incl_vat); o.profit += num(r.profit); })
+    .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size }));
+  G.sort((a,b) => F.by === 'dt' || F.by === 'iv' ? (a.key < b.key ? -1 : 1) : b.tot - a.tot);
+  const cols = [{k:'label',l:K[2],left:1}, ...(['cu','it','iv'].includes(F.by) ? [{k:'code',l:F.by === 'iv' ? 'Date' : 'Code'}] : []), ...(F.by === 'iv' ? [{k:'sub',l:'Customer',left:1}] : []),
+    ...(F.by !== 'iv' ? [{k:'invoices',l:'Invoices',sum:1}] : []), ...(!['cu','iv'].includes(F.by) ? [{k:'customers',l:'Customers'}] : []),
+    {k:'qty',l:'Qty',sum:1},{k:'gross',l:'Gross',money:1,sum:1},{k:'disc',l:'Discount',money:1,sum:1},{k:'net',l:'Net',money:1,sum:1},{k:'vat',l:'VAT',money:1,sum:1},{k:'tot',l:'Net incl. VAT',money:1,sum:1},{k:'profit',l:'Profit',money:1,sum:1}];
+  const sel = (id, lab, opts, v) => `<label>${lab}<select id="${id}">${opts.map(([k,l]) => `<option value="${esc(k)}" ${String(k)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+  $('#v').innerHTML = `<div class="card"><div class="row">
+      ${sel('f_by','Group by',[['sm','Salesman'],['cu','Customer'],['it','Item'],['iv','Invoice'],['dt','Date'],['td','Cash / credit']],F.by)}
+      ${sel('f_sm','Salesman',[['','All salesmen'],...sms.map(s=>[s,s])],F.sm)}
+      ${sel('f_item','Item',[['','All items'],...its.map(i=>[i,iNm(i)])],F.item)}
+      ${sel('f_tender','Tender',[['','Cash and credit'],['Cash','Cash'],['Credit','Credit']],F.tender)}
+      ${sel('f_type','Transactions',[['NET','Net sales'],['CR','Sales'],['SR','Sales returns']],F.type)}
+      <label>Customer<input id="f_cust" value="${esc(F.cust)}" placeholder="Name or code"></label>
+      <button id="f_clr">Clear filters</button>${tools()}</div>
+    <p class="muted">${rows.length} lines · ${new Set(rows.map(r=>r.invoice_no)).size} invoices · AED incl. VAT ${money(rows.reduce((a,r)=>a+num(r.net_incl_vat),0))}. Click a row to drill down.</p>
+    ${table(cols, G, { click:1, max:640 })}</div><div id="drill"></div>`;
+  ['by','sm','item','tender','type'].forEach(k => $('#f_' + k).onchange = e => { F[k] = e.target.value; vAnalysis(); });
+  $('#f_cust').onchange = e => { F.cust = e.target.value.trim(); vAnalysis(); };
+  $('#f_clr').onclick = () => { S.saf = null; vAnalysis(); };
+  bindRows($('#v'), G, g => {
+    if (F.by === 'iv') { const L = rows.filter(r => r.invoice_no === g.key);
+      $('#drill').innerHTML = `<div class="card"><h3>${esc(g.key)} — ${esc(g.sub)} · ${esc(L[0]?.tran_date||'')} · ${esc(L[0]?.tender_type||'')} · ${esc(saleName(L[0]||{}))}</h3>
+        ${table([{l:'Item',left:1,f:r=>r.item_id?iNm(r.item_id):r.item_name},{k:'item_code',l:'Code'},{k:'qty_base',l:'Qty',sum:1},{k:'gross',l:'Gross',money:1,sum:1},{k:'disc',l:'Discount',money:1,sum:1},{k:'net',l:'Net',money:1,sum:1},{k:'vat',l:'VAT',money:1,sum:1},{k:'net_incl_vat',l:'Net incl. VAT',money:1,sum:1}], L)}</div>`;
+    } else { const nf = { ...F, by:'iv' }; const fk = { sm:'sm', it:'item', cu:'cust', td:'tender' }[F.by]; if (fk) nf[fk] = String(g.key);
+      if (F.by === 'dt') { S.from = S.date = g.key; } S.saf = nf; render(); return; }
+    $('#drill').scrollIntoView({ behavior:'smooth' });
+  });
+  bindTools('Sales analysis', () => [[K[2] + '-wise', cols, G], ['Lines', [{k:'tran_date',l:'Date'},{k:'invoice_no',l:'Invoice'},{k:'tran_type',l:'Type'},{k:'tender_type',l:'Tender'},{l:'Salesman',f:saleName},{k:'customer_code',l:'Customer code'},{k:'customer_name',l:'Customer'},{k:'item_code',l:'Item code'},{l:'Item',f:r=>r.item_id?iNm(r.item_id):r.item_name},{k:'qty_base',l:'Qty',sum:1},{k:'gross',l:'Gross',sum:1},{k:'disc',l:'Discount',sum:1},{k:'net',l:'Net',sum:1},{k:'vat',l:'VAT',sum:1},{k:'net_incl_vat',l:'Net incl. VAT',sum:1},{k:'profit',l:'Profit',sum:1}], rows]]);
+}
+
+// ---------- LOADING & RETURN ----------
+async function vLoadRet(){
+  loading(); const X = await rangeItems();
+  const g = groupToggle([['sm','Salesman-wise'],['it','Item-wise'],['si','Salesman and item'],['dt','Date-wise']]);
+  const key = { sm:x => x.d.salesman_id, it:x => x.item_id, si:x => x.d.salesman_id + '|' + x.item_id, dt:x => x.d.business_date }[S.grp];
+  const K = ['load','sale','grv','good','damage','expiry','waste','foc','total_return','short','excess'];
+  const rows = aggregate(X, key, x => ({ date:x.d.business_date, sm:smNm(x.d.salesman_id), item:iNm(x.item_id), io:ord(x.item_id), ...Object.fromEntries(K.map(k => [k, 0])) }), (o,x) => K.forEach(k => o[k] += num(x[k])))
+    .sort((a,b) => S.grp === 'it' ? a.io - b.io : S.grp === 'dt' ? (a.date < b.date ? -1 : 1) : a.sm.localeCompare(b.sm) || a.io - b.io);
+  const cols = [...(S.grp === 'dt' ? [{k:'date',l:'Date'}] : []), ...(['sm','si'].includes(S.grp) ? [{k:'sm',l:'Salesman',left:1}] : []), ...(['it','si'].includes(S.grp) ? [{k:'item',l:'Item',left:1}] : []),
+    ...K.map(k => ({ k, l:{load:'Load',sale:'Sale',grv:'GRV',good:'Good',damage:'Dmg',expiry:'Exp',waste:'Wst',foc:'FOC',total_return:'Total return',short:'Short',excess:'Excess'}[k], sum:1, cls:k==='short'||k==='excess'?(r=>r[k]?'bad':''):null }))];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows, { max:700 })}
+    <p class="muted" style="margin-top:8px">Packs for finished goods, pieces for raw egg. Totals mix both units when items are combined.</p></div>`;
+  $('#grp').onchange = e => { S.grp = e.target.value; vLoadRet(); }; bindTools('Loading and return', [['Loading & return', cols, rows]]);
+}
+
+// ---------- VAN LOG ----------
+async function vVanLog(){
+  loading(); const days = await getDays();
+  const rows = days.map(d => ({ ...d, sm:smNm(d.salesman_id), van:S.vans.find(v => v.id === d.van_id)?.van_no || '', km:d.end_km != null && d.start_km != null ? d.end_km - d.start_km : '' }))
+    .sort((a,b) => a.business_date < b.business_date ? -1 : a.business_date > b.business_date ? 1 : a.sm.localeCompare(b.sm));
+  const cols = [{k:'business_date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'van',l:'Van'},{l:'Status',k:'status'},{k:'start_km',l:'Start KM'},{k:'end_km',l:'End KM'},{k:'km',l:'KM run',sum:1},
+    {l:'Load time',f:r=>(r.load_time||'').slice(0,5)},{k:'load_temp',l:'Load °C'},{l:'Unload time',f:r=>(r.unload_time||'').slice(0,5)},{k:'unload_temp',l:'Unload °C',cls:r=>num(r.unload_temp)>8?'bad':''},{k:'carton_small',l:'Ctn small',sum:1},{k:'carton_big',l:'Ctn big',sum:1}];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:flex-end">${tools()}</div>${table(cols, rows, { max:700 })}</div>`;
+  bindTools('Van log', [['Van log', cols, rows]]);
+}
+
+// ---------- COLLECTIONS ----------
+async function vCollections(){
+  loading(); const days = await getDays(); const [C, cu] = await Promise.all([getColl(days), getCust()]); const dm = new Map(days.map(d => [d.id, d]));
+  const rows = C.map(c => { const d = dm.get(c.van_day_id), k = cu.find(x => x.id === c.customer_id) || {}; return { ...c, date:d?.business_date, sm:smNm(d?.salesman_id), cust:k.name || '', code:k.itrade_code || '' }; })
+    .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.sm.localeCompare(b.sm));
+  const byMode = aggregate(rows, r => r.sm + '|' + r.mode, r => ({ sm:r.sm, mode:r.mode, n:0, amount:0 }), (o,r) => { o.n++; o.amount += num(r.amount); }).sort((a,b) => a.sm.localeCompare(b.sm));
+  const c1 = [{k:'sm',l:'Salesman',left:1},{k:'mode',l:'Mode'},{k:'n',l:'Receipts',sum:1},{k:'amount',l:'Amount AED',money:1,sum:1}];
+  const c2 = [{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'receipt_no',l:'Receipt'},{k:'invoice_no',l:'Invoice'},{k:'code',l:'Code'},{k:'cust',l:'Customer',left:1},{k:'mode',l:'Mode'},{k:'amount',l:'Amount AED',money:1,sum:1}];
+  $('#v').innerHTML = `<div class="kpis">${['CASH','CHEQUE','TRANSFER'].map(m => kpi(m.charAt(0)+m.slice(1).toLowerCase(), 'AED ' + money(rows.filter(r=>r.mode===m).reduce((a,r)=>a+num(r.amount),0)))).join('')}${kpi('Total','AED '+money(rows.reduce((a,r)=>a+num(r.amount),0)), rows.length+' receipts')}</div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Salesman and mode</h3>${tools()}</div>${table(c1, byMode)}</div>
+    <div class="card"><h3>Receipts</h3>${table(c2, rows, { max:600 })}</div>`;
+  bindTools('Collections', [['By salesman', c1, byMode], ['Receipts', c2, rows]]);
+}
+
+// ---------- EXPENSES ----------
+async function vExpenses(){
+  loading(); const days = await getDays(); const [E, cu] = await Promise.all([getExp(days), getCust()]); const dm = new Map(days.map(d => [d.id, d]));
+  const rows = E.map(e => { const d = dm.get(e.van_day_id); return { ...e, date:d?.business_date, sm:smNm(d?.salesman_id), cust:cu.find(x => x.id === e.customer_id)?.name || '' }; })
+    .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.sm.localeCompare(b.sm));
+  const types = [...new Set(rows.map(r => r.expense_type))].sort();
+  const piv = aggregate(rows, r => r.sm, r => ({ sm:r.sm, t:{} }), (o,r) => o.t[r.expense_type] = (o.t[r.expense_type] || 0) + num(r.amount)).sort((a,b) => a.sm.localeCompare(b.sm));
+  const c1 = [{k:'sm',l:'Salesman',left:1}, ...types.map(t => ({ l:t.charAt(0)+t.slice(1).toLowerCase(), money:1, sum:1, f:r => num(r.t[t]) })), { l:'Total', money:1, sum:1, f:r => Object.values(r.t).reduce((a,v) => a + v, 0) }];
+  const c2 = [{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'expense_type',l:'Type'},{k:'cust',l:'Customer',left:1},{k:'note',l:'Note',left:1},{k:'amount',l:'Amount AED',money:1,sum:1}];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Salesman and type</h3>${tools()}</div>${table(c1, piv)}</div>
+    <div class="card"><h3>Expense lines</h3>${table(c2, rows, { max:600 })}</div>`;
+  bindTools('Expenses', [['By salesman', c1, piv], ['Lines', c2, rows]]);
+}
+
+// ---------- PETTY CASH ----------
+const PT = [['RECEIPT','Receipt',1],['PAYMENT','Payment',-1],['FOOD ALLOWANCE','Food allowance',-1],['TRAVEL ALLOWANCE','Travel allowance',-1],['DEPOSIT','Bank deposit',-1],['SUSPENSE','Suspense given',-1],['SUSPENSE CLEARED','Suspense cleared',1]];
+const pdir = t => (PT.find(x => x[0] === t) || [0,0,-1])[2];
+async function vPetty(){
+  loading();
+  const { error:pe } = await sb.from('petty_cash').select('id').limit(1);
+  if (pe) { $('#v').innerHTML = `<div class="card"><div class="notice">Petty cash is not installed in the database yet. Run <b>docs/sql/PETTY CASH - CREATE.sql</b> in the Supabase SQL editor once, then reload this page.</div></div>`; return; }
+  const [L, opening, sus] = await Promise.all([
+    q(sb.from('petty_cash').select('*').eq('branch_id', S.br).eq('entry_date', S.date).order('line_no')),
+    rpc('petty_opening', { p_branch:S.br, p_date:S.date }),
+    fetchAll(() => sb.from('petty_cash').select('entry_date,line_type,party,ref,amount').eq('branch_id', S.br).in('line_type', ['SUSPENSE','SUSPENSE CLEARED']).lte('entry_date', S.date).order('entry_date'))]);
+  const E = canE('pc');
+  let lines = L.map(l => ({ line_type:l.line_type, ref:l.ref || '', party:l.party, note:l.note || '', for_date:l.for_date || '', amount:num(l.amount) }));
+  const openSus = aggregate(sus, r => r.party.trim().toUpperCase(), r => ({ party:r.party, given:'', amount:0 }), (o,r) => { if (r.line_type === 'SUSPENSE') { o.amount += num(r.amount); o.given = o.given || r.entry_date; } else o.amount -= num(r.amount); })
+    .filter(o => r2(o.amount) > 0);
+  const draw = () => {
+    const tin = lines.filter(l => pdir(l.line_type) > 0).reduce((a,l) => a + num(l.amount), 0), tout = lines.filter(l => pdir(l.line_type) < 0).reduce((a,l) => a + num(l.amount), 0);
+    $('#v').innerHTML = `<div class="kpis">${kpi('Opening', 'AED ' + money(opening))}${kpi('Cash in', 'AED ' + money(tin))}${kpi('Cash out', 'AED ' + money(tout))}${kpi('Closing', 'AED ' + money(num(opening) + tin - tout))}</div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${tools(E ? '<button id="add">Add line</button><button class="p" id="sv">Save day</button>' : '')}</div>
+      <div class="tw"><table><tr><th>#</th><th class="l">Type</th><th class="l">Ref</th><th class="l">Particulars</th><th class="l">Narration</th><th>For date</th><th>In</th><th>Out</th>${E ? '<th class="noprint"></th>' : ''}</tr>
+        ${lines.map((l,i) => E ? `<tr data-i="${i}"><td>${i+1}</td><td class="l"><select data-k="line_type">${PT.map(([k,lb]) => `<option value="${k}" ${k===l.line_type?'selected':''}>${lb}</option>`).join('')}</select></td>
+          <td class="l"><input data-k="ref" value="${esc(l.ref)}" style="width:90px"></td><td class="l"><input data-k="party" value="${esc(l.party)}" list="sus" style="width:180px"></td><td class="l"><input data-k="note" value="${esc(l.note)}" list="nts" style="width:180px"></td>
+          <td><input type="date" data-k="for_date" value="${esc(l.for_date)}" ${l.line_type==='DEPOSIT'?'':'disabled'}></td><td colspan="2"><input data-k="amount" value="${l.amount||''}" inputmode="decimal" style="width:110px;text-align:right;font-family:'IBM Plex Mono',monospace;color:${pdir(l.line_type)>0?'#2f7a4f':'#b0432e'}"></td>
+          <td class="noprint"><button class="d" data-x="${i}">✕</button></td></tr>`
+          : `<tr><td>${i+1}</td><td class="l">${esc(PT.find(x=>x[0]===l.line_type)?.[1]||l.line_type)}</td><td class="l">${esc(l.ref)}</td><td class="l">${esc(l.party)}</td><td class="l">${esc(l.note)}</td><td>${esc(l.for_date)}</td><td>${pdir(l.line_type)>0?money(l.amount):''}</td><td>${pdir(l.line_type)<0?money(l.amount):''}</td></tr>`).join('')}
+        <tr class="tot"><td></td><td class="l" colspan="5">Total</td><td>${money(tin)}</td><td>${money(tout)}</td>${E ? '<td class="noprint"></td>' : ''}</tr></table></div>
+        <datalist id="sus">${openSus.map(o => `<option value="${esc(o.party)}">`).join('')}</datalist><datalist id="nts"><option value="Food allowance"><option value="Travel allowance"></datalist></div>
+      <div class="card"><h3>Open suspense up to ${S.date}</h3>${table([{k:'party',l:'Given to',left:1},{k:'given',l:'First given'},{k:'amount',l:'Open AED',money:1,sum:1}], openSus, { empty:'No open suspense.' })}</div>`;
+    if (!E) return bindTools('Petty cash', [['Petty cash', [{k:'line_type',l:'Type'},{k:'ref',l:'Ref'},{k:'party',l:'Particulars'},{k:'note',l:'Narration'},{k:'for_date',l:'For date'},{l:'In',f:l=>pdir(l.line_type)>0?num(l.amount):'',sum:1},{l:'Out',f:l=>pdir(l.line_type)<0?num(l.amount):'',sum:1}], lines]]);
+    $('#v').querySelectorAll('tr[data-i]').forEach(tr => tr.onchange = e => { const k = e.target.dataset.k; if (!k) return; lines[+tr.dataset.i][k] = k === 'amount' ? num(e.target.value) : e.target.value; if (k === 'line_type' || k === 'amount') draw(); });
+    $('#v').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { lines.splice(+b.dataset.x, 1); draw(); });
+    $('#add').onclick = () => { lines.push({ line_type:'PAYMENT', ref:'', party:'', note:'', for_date:'', amount:0 }); draw(); };
+    $('#sv').onclick = async () => { const bad = lines.findIndex(l => !l.party.trim() || num(l.amount) <= 0); if (bad > -1) return toast(`Line ${bad+1}: particulars and amount are needed`, false);
+      await rpc('save_petty_cash', { p_branch:S.br, p_date:S.date, p_lines:lines.map(l => ({ ...l, for_date:l.line_type === 'DEPOSIT' ? l.for_date : '' })) }); toast('Petty cash saved'); vPetty(); };
+    bindTools('Petty cash', [['Petty cash', [{k:'line_type',l:'Type'},{k:'ref',l:'Ref'},{k:'party',l:'Particulars'},{k:'note',l:'Narration'},{k:'for_date',l:'For date'},{l:'In',f:l=>pdir(l.line_type)>0?num(l.amount):'',sum:1},{l:'Out',f:l=>pdir(l.line_type)<0?num(l.amount):'',sum:1}], lines]]);
+  };
+  draw();
+}
+
+// ---------- STAFF (admin) ----------
+async function vStaff(){
+  loading(); const st = await q(sb.from('staff').select('*').order('name'));
+  const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','PACKER','VIEWER'];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Staff and access</h3>${tools()}</div>
+    <div class="notice" style="margin-bottom:12px">To give someone a login: Supabase → Authentication → Add user, email <b>name${EMAIL_DOMAIN}</b> (as written here, lowercase, spaces removed). It links to the staff record automatically when "Can log in" is ticked.</div>
+    <div class="tw"><table><tr><th class="l">Name</th><th>Role</th><th>Branch</th><th>Can log in</th><th>Active</th><th></th></tr>
+    ${st.map(s => `<tr data-s="${s.id}"><td class="l">${esc(s.name)}</td><td><select data-k="role">${roles.map(r => `<option ${r===s.role?'selected':''}>${r}</option>`).join('')}</select></td>
+      <td><select data-k="branch_id"><option value="">Both</option>${S.branches.map(b => `<option value="${b.id}" ${b.id===s.branch_id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></td>
+      <td><input type="checkbox" data-k="can_login" ${s.can_login?'checked':''}></td><td><input type="checkbox" data-k="active" ${s.active?'checked':''}></td><td><button data-sv="${s.id}">Save</button></td></tr>`).join('')}</table></div></div>`;
+  $('#v').querySelectorAll('[data-sv]').forEach(b => b.onclick = async () => { const tr = b.closest('tr'), v = k => tr.querySelector(`[data-k="${k}"]`);
+    await q(sb.from('staff').update({ role:v('role').value, branch_id:v('branch_id').value ? +v('branch_id').value : null, can_login:v('can_login').checked, active:v('active').checked }).eq('id', +tr.dataset.s));
+    toast('Saved ' + tr.cells[0].textContent); });
+  bindTools('Staff', [['Staff', [{k:'name',l:'Name'},{k:'role',l:'Role'},{l:'Branch',f:s=>S.branches.find(b=>b.id===s.branch_id)?.name||'Both'},{l:'Can log in',f:s=>s.can_login?'Yes':'No'},{l:'Active',f:s=>s.active?'Yes':'No'}], st]]);
+}
+
+
+// ---------- ROLE ACCESS (ADMIN) ----------
+async function vAccess(){
+  loading();
+  const [M, A] = await Promise.all([sb.from('role_modules').select('*').order('sort'), sb.from('role_access').select('*')]);
+  if (M.error || A.error) { $('#v').innerHTML = `<div class="card"><div class="notice">Role access is not installed in the database yet. Run <b>docs/sql/ROLE ACCESS - CREATE.sql</b> in the Supabase SQL editor once (after PETTY CASH - CREATE.sql), then reload this page.</div></div>`; return; }
+  const roles = ['ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
+  const get = (r, m) => A.data.find(a => a.role === r && a.module === m) || { can_view:false, can_edit:false };
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Role access</h3><div class="row" style="margin:0"><button id="rs">Undo changes</button><button class="p" id="sv">Save access</button></div></div>
+    <p class="muted" style="margin-bottom:12px">View = the page shows. Edit = can post or change (Edit includes View). ADMIN always has full access. Branch rules and "salesman sees only his own day" always apply. Every change is kept in the audit log.</p>
+    <div class="tw"><table><tr><th class="l" rowspan="2">Page / action</th><th rowspan="2">ADMIN</th>${roles.map(r => `<th colspan="2">${r}</th>`).join('')}</tr>
+      <tr>${roles.map(() => '<th>View</th><th>Edit</th>').join('')}</tr>
+      ${M.data.map((m,i) => (i === 0 || M.data[i-1].grp !== m.grp ? `<tr class="tot"><td class="l" colspan="${2 + roles.length*2}">${esc(m.grp)}</td></tr>` : '') + `<tr><td class="l">${esc(m.label)}</td><td>Full</td>
+        ${roles.map(r => { const a = get(r, m.module); return `<td><input type="checkbox" data-r="${r}" data-m="${m.module}" data-k="can_view" ${a.can_view?'checked':''}></td>
+          <td>${m.has_edit ? `<input type="checkbox" data-r="${r}" data-m="${m.module}" data-k="can_edit" ${a.can_edit?'checked':''}>` : '—'}</td>`; }).join('')}</tr>`).join('')}
+    </table></div></div>`;
+  $('#v').querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+    const sib = k => $(`input[data-r="${cb.dataset.r}"][data-m="${cb.dataset.m}"][data-k="${k}"]`, $('#v'));
+    if (cb.dataset.k === 'can_edit' && cb.checked) sib('can_view').checked = true;
+    if (cb.dataset.k === 'can_view' && !cb.checked && sib('can_edit')) sib('can_edit').checked = false; });
+  $('#rs').onclick = vAccess;
+  $('#sv').onclick = async () => {
+    const rows = []; roles.forEach(r => M.data.forEach(m => { const v = k => !!$(`input[data-r="${r}"][data-m="${m.module}"][data-k="${k}"]`, $('#v'))?.checked;
+      rows.push({ role:r, module:m.module, can_view:v('can_view'), can_edit:v('can_edit') }); }));
+    const n = await rpc('save_role_access', { p_rows:rows }); toast(n ? `Saved · ${n} change(s). Users see them after signing in again.` : 'No changes'); vAccess(); };
+}
+
+// ---------- DATA CHECK ----------
+async function vCheck(){
+  loading(); const [sales, days] = await Promise.all([getSales(), getDays()]);
+  const noItem = aggregate(sales.filter(r => !r.item_id), r => r.item_code, r => ({ code:r.item_code, name:r.item_name, n:0 }), (o) => o.n++);
+  const noSm = aggregate(sales.filter(r => !r.salesman_id), r => r.sales_executive || r.itrade_user || '(blank)', r => ({ who:r.sales_executive || r.itrade_user || '(blank)', n:0, net:0 }), (o,r) => { o.n++; o.net += num(r.net_incl_vat); });
+  const noDay = aggregate(sales.filter(r => r.salesman_id && !r.van_day_id), r => r.tran_date + '|' + r.salesman_id, r => ({ date:r.tran_date, sm:smNm(r.salesman_id), inv:new Set() }), (o,r) => o.inv.add(r.invoice_no)).map(o => ({ ...o, n:o.inv.size }));
+  const open = days.filter(d => d.status !== 'CLOSED' && d.business_date < today()).map(d => ({ date:d.business_date, sm:smNm(d.salesman_id), status:d.status }));
+  $('#v').innerHTML = `<div class="kpis">${kpi('Items not in master', noItem.length)}${kpi('Sales with no salesman', noSm.reduce((a,o)=>a+o.n,0) + ' lines')}${kpi('Sales with no van day', noDay.length)}${kpi('Van days not closed', open.length)}</div>
+    <div class="card"><h3>Item codes not in the item master</h3>${table([{k:'code',l:'iTrade code'},{k:'name',l:'Item name',left:1},{k:'n',l:'Lines',sum:1}], noItem, { empty:'All item codes are mapped.' })}</div>
+    <div class="card"><h3>Sales not linked to a salesman (store sales and unknown names)</h3>${table([{k:'who',l:'iTrade user / sales executive',left:1},{k:'n',l:'Lines',sum:1},{k:'net',l:'AED',money:1,sum:1}], noSm, { empty:'None.' })}</div>
+    <div class="card"><h3>Salesman sales with no van day (not loaded)</h3>${table([{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'n',l:'Invoices',sum:1}], noDay, { empty:'None.' })}</div>
+    <div class="card"><h3>Van days not closed (before today)</h3>${table([{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'status',l:'Status'}], open, { empty:'All closed.' })}</div>`;
+}
+
+// ---------- REQUIREMENT ----------
+async function vRequirement(){
+  const isSm = S.me.role === 'SALESMAN';
+  S.rsm = isSm ? S.me.id : S.rsm; S.rdate = S.rdate || today(1);
+  $('#v').innerHTML = `<div class="card"><h3>Requirement (cartons)</h3><div class="row">
+    ${isSm ? '' : `<label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.rsm)}</select></label>`}
+    <label>For date<input type="date" id="rd" value="${S.rdate}"></label></div><div id="g"></div></div>`;
+  $('#sm') && ($('#sm').onchange = e => { S.rsm = +e.target.value || null; fill(); });
+  $('#rd').onchange = e => { S.rdate = e.target.value; fill(); };
+  async function fill(){
+    if (!S.rsm) { $('#g').innerHTML=''; return; }
+    const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.rsm).eq('required_date', S.rdate));
+    $('#g').innerHTML = `<div class="tw"><table><tr><th class="l">Item</th><th>Cartons</th></tr>${sellItems().map(it => `<tr data-id="${it.id}"><td class="l">${esc(it.short_name||it.name)}</td>
+      <td><input type="number" min="0" step="0.5" value="${req.find(r=>r.item_id===it.id)?.qty_cartons ?? ''}"></td></tr>`).join('')}</table></div>
+      <div class="row" style="margin-top:8px"><button class="p" id="sv">Save requirement</button></div>`;
+    $('#sv').onclick = async () => {
+      const ln = [...$('#g').querySelectorAll('tr[data-id]')].map(tr => ({ item_id:+tr.dataset.id, qty_cartons:num($('input',tr).value) })).filter(x=>x.qty_cartons>0);
+      await rpc('save_requirement', { p_salesman:S.rsm, p_date:S.rdate, p_lines:ln }); toast('Requirement saved');
+    };
+  }
+  await fill();
+}
+</script>
+</body>
+</html>

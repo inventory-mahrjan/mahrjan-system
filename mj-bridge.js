@@ -28,7 +28,7 @@
 
   // ---------- Supabase ----------
   var sbP = null;
-  function sb() { if (!sbP) sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: 'mj-app-auth' } }); }); return sbP; }
+  function sb() { if (!sbP) sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.MJ_AUTH_KEY || 'mj-app-auth' } }); }); return sbP; }
   async function q(p) { var r = await p; if (r.error) throw new Error(r.error.message); return r.data; }
   async function rpc(fn, args) { var c = await sb(); return q(c.rpc(fn, args)); }
   async function all(mk) { var out = []; for (var i = 0; ; i += 1000) { var d = await q(mk().range(i, i + 999)); out = out.concat(d); if (d.length < 1000) break; } return out; }
@@ -443,12 +443,168 @@
   // ---------- read-only test hook (?mjdebug=1): reuse the portal's signed-in session ----------
   if (/[?&]mjdebug=1/.test(location.search)) window.MJ_DEBUG = { doGet: doGet, usePortalSession: function () { sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY); }); ME = null; } };
 
+
+  // =====================================================================
+  // PORTAL — the old SALES_PORTAL posts {fn, args} to its Apps Script. Same replies, from Supabase.
+  // =====================================================================
+  var PORTAL_UNIT_NAMES = { 'AL QUOZ': 'MAHRJAN GENERAL TRADING LLC-ALQUOZ', 'AJMAN': 'MAHRJAN GENERAL TRADING LLC-AJMAN' };
+  var PU = (function () { try { return sessionStorage.getItem('mjPortalUnit') || localStorage.getItem('mahrjanUnit') || 'AL QUOZ'; } catch (e) { return 'AL QUOZ'; } })();
+  function hexR(n) { return Array.from(crypto.getRandomValues(new Uint8Array(n)), function (v) { return v.toString(16).padStart(2, '0'); }).join(''); }
+  function dayShift_(d, n) { return new Date(Date.parse(d + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
+  function ymdOf(v) { return v ? String(v).slice(0, 10) : ''; }
+  function hmOf(v) { if (!v) return ''; var d = new Date(v); if (isNaN(d)) return String(v).slice(0, 5); return new Date(d.getTime() + (d.getTimezoneOffset() + TZ_OFF) * 60000).toTimeString().slice(0, 5); }
+  async function pWho() { var w = await me(); if (!w || w.s.role === 'PACKER') throw new Error('SESSION_EXPIRED'); return w.s; }
+  async function pUnits(s) { if (s.branch_id == null) return ['AL QUOZ', 'AJMAN']; var c = await sb(), b = (await q(c.from('branches').select('*'))).filter(function (x) { return x.id === s.branch_id; })[0]; return [b && b.code === 'MGT' ? 'AJMAN' : 'AL QUOZ']; }
+  async function pSession(s, unit) { var units = await pUnits(s); if (units.indexOf(unit) < 0) throw new Error('You do not have access to ' + PORTAL_UNIT_NAMES[unit] + '.');
+    PU = unit; try { sessionStorage.setItem('mjPortalUnit', unit); } catch (e) {}
+    return { token: hexR(32), username: up(s.name), role: s.role, unit: unit, unitName: PORTAL_UNIT_NAMES[unit], units: units, expires: Date.now() + 8 * 3600000 }; }
+  function needRole(s, roles, msg) { if (roles.indexOf(s.role) < 0) throw new Error(msg || 'You cannot open this.'); }
+  async function pRoster() { var m = await masters(PU); return { roster: readRoute(m).map(function (r) { return { name: r.salesman, route: r.route, van: r.van }; }), today: today() }; }
+
+  // CASH BALANCE + openingFor (same rule as the old portal: latest counted or locked day, then every later day's cash movement)
+  var CASH_LOCK_DAYS = 5;
+  async function openingFor_(m, date, s) {
+    var c = await sb(), rows = await q(c.from('cash_balance').select('*').eq('branch_id', m.br.id).lt('close_date', date).order('close_date')).catch(function () { return []; });
+    if (!rows.length) return null;
+    var locked = function (d) { return d <= dayShift_(today(), -CASH_LOCK_DAYS); }, by = {}, a = null;
+    rows.forEach(function (x) { by[x.close_date] = x; });
+    for (var i = rows.length - 1; i >= 0; i--) { if (num(rows[i].counted) > 0 || locked(rows[i].close_date)) { a = rows[i]; break; } }
+    if (!a) a = rows[0];
+    var o = num(a.closing), d = dayShift_(a.close_date, 1), g = 0, save = [];
+    while (d < date && g++ < 40) { var x = by[d];
+      if (x && (num(x.counted) > 0 || locked(d))) o = num(x.closing);
+      else { var F = await cashFigures_(m, await dayData(m, d)); o = o + F.tot.cs - F.tot.gc + F.rc - F.pay - F.et - F.dep; if (locked(d) && !x) save.push({ date: d, expected: Math.round(o * 100) / 100, counted: null, closing: Math.round(o * 100) / 100 }); }
+      d = dayShift_(d, 1); }
+    if (save.length && s && (s.role === 'ADMIN' || s.role === 'ACCOUNTANT')) { try { await rpc('save_cash_balance', { p_branch: m.br.id, p_rows: save, p_only_new: true }); } catch (e) {} }
+    return Math.round(o * 100) / 100;
+  }
+  function cashExport_(F, opening) { var r2 = function (v) { return Math.round((Number(v) || 0) * 100) / 100; }, ref = function (v) { return v === '' || v == null ? '' : String(v); };
+    return { opening: r2(opening), dep: r2(F.dep),
+      men: F.order.concat(['STORE']).map(function (k) { var r = F.rows[k]; return [k === 'STORE' ? 'STORE SALE' : k, r2(r.cs), r2(r.cr), r2(r.gc), r2(r.gr), r2(r.FUEL), r2(r.PARKING), r2(r.CARTON)]; }),
+      receipts: F.receipts.map(function (x) { return [ref(x.ref), x.part, r2(x.amount)]; }), payments: F.payments.map(function (x) { return [ref(x.ref), x.part, r2(x.amount)]; }),
+      suspense: (F.suspense || []).filter(function (x) { return Math.abs(x.given - x.cleared) > 0.004; }).map(function (x) { return [x.name, r2(x.given - x.cleared)]; }) }; }
+  // PICKING SHEET: items down, salesmen across (only those who raised a requirement), then who has not entered.
+  function picking_(m, reqs) { var R = {}, items = readItems(m), men = [], pending = [];
+    Object.keys(reqs).forEach(function (k) { R[up(k)] = reqs[k]; });
+    readRoute(m).forEach(function (r) { var x = R[up(r.salesman)] || {}; if (Object.keys(x).some(function (k) { return x[k] > 0; })) men.push(r.salesman); else pending.push(r.salesman); });
+    var byKey = {}; items.forEach(function (it) { [it.shortName, it.name, it.code].forEach(function (k) { if (k && !byKey[up(k)]) byKey[up(k)] = it; }); });
+    var lines = {}, order = [];
+    men.forEach(function (sm) { var x = R[up(sm)] || {}; Object.keys(x).forEach(function (h) { var qn = Number(x[h]) || 0; if (qn <= 0) return; var it = byKey[up(h)], key = it ? 'C' + it.code : 'H' + up(h);
+      if (!lines[key]) { lines[key] = { name: it ? (it.shortName || it.name) : h, q: {} }; order.push(key); } lines[key].q[sm] = (lines[key].q[sm] || 0) + qn; }); });
+    var pos = {}; items.forEach(function (it, i) { pos['C' + it.code] = i; });
+    order.sort(function (a, b) { var x = a in pos ? pos[a] : 1e9, y = b in pos ? pos[b] : 1e9; return x - y || lines[a].name.localeCompare(lines[b].name); });
+    return { w: Math.max(4, men.length + 3), fill: function (o) {
+      if (!men.length) o.add(['', 'No requirement entered for this date.']);
+      else { o.add(['SL', 'ITEM'].concat(men, ['TOTAL']), 'head'); var col = men.map(function () { return 0; }), grand = 0;
+        order.forEach(function (k, i) { var L = lines[k], tot = 0, cells = men.map(function (sm, j) { var qn = L.q[sm] || 0; tot += qn; col[j] += qn; return blank_(qn); }); grand += tot; o.add([i + 1, L.name].concat(cells, [tot])); });
+        o.add(['', 'TOTAL'].concat(col.map(blank_), [grand]), 'total'); }
+      o.gap(); o.add(['', 'NOT ENTERED', pending.length ? pending.join(', ') : 'None'], 'bold'); } }; }
+  async function pReport(s, name, date, sm) {
+    if (['LOADING SHEET', 'SALESMAN SUMMARY', 'CASH SHEET', 'PICKING SHEET'].indexOf(name) < 0) throw new Error('Unknown report.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) throw new Error('Choose a valid report date.');
+    var m = await masters(PU);
+    if (name !== 'CASH SHEET' && name !== 'PICKING SHEET' && !readRoute(m).some(function (r) { return up(r.salesman) === up(sm); })) throw new Error('Choose a salesman from the route table.');
+    if (name === 'PICKING SHEET') { var pk = picking_(m, await readReqs(m, date)), po = new Sheet_(pk.w); pk.fill(po);
+      return { ok: true, name: name, date: date, salesman: '', rows: po.rows, head: po.head, bold: po.bold, money: po.money, segs: po.segs, titles: po.titles, sign: po.sign, position: null, cash: null }; }
+    var D = await dayData(m, date), o = new Sheet_(name === 'SALESMAN SUMMARY' ? 12 : name === 'CASH SHEET' ? 10 : 15), pos = null, cx = null;
+    if (name === 'LOADING SHEET') await loadingSheet_(o, m, D, sm, await readReqs(m, date));
+    else if (name === 'SALESMAN SUMMARY') salesmanSummary_(o, m, D, sm);
+    else { var F = await cashFigures_(m, D), op = (await openingFor_(m, date, s)) || 0; cashRows_(o, F, op); cx = cashExport_(F, op); pos = cashPosition_(F, op).map(function (p) { return [p[0], '', p[1]]; }); }
+    return JSON.parse(JSON.stringify({ ok: true, name: name, date: date, salesman: sm, rows: o.rows, head: o.head, bold: o.bold, money: o.money, segs: o.segs, titles: o.titles, sign: o.sign, position: pos, cash: cx }));
+  }
+
+  // SNAPSHOT: the unit sheet's tables with the same headings, for the analysis pages.
+  async function pSnapshot(days) {
+    var m = await masters(PU), c = await sb(), cutoff = days > 0 ? dayShift_(today(), -days) : '';
+    var vdq = function () { var x = c.from('van_day').select('*').eq('branch_id', m.br.id); return cutoff ? x.gte('business_date', cutoff) : x; };
+    var slq = function () { var x = c.from('sales_lines').select('*').eq('branch_id', m.br.id); if (cutoff) x = x.gte('tran_date', cutoff); return x.order('id'); };
+    var res = await Promise.all([all(vdq), all(slq), all(function () { return c.from('sales_deletes').select('*').eq('branch_id', m.br.id).order('id'); })]);
+    var days_ = res[0], sales = res[1], dels = res[2], ids = days_.map(function (d) { return d.id; });
+    var more = await Promise.all([ids.length ? byIds('loading_lines', '*', 'van_day_id', ids) : [], ids.length ? byIds('return_lines', '*', 'van_day_id', ids) : [],
+      ids.length ? byIds('expenses', '*', 'van_day_id', ids) : [], ids.length ? byIds('collections', '*', 'van_day_id', ids) : []]);
+    var vd = {}; days_.forEach(function (d) { vd[d.id] = d; });
+    var smName = function (id) { return (m.staffById[id] || {}).name || ''; }, vanNo = function (id) { var v = m.vans.filter(function (x) { return x.id === id; })[0]; return v ? v.van_no : ''; };
+    var routeOf = function (d) { var r = d.route_id && m.routes.filter(function (x) { return x.id === d.route_id; })[0]; return r ? r.name : m.routeName(d.salesman_id); };
+    var tag = function (p, d) { return p + '-' + d.business_date.replace(/-/g, '') + '-' + smName(d.salesman_id); };
+    var custById = {}; m.customers.forEach(function (x) { custById[x.id] = x; });
+    var it = function (id) { return m.itemById[id] || {}; }, raw = function (id) { return it(id).item_type === 'RAW_EGG'; };
+    var row = 2, R = function (o) { o._row = row++; return o; };
+    var T = {};
+    T['RAW SALES'] = sales.filter(function (l) { return !l.cancelled || l.cancel_reason === 'DELETE LIST'; }).map(function (l) { var s = m.staffById[l.salesman_id];
+      return R({ 'Tran Date': l.tran_date, 'Tran No': l.tran_no || '', 'Invoice No': l.invoice_no, 'User': s ? s.name : up(l.itrade_user), 'Sales Executive': l.sales_executive || '', 'Tran Type': l.tran_type, 'Tender Type': l.tender_type,
+        'Head No': l.customer_code || '', 'Account Name': l.customer_name || '', 'Item Code': l.item_id ? m.code(it(l.item_id)) || l.item_code : l.item_code, 'Item Name': l.item_name || '', 'CF': num(l.cf), 'Unit': l.unit || '',
+        'Qty': num(l.qty), 'Rate': num(l.rate), 'Gross': num(l.gross), 'Disc': num(l.disc), 'Net': num(l.net), 'VAT': num(l.vat), 'Net Incl VAT': num(l.net_incl_vat), 'Profit': num(l.profit), 'Margin %': num(l.net) ? Math.round(num(l.profit) / num(l.net) * 10000) / 100 : 0 }); });
+    row = 2; T.BOARD = more[0].filter(function (l) { return vd[l.van_day_id] && !raw(l.item_id); }).map(function (l) { var d = vd[l.van_day_id];
+      return R({ 'DATE': ymdOf(l.created_at), 'BOARD DATE': d.business_date, 'SALESMAN': smName(d.salesman_id), 'VEHCLE NUMBER': vanNo(d.van_id), 'ROUTE': routeOf(d), 'BARCODE': m.code(it(l.item_id)), 'ITEM NAME': it(l.item_id).name || '', 'QTY': num(l.qty), 'ID': tag('BOARD', d) }); });
+    // RETURN DIFF = board − sold (net of GRV) − returned, as the unit sheet works it out
+    var boardQ = {}, soldQ = {}; more[0].forEach(function (l) { var k = l.van_day_id + '|' + l.item_id; boardQ[k] = (boardQ[k] || 0) + num(l.qty); });
+    var dayKey = {}; days_.forEach(function (d) { dayKey[d.salesman_id + '|' + d.business_date] = d.id; });
+    sales.forEach(function (l) { if (l.cancelled || !l.item_id) return; var id = l.van_day_id || dayKey[l.salesman_id + '|' + l.tran_date]; if (!id) return; var k = id + '|' + l.item_id; soldQ[k] = (soldQ[k] || 0) + num(l.qty); });
+    row = 2; T.RETURN = more[1].filter(function (l) { return vd[l.van_day_id] && !raw(l.item_id); }).map(function (l) { var d = vd[l.van_day_id], k = l.van_day_id + '|' + l.item_id, tot = num(l.good) + num(l.damage) + num(l.expiry) + num(l.waste) + num(l.foc);
+      return R({ 'DATE': ymdOf(l.created_at), 'RETURN DATE': d.business_date, 'SALESMAN': smName(d.salesman_id), 'VEHCLE NUMBER': vanNo(d.van_id), 'ROUTE': routeOf(d), 'BARCODE': m.code(it(l.item_id)), 'ITEM NAME': it(l.item_id).name || '',
+        'GOOD': num(l.good), 'DMG': num(l.damage), 'EXP': num(l.expiry), 'WST': num(l.waste), 'FOC': num(l.foc), 'TOTAL RETURN': tot, 'DIFF': (boardQ[k] || 0) - (soldQ[k] || 0) - tot, 'ID': tag('RETURN', d) }); });
+    row = 2; T['VAN LOG'] = days_.filter(function (d) { return d.load_time || d.unload_time || d.start_km != null; }).map(function (d) {
+      return R({ 'DATE': d.business_date, 'SALESMAN': smName(d.salesman_id), 'VAN': vanNo(d.van_id), 'ROUTE': routeOf(d), 'LOADING TIME': d.load_time ? String(d.load_time).slice(0, 5) : '', 'LOADING TEMP': d.load_temp == null ? '' : num(d.load_temp),
+        'UNLOADING TIME': d.unload_time ? String(d.unload_time).slice(0, 5) : '', 'UNLOADING TEMP': d.unload_temp == null ? '' : num(d.unload_temp), 'ID': tag('LOG', d), 'START KM': d.start_km == null ? '' : d.start_km, 'END KM': d.end_km == null ? '' : d.end_km }); });
+    row = 2; T.COLLECTION = more[3].filter(function (x) { return vd[x.van_day_id]; }).map(function (x) { var d = vd[x.van_day_id], cu = custById[x.customer_id] || {};
+      return R({ 'DATE': d.business_date, 'SALESMAN': smName(d.salesman_id), 'RECEIPT NO': /^NA-/.test(x.receipt_no) ? '' : String(x.receipt_no).replace(/-\d+$/, ''), 'INVOICE NUMBER': x.invoice_no || '', 'HEAD NO': cu.itrade_code || '', 'CUSTOMER NAME': cu.name || '', 'MODE OF PAYMENT': x.mode, 'AMOUNT': num(x.amount), 'ID': tag('COLL', d) }); });
+    row = 2; T.EXPENSE = more[2].filter(function (e) { return vd[e.van_day_id]; }).map(function (e) { var d = vd[e.van_day_id], cu = custById[e.customer_id] || {}, ty = e.expense_type, note = e.note || '';
+      if (ty === 'OTHER' && /\s—\s/.test(note) && !/^OTHER$/i.test(note)) { var p = note.split(' — '); ty = p.shift(); note = p.join(' — '); } else if (ty === 'OTHER' && note === 'OTHER') note = '';
+      return R({ 'DATE': ymdOf(e.created_at), 'EXPENSE DATE': d.business_date, 'SALESMAN': smName(d.salesman_id), 'VEHCLE NUMBER': vanNo(d.van_id), 'ROUTE': routeOf(d), 'TYPE': ty, 'AMOUNT': num(e.amount), 'NOTE': note, 'ID': tag('EXP', d), 'CUSTOMER NAME': cu.name || '', 'HEAD NO': cu.itrade_code || '' }); });
+    row = 2; T.SUMMARY = days_.filter(function (d) { return d.summary; }).map(function (d) { var x = d.summary || {};
+      return R({ 'Timestamp': hmOf(d.updated_at || d.created_at), 'Date': d.business_date, 'Salesman': smName(d.salesman_id), 'Van': vanNo(d.van_id), 'Route': routeOf(d), 'Board': num(x.board), 'Sales': num(x.sales), 'Good': num(x.good),
+        'Damage': num(x.damage), 'Expiry': num(x.expiry), 'Waste': num(x.waste), 'FOC': num(x.foc), 'Variance': num(x.variance), 'Reason': x.reason || '', 'Ref': tag('SUMMARY', d) }); });
+    // CUSTOMERS: salesman · head no · name · last visit (latest bill in the loaded sales)
+    var last = {}; sales.forEach(function (l) { if (l.customer_code && (!last[l.customer_code] || last[l.customer_code] < l.tran_date)) last[l.customer_code] = l.tran_date; });
+    var smOfCust = {}; m.assign.forEach(function (a) { smOfCust[a.customer_id] = a.salesman_id; });
+    row = 2; T.CUSTOMERS = m.customers.filter(function (x) { return x.active && smOfCust[x.id] && m.staffById[smOfCust[x.id]] && m.staffById[smOfCust[x.id]].branch_id === m.br.id; }).map(function (x) {
+      return R({ 'Salesman': smName(smOfCust[x.id]), 'Head No': x.itrade_code || '', 'Customer Name': x.name, 'last visit': last[x.itrade_code] || '', 'LAST BILLED': last[x.itrade_code] || '' }); });
+    row = 2; T.DELETE = dels.map(function (x) { return R({ 'DATE': x.del_date, 'INVOICE NUMBER': x.invoice, 'USER': x.user_name || '' }); });
+    var HEAD = { 'RAW SALES': ['Tran Date', 'Tran No', 'Invoice No', 'User', 'Sales Executive', 'Tran Type', 'Tender Type', 'Head No', 'Account Name', 'Item Code', 'Item Name', 'CF', 'Unit', 'Qty', 'Rate', 'Gross', 'Disc', 'Net', 'VAT', 'Net Incl VAT', 'Profit', 'Margin %'],
+      BOARD: ['DATE', 'BOARD DATE', 'SALESMAN', 'VEHCLE NUMBER', 'ROUTE', 'BARCODE', 'ITEM NAME', 'QTY', 'ID'], RETURN: ['DATE', 'RETURN DATE', 'SALESMAN', 'VEHCLE NUMBER', 'ROUTE', 'BARCODE', 'ITEM NAME', 'GOOD', 'DMG', 'EXP', 'WST', 'FOC', 'TOTAL RETURN', 'DIFF', 'ID'],
+      'VAN LOG': ['DATE', 'SALESMAN', 'VAN', 'ROUTE', 'LOADING TIME', 'LOADING TEMP', 'UNLOADING TIME', 'UNLOADING TEMP', 'ID', 'START KM', 'END KM'], COLLECTION: ['DATE', 'SALESMAN', 'RECEIPT NO', 'INVOICE NUMBER', 'HEAD NO', 'CUSTOMER NAME', 'MODE OF PAYMENT', 'AMOUNT', 'ID'],
+      EXPENSE: ['DATE', 'EXPENSE DATE', 'SALESMAN', 'VEHCLE NUMBER', 'ROUTE', 'TYPE', 'AMOUNT', 'NOTE', 'ID', 'CUSTOMER NAME', 'HEAD NO'], SUMMARY: ['Timestamp', 'Date', 'Salesman', 'Van', 'Route', 'Board', 'Sales', 'Good', 'Damage', 'Expiry', 'Waste', 'FOC', 'Variance', 'Reason', 'Ref'],
+      CUSTOMERS: ['Salesman', 'Head No', 'Customer Name', 'last visit', 'LAST BILLED'], DELETE: ['DATE', 'INVOICE NUMBER', 'USER'] };
+    var out = {}, schema = []; Object.keys(HEAD).forEach(function (k) { out[k] = T[k] || []; schema.push({ sheet: k, headers: HEAD[k], rows: out[k].length }); });
+    out.roster = (await pRoster()).roster;
+    out.meta = { live: true, source: 'Google Sheets', snapshotDate: today(), days: days || 0, from: cutoff, schema: schema, ignoredSheets: [] };
+    return out;
+  }
+
+  var NOT_YET = 'This page is not moved to the new system yet.';
+  async function portalCall(fn, a) {
+    a = a || [];
+    if (fn === 'portalUnits') return Object.keys(PORTAL_UNIT_NAMES).map(function (k) { return { unit: k, name: PORTAL_UNIT_NAMES[k], ready: true }; });
+    if (fn === 'portalUrl') return location.href.split('#')[0];
+    if (fn === 'portalChallenge') return { salt: hexR(16), iterations: 600000 };
+    if (fn === 'portalLogin') { var un = up(a[2] || 'AL QUOZ'); if (!PORTAL_UNIT_NAMES[un]) throw new Error('Choose a company.');
+      if (!lastPw) throw new Error('Incorrect username or password.');
+      var c = await sb(), r = await c.auth.signInWithPassword({ email: emailOf(a[0]), password: lastPw }); lastPw = null;
+      if (r.error) throw new Error('Incorrect username or password.');
+      ME = null; var w = await me(); if (!w || w.s.role === 'PACKER') { await c.auth.signOut(); throw new Error('Incorrect username or password.'); }
+      try { var ss = await pSession(w.s, un); } catch (e) { await c.auth.signOut(); throw e; }
+      try { ss.roster = await pRoster(); } catch (e) {} ss.device = hexR(32); return ss; }
+    if (fn === 'portalResume') { ME = null; var w2 = await me(); if (!w2 || w2.s.role === 'PACKER') throw new Error('DEVICE_EXPIRED'); return pSession(w2.s, PU); }
+    if (fn === 'portalRemember') { await pWho(); return { key: hexR(32) }; }
+    if (fn === 'portalLogout') { try { var c2 = await sb(); await c2.auth.signOut(); } catch (e) {} ME = null; return { ok: true }; }
+    if (fn === 'portalSetup') throw new Error('Accounts are made by the admin in the new system.');
+    var s = await pWho();
+    if (fn === 'portalSwitchUnit') { var u2 = up(a[1]); if (!PORTAL_UNIT_NAMES[u2]) throw new Error('Choose a company.'); return pSession(s, u2); }
+    if (fn === 'portalRoster') return pRoster();
+    if (fn === 'portalSnapshot') { var n = Math.floor(Number(a[1])); return pSnapshot(n > 0 && n <= 3660 ? n : 0); }
+    if (fn === 'portalReport') return pReport(s, String(a[1] || ''), String(a[2] || ''), String(a[3] || ''));
+    if (fn === 'portalChangePassword' || fn === 'portalResetPassword') throw new Error('Passwords are changed by the admin in the new system (Supabase → Authentication).');
+    throw new Error(NOT_YET);
+  }
+
   // ---------- fetch: answer the app's "sheet" calls ----------
   var realFetch = window.fetch.bind(window);
   function reply(obj) { return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } }); }
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
     if (url.indexOf(FAKE) !== 0) return realFetch(input, init);
+    if (url.indexOf(FAKE + 'PORTAL/') === 0) { var b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (e) {}
+      return portalCall(String(b.fn || ''), Array.isArray(b.args) ? b.args : []).then(function (r) { return reply({ ok: true, result: r }); }, function (e) { return reply({ ok: false, error: String(e && e.message || e) }); }); }
     var u = new URL(url), unit = decodeURIComponent(u.pathname.split('/')[1] || 'AL QUOZ').toUpperCase(); if (!UNIT_CODE[unit]) unit = 'AL QUOZ';
     var job = (init && String(init.method || '').toUpperCase() === 'POST') ? doPost(unit, JSON.parse(init.body || '{}')) : doGet(unit, u.searchParams);
     return job.then(reply, function (e) { return reply({ ok: false, error: String(e && e.message || e) }); });
