@@ -48,7 +48,7 @@
   tbody tr:hover td,tr:hover td{background:#fafbf9}
   .st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;background:#eef0ec;color:#3c4442}
   .st.LOADED{background:#e6eef8;color:#1f4f86}.st.RETURNED{background:#fbf0de;color:var(--amb)}.st.SETTLED{background:#efe8f6;color:#5b3c86}.st.CLOSED{background:var(--soft);color:var(--accent-ink)}
-  .bad{color:var(--neg);font-weight:600}.warn{color:var(--amb);font-size:12px}
+  .bad{color:var(--neg);font-weight:600} tr.tot td{font-weight:700;background:#f4f7f2}.warn{color:var(--amb);font-size:12px}
   .muted{color:var(--muted);font-size:12.5px}
   .msg{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:8px;color:#fff;z-index:9;max-width:90%;font-size:13.5px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
   .msg.ok{background:var(--accent-ink)}.msg.er{background:var(--neg)}
@@ -99,6 +99,7 @@ const $ = (s, el=document) => el.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isNaN(n) ? 0 : n; };
 const money = v => num(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n*864e5).toISOString().slice(0,10);
 function today(off=0){ const d=new Date(Date.now()+off*864e5); return d.toLocaleDateString('en-CA',{timeZone:'Asia/Dubai'}); }
 function toast(t, ok=true){ const m=document.createElement('div'); m.className='msg '+(ok?'ok':'er'); m.textContent=t; document.body.appendChild(m); setTimeout(()=>m.remove(), ok?2500:6000); }
 async function q(p){ const { data, error } = await p; if (error) { toast(error.message, false); throw error; } return data; }
@@ -108,9 +109,9 @@ window.addEventListener('unhandledrejection', e => { if (e.reason && (e.reason.m
 const has = (...r) => r.includes(S.me?.role);
 const item = id => S.items.find(i => i.id === id) || {};
 const per = it => it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 1) : (it.packs_per_carton || 1);
-const unit = it => it.item_type === 'RAW_EGG' ? 'pcs' : 'pk';
+const unit = it => it.item_type === 'FG' ? 'pk' : 'pcs';
 function split(it, qty){ const p=per(it); qty=num(qty); return { c: Math.floor(qty/p), r: +(qty - Math.floor(qty/p)*p).toFixed(2) }; }
-function showQty(it, qty){ qty=num(qty); if(!qty) return ''; const s=split(it,qty); return (s.c? s.c+' ctn ':'') + (s.r? s.r+' '+unit(it):''); }
+function showQty(it, qty){ qty=num(qty); if(!qty) return ''; if(per(it)<=1) return qty+' '+unit(it); const s=split(it,qty); return (s.c? s.c+' ctn ':'') + (s.r? s.r+' '+unit(it):''); }
 const sellItems = () => S.items.filter(i => i.active && i.item_type !== 'MATERIAL').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
 
 // ---------- start ----------
@@ -152,7 +153,7 @@ function tabsFor(){
   const t = [];
   if (has('RECEIVER','ACCOUNTANT','ADMIN')) t.push(['load','Loading'], ['ret','Return']);
   t.push(['days','Van days']);
-  if (has('RECEIVER','ACCOUNTANT','ADMIN','VIEWER')) t.push(['wh','Warehouse']);
+  if (has('RECEIVER','ACCOUNTANT','ADMIN','VIEWER')) t.push(['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count']);
   if (has('ACCOUNTANT','ADMIN')) t.push(['imp','Sales import']);
   if (has('SALESMAN','RECEIVER','ACCOUNTANT','ADMIN')) t.push(['req','Requirement']);
   return t;
@@ -164,7 +165,8 @@ function render(){
   const unitName = S.me.branch_id ? br.toUpperCase() : 'SALES PORTAL';
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
     days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
-    req:'Next-day order by salesman, in cartons.', wh:'Production and cleaning batches: issue, return, differences and output.' };
+    req:'Next-day order by salesman, in cartons.', wh:'Production and cleaning batches: issue, return, differences and output.',
+    ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Daily and weekly store count (good and damage), compared with the iTrade stock.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav><div class="navlabel">Daily flow</div>${T.map(([k,l]) => `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
@@ -180,7 +182,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse })[S.tab](); }
+function view(){ ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && s.branch_id === S.br);
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -444,6 +446,95 @@ async function vWarehouse(){
         <td class="${num(l.difference)?'bad':''}">${l.difference!=null?num(l.difference):''}</td><td class="l">${esc(l.reason||'')}</td><td>${l.exp_date||''}</td><td class="l">${esc(l.origin||'')}</td></tr>`).join('')}
     </table></div>${b.cancel_reason?`<p class="muted">Cancelled: ${esc(b.cancel_reason)}</p>`:''}</div>`;
   });
+}
+
+// ---------- STOCK COUNT ----------
+async function vStock(){
+  S.sct = S.sct || 'WEEKLY';
+  const hist = await q(sb.from('stock_counts').select('*').eq('branch_id', S.br).gte('count_date', addDays(S.date, -35)).lte('count_date', S.date).order('count_date', { ascending:false }));
+  const c = hist.find(h => h.count_date === S.date && h.count_type === S.sct);
+  const L = c ? await q(sb.from('stock_count_lines').select('*').eq('count_id', c.id)) : [];
+  const nm = id => S.staff.find(s => s.id === id)?.name || '';
+  const hasSys = c && c.system_loaded_at, canUp = has('ACCOUNTANT','ADMIN') && c;
+  const rows = L.map(l => ({ ...l, it:item(l.item_id) })).filter(l => num(l.good) || num(l.damage) || l.system_qty != null)
+    .sort((a,b) => (a.it.display_order||0) - (b.it.display_order||0));
+  const grp = [['FG','Finished goods (packs)'],['RAW_EGG','Raw egg (pieces)'],['MATERIAL','Packing material (pieces)']];
+  $('#v').innerHTML = `<div class="card"><h3>Count</h3><div class="row">
+      <label>Type<select id="ty">${['DAILY','WEEKLY'].map(t => `<option ${t===S.sct?'selected':''}>${t}</option>`).join('')}</select></label>
+      ${canUp ? `<label>iTrade stock (.xlsx)<input type="file" id="sf" accept=".xlsx,.xls,.csv"></label>` : ''}
+      ${c ? `<span class="muted">Counted by <b>${esc(nm(c.counted_by))}</b> · ${new Date(c.posted_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})}${hasSys?' · iTrade stock loaded '+new Date(c.system_loaded_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):''}</span>` : `<span class="muted">No ${S.sct.toLowerCase()} count for ${S.date}.</span>`}
+    </div>${rows.length ? grp.map(([t,l]) => { const g = rows.filter(r => r.it.item_type === t); if (!g.length) return '';
+      const tot = k => g.reduce((a,r) => a + num(r[k]), 0), tsys = g.reduce((a,r) => a + num(r.system_qty), 0);
+      return `<h3 style="margin-top:14px">${l}</h3><div class="tw"><table><tr><th class="l">Item</th><th>Good</th><th>Damage</th><th>Total</th>${hasSys?'<th>iTrade</th><th>Difference</th>':''}</tr>
+        ${g.map(r => { const t = num(r.good) + num(r.damage), df = t - num(r.system_qty); return `<tr><td class="l">${esc(r.it.short_name||r.it.name)}</td>
+          <td>${showQty(r.it, r.good) || 0}</td><td>${num(r.damage) || ''}</td><td>${showQty(r.it, t) || 0}</td>
+          ${hasSys ? `<td>${r.system_qty!=null?showQty(r.it, r.system_qty)||0:'—'}</td><td class="${r.system_qty!=null&&df?'bad':''}">${r.system_qty==null?'—':(df>0?'+':'')+(+df.toFixed(2))}</td>` : ''}</tr>`; }).join('')}
+        <tr class="tot"><td class="l">Total</td><td>${tot('good')}</td><td>${tot('damage')}</td><td>${tot('good')+tot('damage')}</td>${hasSys?`<td>${tsys}</td><td>${+(tot('good')+tot('damage')-tsys).toFixed(2)}</td>`:''}</tr></table></div>`; }).join('') : ''}</div>
+    <div class="card"><h3>Counts — last 5 weeks</h3>${hist.length ? `<div class="tw"><table><tr><th>Date</th><th>Type</th><th class="l">Counted by</th><th>Posted</th><th>iTrade compare</th><th></th></tr>
+      ${hist.map(h => `<tr><td>${h.count_date}</td><td>${h.count_type}</td><td class="l">${esc(nm(h.counted_by))}</td><td>${new Date(h.posted_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'})}</td>
+        <td>${h.system_loaded_at?'Yes':''}</td><td><button data-h="${h.count_date}|${h.count_type}">Open</button></td></tr>`).join('')}</table></div>` : '<p class="muted">No counts yet. The receiver posts counts from the PDT app (Stock count).</p>'}</div>`;
+  $('#ty').onchange = e => { S.sct = e.target.value; vStock(); };
+  $('#v').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { const [d,t] = b.dataset.h.split('|'); S.date = d; S.sct = t; $('#dt').value = d; vStock(); });
+  $('#sf') && ($('#sf').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+    const grid = XLSX.utils.sheet_to_json((wb => wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer())), { header:1, defval:'' });
+    const hi = grid.findIndex(r => r.some(x => /code/i.test(x)) && r.some(x => /qty|quantity|stock|balance|closing/i.test(x)));
+    if (hi < 0) return toast('Could not find the item code and quantity columns', false);
+    const H = grid[hi].map(x => String(x).trim()), ci = H.findIndex(x => /code/i.test(x)),
+          qi = H.findIndex(x => /closing|balance/i.test(x)) >= 0 ? H.findIndex(x => /closing|balance/i.test(x)) : H.findIndex(x => /qty|quantity|stock/i.test(x)),
+          ui = H.findIndex(x => /^(unit|uom)/i.test(x));
+    const rows = grid.slice(hi + 1).filter(r => String(r[ci]).trim() && r[qi] !== '').map(r => {
+      const it = S.items.find(i => i.itrade_code === String(r[ci]).trim()) || {}, u = ui >= 0 ? String(r[ui]).toUpperCase() : '';
+      const m = /TRAY/.test(u) ? (it.pcs_per_tray || 30) : /CTN|CARTON|BOX/.test(u) ? per(it) : 1;
+      return { item_code:String(r[ci]).trim(), qty: num(r[qi]) * m }; });
+    const res = await rpc('set_system_stock', { p_count:c.id, p_rows:rows });
+    toast(`iTrade stock loaded · ${rows.length} rows` + (res?.unknown_items ? ' · not in item master: ' + res.unknown_items : ''), !res?.unknown_items);
+    vStock();
+  });
+}
+
+// ---------- I TRADE ENTRY (what to post in iTrade for the day: production, unwrap, broken, wastage) ----------
+async function vItrade(){
+  S.ito = S.ito && S.ito >= S.date ? S.ito : S.date;
+  const [bs, days] = await Promise.all([
+    q(sb.from('wh_batches').select('id,process,status').eq('branch_id', S.br).gte('work_date', S.date).lte('work_date', S.ito)),
+    q(sb.from('van_day').select('id,salesman_id').eq('branch_id', S.br).gte('business_date', S.date).lte('business_date', S.ito))]);
+  const closed = bs.filter(b => b.status === 'CLOSED'), proc = new Set(closed.filter(b => b.process === 'PRODUCTION').map(b => b.id));
+  const [WL, RL] = await Promise.all([closed.length ? q(sb.from('wh_lines').select('batch_id,line_type,item_id,qty').in('batch_id', closed.map(b => b.id))) : [],
+    days.length ? q(sb.from('return_lines').select('van_day_id,item_id,expiry,waste').in('van_day_id', days.map(d => d.id))) : []]);
+  const agg = (f, cols) => { const m = {}; WL.forEach(l => { const k = f(l); if (k) { m[l.item_id] = m[l.item_id] || {}; m[l.item_id][k] = (m[l.item_id][k]||0) + num(l.qty); } }); return m; };
+  const P = l => proc.has(l.batch_id);
+  const sec = [
+    ['PRODUCTION', 'Finished goods produced (packs)', agg(l => P(l) && l.line_type === 'FG' && 'Packs'), ['Packs']],
+    ['UNWRAP', 'Finished goods given for cleaning (packs)', agg(l => !P(l) && l.line_type === 'ISSUE FG' && 'Packs'), ['Packs']],
+    ['BROKEN', 'Broken eggs and near expiry (pieces)', agg(l => l.line_type === 'BROKEN' ? (P(l) ? 'Production' : 'Cleaning') : l.line_type === 'NEAR EXPIRY' && 'Near expiry'), ['Production','Cleaning','Near expiry']],
+    ['WASTAGE – PRODUCTION', 'Egg and material wasted in production (pieces)', agg(l => P(l) && (l.line_type === 'WASTE' || l.line_type === 'MATERIAL WASTE') && 'Qty'), ['Qty']],
+    ['WASTAGE – CLEANING', 'Egg and material wasted in cleaning (pieces)', agg(l => !P(l) && (l.line_type === 'WASTE' || l.line_type === 'MATERIAL WASTE') && 'Qty'), ['Qty']],
+  ];
+  const sw = {}; RL.forEach(r => { if (num(r.expiry) || num(r.waste)) { const o = sw[r.item_id] = sw[r.item_id] || {}; o.EXP = (o.EXP||0) + num(r.expiry); o.WST = (o.WST||0) + num(r.waste); } });
+  sec.push(['SALESMAN WASTAGE', 'Expiry and waste returned by the vans (packs)', sw, ['EXP','WST']]);
+  const open = bs.filter(b => b.status === 'ISSUED').length;
+  S.itx = sec;
+  $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
+      <button class="p" id="xl">Download Excel</button>
+      <span class="muted">${closed.length} closed batch(es), ${days.length} van day(s).${open ? ` <b class="bad">${open} batch(es) still open — not included.</b>` : ''}</span></div></div>
+    ${sec.map(([t, sub, m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
+      const tot = c => ids.reduce((a,id) => a + num(m[id][c]), 0), multi = cols.length > 1;
+      return `<div class="card"><h3>${t}</h3><p class="muted" style="margin:-4px 0 8px">${sub}</p>${ids.length ? `<div class="tw"><table>
+        <tr><th class="l">Item</th><th>iTrade code</th>${cols.map(c => `<th>${c}</th>`).join('')}${multi?'<th>Total</th>':''}</tr>
+        ${ids.map(id => { const it = item(id); return `<tr><td class="l">${esc(it.short_name||it.name)}</td><td>${esc(it.itrade_code||'')}</td>
+          ${cols.map(c => `<td>${num(m[id][c]) || ''}</td>`).join('')}${multi?`<td><b>${cols.reduce((a,c)=>a+num(m[id][c]),0)}</b></td>`:''}</tr>`; }).join('')}
+        <tr class="tot"><td class="l">Total</td><td></td>${cols.map(c => `<td>${tot(c)}</td>`).join('')}${multi?`<td>${cols.reduce((a,c)=>a+tot(c),0)}</td>`:''}</tr></table></div>` : '<p class="muted">Nothing for this period.</p>'}</div>`; }).join('')}`;
+  $('#to').onchange = e => { S.ito = e.target.value; vItrade(); };
+  $('#xl').onclick = async () => {
+    const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm'), wb = XLSX.utils.book_new(), brn = S.branches.find(b => b.id === S.br)?.name || '';
+    sec.forEach(([t, , m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
+      const aoa = [['MAHRJAN — ' + brn + ' — ' + t + ' — ' + S.date + (S.ito !== S.date ? ' to ' + S.ito : '')], ['Item','iTrade code', ...cols, ...(cols.length > 1 ? ['Total'] : [])],
+        ...ids.map(id => [item(id).short_name || item(id).name, item(id).itrade_code || '', ...cols.map(c => num(m[id][c])), ...(cols.length > 1 ? [cols.reduce((a,c)=>a+num(m[id][c]),0)] : [])])];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), t.replace(/[–\/\\?*\[\]:]/g,'-').slice(0,31)); });
+    XLSX.writeFile(wb, `I TRADE ENTRY - ${brn} - ${S.date}${S.ito !== S.date ? ' to ' + S.ito : ''}.xlsx`);
+  };
 }
 
 // ---------- REQUIREMENT ----------

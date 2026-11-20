@@ -232,7 +232,8 @@ async function home(){
       <button class="tile amb" data-m="exp" ${st?'':'disabled'}><b>Expense</b><span class="n">${money(st?.cash?.expenses)}</span><small>${num(st?.cash?.expenses)?'spent':'nothing yet'}</small></button></div>
     <button class="row ${S.sm?'':'dash'}" data-m="sum" ${st?'':'disabled'}><div><b>Summary</b><small>Item check · cash to hand over</small></div><span class="end">Open →</span></button>
     <button class="row dash" data-m="req" ${S.sm?'':'disabled'}><div><b>Requirement</b><small>for ${dLabel(today(1))}</small></div><span class="end">Open →</span></button>
-    ${canStock ? `<button class="row" id="whb"><div><b>Warehouse</b><small>Production · Cleaning</small></div><span class="end">Open →</span></button>` : ''}
+    ${canStock ? `<button class="row" id="whb"><div><b>Warehouse</b><small>Production · Cleaning</small></div><span class="end">Open →</span></button>
+      <button class="row" id="scb"><div><b>Stock count</b><small>Daily · Weekly · good and damage</small></div><span class="end">Open →</span></button>` : ''}
     ${S.me.role === 'SALESMAN' ? '' : `
     <div class="cap" style="display:flex;justify-content:space-between;margin:14px 0 8px"><span>${Object.values(S.stats).filter(x=>x.day.status==='CLOSED').length} of ${salesmen().length} closed</span><span>PCS</span></div>
     <table class="sm"><tr><th>Salesman</th><th>Board</th><th>Sales</th><th>Open</th></tr>
@@ -248,6 +249,7 @@ async function home(){
   $('#dti').onchange = e => { S.date = e.target.value; home(); };
   document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => openMod(b.dataset.m));
   const whb = $('#whb'); if (whb) whb.onclick = () => whHome();
+  const scb = $('#scb'); if (scb) scb.onclick = () => scHome();
   document.querySelectorAll('tr[data-s]').forEach(tr => tr.onclick = () => { S.sm = +tr.dataset.s; home(); });
   const pk = $('#pk'); if (pk) pk.onclick = () => {
     const pl = $('#pl'); if (pl.innerHTML) { pl.innerHTML = ''; return; }
@@ -280,6 +282,38 @@ history.pushState(null,''); window.addEventListener('popstate', () => { history.
 function keypad(nextLabel){ return `<div class="kp">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}
   ${nextLabel ? `<button class="nx" data-k="N">${nextLabel}</button>` : `<button class="c" data-k="C">C</button>`}<button data-k="0">0</button><button class="x" data-k="B">⌫</button></div>`; }
 
+// ---------------- RawBT printing (same method as the current app: ESC/POS via Android intent) ----------------
+const PW = 64;
+const padR = (s,n) => { s = String(s); return s.length >= n ? s.slice(0,n) : s + ' '.repeat(n - s.length); };
+const lr = (a,b) => { a = String(a); b = String(b); return a.length + b.length + 1 > PW ? padR(a,PW) + '\n' + ' '.repeat(Math.max(PW - b.length,0)) + b : a + ' '.repeat(PW - a.length - b.length) + b; };
+const ctr = s => { s = String(s); return ' '.repeat(Math.max(0, Math.floor((PW - s.length)/2))) + s; };
+const rule = ch => (ch || '-').repeat(PW);
+const ascii = s => String(s).replace(/[^\x0A\x20-\x7E]/g, '');
+function printSlip(text, code){
+  const body = ascii(text);
+  const bc = code ? '\x1ba\x01\x1dh\x50\x1dw\x02\x1dH\x02\x1dk\x49' + String.fromCharCode(String(code).length + 2) + '{B' + code + '\n\x1ba\x00' : '';
+  const parts = body.split('[[BARCODE]]'), raw = '\x1b@' + '\x1dL\x20\x00' + parts[0] + (parts.length > 1 ? bc + parts[1] : '') + '\n\n\n';
+  if (/Android/i.test(navigator.userAgent)) {
+    try { location.href = 'intent:base64,' + btoa(raw) + '#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;'; toast('Sending to RawBT…'); return; } catch (e) {}
+  }
+  const plain = parts.join(code ? '[' + code + ']' : '');
+  if (navigator.share) { navigator.share({ title:'Mahrjan slip', text:plain }).catch(()=>{}); return; }
+  if (navigator.clipboard) { navigator.clipboard.writeText(plain).then(() => toast('Slip copied — paste into RawBT'), () => toast('Printing not supported here', false)); return; }
+  toast('Printing not supported here', false);
+}
+const slipTop = title => [ctr('MAHRJAN GENERAL TRADING'), ctr((S.branches.find(b=>b.id===S.br)?.name || '').toUpperCase()), ctr(title), rule('=')];
+const nowStamp = () => new Date().toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+function boardSlip(kind, lines, extra){
+  const d = S.stats[S.sm]?.day, van = S.vans.find(v => v.id === d?.van_id)?.van_no || '';
+  const L = slipTop(kind === 'board' ? 'BOARD / LOADING SLIP' : 'RETURN SLIP');
+  L.push(lr('Salesman: ' + smName(S.sm), 'Van: ' + van), lr('Date: ' + dLabel(S.date), 'Printed: ' + nowStamp()), rule());
+  if (kind === 'board') { L.push(lr('ITEM', 'QTY')); lines.forEach(l => L.push(lr(iname(itemById(l.id)), l.qty))); L.push(rule(), lr('TOTAL', lines.reduce((a,l)=>a+num(l.qty),0))); }
+  else { L.push(lr('ITEM', 'GOOD DMG EXP WST FOC')); lines.forEach(([id,v]) => L.push(lr(iname(itemById(+id)), [v.good,v.damage,v.expiry,v.waste,v.foc].map(x=>String(num(x)).padStart(3)).join(' ')))); }
+  if (extra) L.push(rule(), ...extra);
+  L.push('', '', lr('Salesman sign: ____________', 'Receiver sign: ____________'));
+  printSlip(L.join('\n'));
+}
+
 // ---------------- BOARD ----------------
 async function mBoard(){
   const d = S.stats[S.sm]?.day;
@@ -301,6 +335,7 @@ async function mBoard(){
         <label>Load KM<input id="km" type="number" inputmode="numeric" placeholder="KM" value="${d?.start_km??''}"></label>
         <label>Load temp °C<input id="tp" type="number" inputmode="decimal" placeholder="Temp °C" value="${d?.load_temp??''}"></label>
         <label>Load time<input value="${d?.load_time?.slice(0,5) || nowHM()}" disabled></label></div>
+      <div class="btns" style="margin:0 0 8px"><button class="btn" id="prn">Print (RawBT)</button><button class="btn d" id="clr" ${locked?'disabled':''}>Clear</button></div>
       <button class="post" id="post" ${locked?'disabled':''}>${locked?'Locked — van returned':'Post'}</button></div>`);
   const draw = () => {
     $('#ls').innerHTML = L.length ? L.map((l,i) => { const it = itemById(l.id);
@@ -318,6 +353,8 @@ async function mBoard(){
     if (k==='C') val=''; else if (k==='B') val=val.slice(0,-1); else if (val.length<6) val+=k; showCur(); });
   $('#ok').onclick = () => { const ex = L.find(l=>l.id===cur.id); ex ? ex.qty += num(val) : L.push({ id:cur.id, qty:num(val) });
     cur=null; val=''; $('#bc').value=''; showCur(); draw(); $('#bc').focus(); };
+  $('#prn').onclick = () => L.length ? boardSlip('board', L, [lr('Load KM: ' + ($('#km').value||'-'), 'Temp: ' + ($('#tp').value||'-'))]) : toast('Nothing to print', false);
+  $('#clr').onclick = () => { L = []; draw(); };
   $('#post').onclick = async () => {
     if (!L.length) return toast('Nothing on the board', false);
     $('#post').disabled = true;
@@ -350,6 +387,7 @@ async function mReturn(){
         <label>Unload temp °C<input id="tp" type="number" inputmode="decimal" placeholder="Temp °C" value="${d.unload_temp??''}"></label>
         <label>Ctn small<input id="cs" type="number" inputmode="numeric" placeholder="Small" value="${d.carton_small||''}"></label>
         <label>Ctn big<input id="cb" type="number" inputmode="numeric" placeholder="Big" value="${d.carton_big||''}"></label></div>
+      <div class="btns" style="margin:0 0 8px"><button class="btn" id="prn">Print (RawBT)</button><button class="btn d" id="clr" ${locked?'disabled':''}>Clear</button></div>
       <button class="post" id="post" ${locked?'disabled':''}>${locked?'Locked — '+d.status:'Post'}</button></div>`);
   const exp = id => num(rec.find(r=>r.item_id===id)?.expected_return);
   const tot = id => F.reduce((a,[k])=>a+num(R[id]?.[k]),0);
@@ -375,6 +413,8 @@ async function mReturn(){
   document.querySelectorAll('.kp button').forEach(b => b.onclick = () => { if (!cur) return; const k=b.dataset.k, f=F[fi][0];
     if (k==='N') fi = (fi+1) % F.length; else if (k==='B') vals[f]=(vals[f]||'').slice(0,-1); else if ((vals[f]||'').length<6) vals[f]=(vals[f]||'')+k; showCur(); });
   $('#ok').onclick = () => { R[cur.id] = Object.fromEntries(F.map(([k])=>[k, num(vals[k])])); cur=null; vals={}; $('#bc').value=''; showCur(); draw(); $('#bc').focus(); };
+  $('#prn').onclick = () => Object.keys(R).length ? boardSlip('ret', Object.entries(R), [lr('Unload KM: ' + ($('#km').value||'-'), 'Temp: ' + ($('#tp').value||'-')), lr('Carton small: ' + ($('#cs').value||0), 'Carton big: ' + ($('#cb').value||0))]) : toast('Nothing to print', false);
+  $('#clr').onclick = () => { for (const k in R) delete R[k]; draw(); };
   $('#post').onclick = async () => {
     $('#post').disabled = true;
     try { await rpc('post_return', { p_van_day:d.id, p_end_km:+$('#km').value||null, p_unload_temp:$('#tp').value===''?null:+$('#tp').value,
@@ -467,6 +507,41 @@ async function mExp(){
   };
 }
 
+// ---------------- STOCK COUNT (receiver: daily / weekly, good + damage, all store stock; vans not counted) ----------------
+const SC = { type:'DAILY', f:'' };
+const perOf = it => it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 1) : (it.packs_per_carton || 1);
+async function scHome(){
+  S.mod = 'sc';
+  const [c] = await q(sb.from('stock_counts').select('id,posted_at,counted_by').eq('branch_id', S.br).eq('count_date', S.date).eq('count_type', SC.type));
+  const lines = c ? await q(sb.from('stock_count_lines').select('item_id,good,damage').eq('count_id', c.id)) : [];
+  const V = {}; lines.forEach(l => V[l.item_id] = { good:num(l.good), damage:num(l.damage) });
+  const grp = [['FG','Finished goods (packs)'],['RAW_EGG','Raw egg (pieces)'],['MATERIAL','Packing material (pieces)']];
+  const its = S.items.filter(i => i.active).sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+  $('#app').innerHTML = `<div class="mh"><div class="r1"><button class="back" id="bk">←</button>
+      <div><h2>Stock count</h2><div class="sub">${esc(S.branches.find(b=>b.id===S.br)?.name||'')} · ${dLabel(S.date)}${c?' · saved '+new Date(c.posted_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'}):''}</div></div></div>
+    <div class="tabs">${['DAILY','WEEKLY'].map(t => `<button data-y="${t}" class="${t===SC.type?'on':''}">${t==='DAILY'?'Daily':'Weekly'}</button>`).join('')}</div></div>
+    <div class="wrap" id="mb"><input class="bc" id="sf" placeholder="Search item" value="${esc(SC.f)}" autocomplete="off" style="margin-bottom:10px">
+      ${grp.map(([t,l]) => { const g = its.filter(i => i.item_type === t); return g.length ? `<div class="cap" style="margin:10px 0 4px" data-g="${t}">${l}</div>
+        <div class="grid-in" style="margin:0"><span class="lbl"></span><span class="cap" style="text-align:center">Ctn</span><span class="cap" style="text-align:center">Loose</span><span class="cap" style="text-align:center">Damage</span></div>
+        ${g.map(it => { const p = perOf(it), v = V[it.id] || {}, gd = num(v.good), c1 = p > 1 ? Math.floor(gd/p) : 0;
+          return `<div class="grid-in" data-i="${it.id}" data-n="${esc((iname(it)+' '+(it.itrade_code||'')).toLowerCase())}"><span class="lbl">${esc(iname(it))}<small>${p>1?p+' / ctn':''}</small></span>
+            <input type="number" inputmode="numeric" data-k="c" value="${c1||''}" ${p>1?'':'disabled'}><input type="number" inputmode="decimal" data-k="r" value="${(gd - c1*p)||''}"><input type="number" inputmode="decimal" data-k="d" value="${num(v.damage)||''}"></div>`; }).join('')}` : ''; }).join('')}
+      <div class="foot" style="margin:12px -12px -12px"><button class="post" id="sv">Save ${SC.type==='DAILY'?'daily':'weekly'} count</button></div></div>`;
+  $('#bk').onclick = home;
+  document.querySelectorAll('[data-y]').forEach(b => b.onclick = () => { SC.type = b.dataset.y; scHome(); });
+  const filt = () => { const f = SC.f.toLowerCase(); document.querySelectorAll('[data-i]').forEach(r => r.style.display = !f || r.dataset.n.includes(f) ? '' : 'none'); };
+  $('#sf').oninput = e => { SC.f = e.target.value; filt(); }; filt();
+  $('#sv').onclick = async () => {
+    const L = [...document.querySelectorAll('[data-i]')].map(r => { const it = itemById(+r.dataset.i), v = k => num(r.querySelector(`[data-k="${k}"]`).value);
+      return { item_id:it.id, good: v('c') * perOf(it) + v('r'), damage: v('d') }; }).filter(x => x.good || x.damage);
+    if (L.some(x => x.good < 0 || x.damage < 0)) return toast('Quantities cannot be negative', false);
+    if (!L.length) return toast("Nothing counted", false);
+    $('#sv').disabled = true;
+    try { await rpc('save_stock_count', { p_branch:S.br, p_date:S.date, p_type:SC.type, p_lines:L }); toast(`Saved · ${L.length} items counted`); scHome(); }
+    catch (e) { $('#sv').disabled = false; }
+  };
+}
+
 // ---------------- WAREHOUSE: PRODUCTION & CLEANING ----------------
 const W = { proc:'PRODUCTION' };
 const fgItems = () => S.items.filter(i => i.active && i.item_type === 'FG').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
@@ -519,7 +594,7 @@ async function whIssue(){
   const draw = () => {
     $('#cards').innerHTML = cards.map((c,ci) => { const fg = itemById(c.fg);
       return `<div class="card2"><div style="display:flex;justify-content:space-between;align-items:center"><b>${esc(iname(fg))}</b><button class="del" data-x="${ci}" style="border:0;background:none;color:var(--neg);font-size:18px">✕</button></div>
-        <div class="grid-in"><span class="lbl">${prod?'Packs to produce':'Packs for cleaning'}</span><input data-c="${ci}" data-f="packs" type="number" inputmode="numeric" value="${c.packs||''}" style="grid-column:span 3"></div>
+        <div class="grid-in"><span class="lbl">${prod?'Packs planned<small>only fills the issue qty below</small>':'Packs for cleaning'}</span><input data-c="${ci}" data-f="packs" type="number" inputmode="numeric" value="${c.packs||''}" style="grid-column:span 3"></div>
         ${prod ? c.lines.map((l,li) => { const it = itemById(l.item_id), egg = it.item_type === 'RAW_EGG';
           return `<div class="grid-in"><span class="lbl">${esc(iname(it))}<small>${egg?'raw egg · pcs':'material · pcs'}</small></span>
             <input data-c="${ci}" data-l="${li}" data-f="qty" type="number" inputmode="numeric" value="${l.qty||''}" placeholder="pcs">
@@ -550,7 +625,7 @@ async function whIssue(){
     if (!lines.length) return toast('Enter at least one qty', false);
     $('#sv').disabled = true;
     try { const r = await rpc('wh_issue', { p_branch:S.br, p_process:W.proc, p_duty:S.duty, p_staff:[...pick], p_lines:lines });
-          toast('Saved · ' + r.batch_no + ' (' + r.shift + ')'); whHome(); } catch(e) { $('#sv').disabled = false; }
+          toast('Saved · ' + r.batch_no + ' (' + r.shift + ')'); const [nb] = await q(sb.from('wh_batches').select('*').eq('id', r.batch_id)); whView(nb, true); } catch(e) { $('#sv').disabled = false; }
   };
   draw(); $('#bc').focus();
 }
@@ -603,7 +678,7 @@ async function whReturn(id){
     const data = prod ? { fg:obj('[data-fg]'), broken:per('broken'), waste:per('waste'), mwaste:per('mwaste'), counted:per('counted'), reason }
                       : { good:per('good'), near:per('near'), broken:per('broken'), waste:per('waste'), reuse:obj('[data-reuse]'), reason };
     $('#sv').disabled = true;
-    try { const r = await rpc('wh_return', { p_batch:b.id, p_duty:S.duty, p_data:data }); toast('Closed · ' + r.batch_no + (num(r.egg_diff) ? ' · egg diff ' + r.egg_diff : '')); whHome(); }
+    try { const r = await rpc('wh_return', { p_batch:b.id, p_duty:S.duty, p_data:data }); toast('Closed · ' + r.batch_no + (num(r.egg_diff) ? ' · egg diff ' + r.egg_diff : '')); const [nb] = await q(sb.from('wh_batches').select('*').eq('id', b.id)); whView(nb, true); }
     catch(e) { $('#sv').disabled = false; }
   };
   $('#cx').onclick = () => {
@@ -612,8 +687,16 @@ async function whReturn(id){
       await rpc('wh_cancel', { p_batch:b.id, p_reason:$('#cr').value.trim() }); toast('Batch cancelled'); whHome(); };
   };
 }
-async function whView(b){
+async function whView(b, autoPrint){
   const L = await q(sb.from('wh_lines').select('*').eq('batch_id', b.id).order('id'));
+  const nm = id => S.staff.find(s => s.id === id)?.name || '';
+  const slip = which => { const ls = L.filter(l => l.slip === which); if (!ls.length) return toast('Nothing to print', false);
+    const T = slipTop((b.process === 'PRODUCTION' ? 'PRODUCTION ' : 'CLEANING ') + (which === 'I1' ? 'ISSUE' : 'RETURN'));
+    T.push(lr('Batch: ' + b.batch_no, 'Slip: ' + b.batch_no + '-' + which), lr('Work date / shift: ' + b.work_date + ' ' + b.shift, nowStamp()),
+           'Staff: ' + b.staff_ids.map(nm).join(', '), lr(which === 'I1' ? 'Issued by: ' + nm(b.issued_by) : 'Received by: ' + nm(b.received_by), ''), rule());
+    ls.forEach(l => { T.push(lr(l.line_type + ' ' + iname(itemById(l.item_id)), num(l.qty))); if (l.difference != null && num(l.difference)) T.push(lr('  calc ' + num(l.calculated) + ' diff ' + num(l.difference), l.reason || '')); if (l.exp_date || l.origin) T.push('  ' + (l.exp_date ? 'EXP ' + l.exp_date + ' ' : '') + (l.origin ? 'ORIGIN ' + l.origin : '')); });
+    T.push(rule(), lr('TOTAL EGGS', num(b.issued_egg_pcs) + ' pcs'), '[[BARCODE]]', '', lr('RECEIVER ____________', 'PACKING STAFF ____________'));
+    printSlip(T.join('\n'), b.batch_no); };
   whShell(b.batch_no, `<div class="card2"><div class="kv"><span>Status</span><span class="st">${b.status}</span></div>
       <div class="kv"><span>Work date / shift</span><b>${b.work_date} ${b.shift}</b></div><div class="kv"><span>Issued eggs</span><b>${num(b.issued_egg_pcs)}</b></div>
       ${b.process==='PRODUCTION'?`<div class="kv"><span>FG packs</span><b>${num(b.fg_packs)}</b></div>`:`<div class="kv"><span>Good / near exp</span><b>${num(b.good_egg_pcs)} / ${num(b.near_pcs)}</b></div>`}
@@ -621,8 +704,11 @@ async function whView(b){
       <div class="kv"><span>Egg difference</span><b style="color:${num(b.egg_diff)?'var(--neg)':'inherit'}">${num(b.egg_diff)}</b></div>
       <div class="kv"><span>Hours · output / staff-hour</span><b>${num(b.hours)} · ${num(b.output_per_staff_hour)}</b></div>
       ${b.cancel_reason?`<div class="kv"><span>Cancelled</span><b>${esc(b.cancel_reason)}</b></div>`:''}</div>
+    <div class="btns" style="margin-bottom:12px"><button class="btn p" id="pi">Print issue slip</button><button class="btn p" id="pr" ${b.status==='CLOSED'?'':'disabled'}>Print return slip</button></div>
     ${L.map(l => `<div class="ln"><div><b>${esc(l.line_type)}</b><small>${esc(iname(itemById(l.item_id)))}${l.reason?' · '+esc(l.reason):''}</small></div>
       <span class="q">${num(l.qty)}${l.difference!=null&&num(l.difference)?`<small style="display:block;color:var(--neg);font-size:11px">${num(l.difference)}</small>`:''}</span></div>`).join('')}`, whHome);
+  $('#pi').onclick = () => slip('I1'); $('#pr').onclick = () => slip('R1');
+  if (autoPrint) slip(b.status === 'CLOSED' ? 'R1' : 'I1');
 }
 
 // ---------------- ITEM PICKER (ADD) ----------------
