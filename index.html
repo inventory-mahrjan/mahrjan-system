@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mahrjan System</title>
+<title>Mahrjan Sales Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -71,6 +71,16 @@
     .sidebar-bottom{flex-direction:row;flex-wrap:wrap;align-items:center}
     main{margin:0;padding:16px}.login-wrap{grid-template-columns:1fr}.login-side{display:none}
   }
+  main>header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .eyebrow{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  #subtitle{color:var(--muted);margin-top:6px;font-size:14px}
+  .header-actions{display:flex;gap:8px;align-items:flex-end}
+  .header-actions label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
+  .card>h3,.card .row>h3{font-size:15px;margin:0 0 16px}
+  .card>.muted:first-of-type{margin-top:-10px}
+  footer{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding-top:8px}
+  .notice{font-size:13px;color:#5f5233;background:#faf6ea;border:1px solid #efe5c8;border-radius:8px;padding:10px 14px;line-height:1.5}
+  .link-btn{border:0;background:none;color:var(--muted);padding:0;text-decoration:underline;text-underline-offset:2px;font-size:13px}
 </style>
 </head>
 <body>
@@ -110,10 +120,10 @@ session ? boot() : renderLogin();
 
 function renderLogin(){
   $('#app').innerHTML = `<div class="login-wrap">
-    <div class="login-side"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small>SALES SYSTEM</small></div></div>
-      <div><h2>Mahrjan Sales System</h2><p>Loading, returns, sales, collections and daily cash settlement in one place.</p></div>
+    <div class="login-side"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">SALES PORTAL</small></div></div>
+      <div><h2>Mahrjan Sales Portal</h2><p>Loading, returns, sales, collections and daily cash settlement in one place.</p></div>
       <small>For Mahrjan staff only.</small></div>
-    <div class="login-main"><div class="login-card"><h1>Sign in</h1><div class="lead">Use the account your administrator created for you.</div>
+    <div class="login-main"><div class="login-card"><h1>Sign in to the Sales Portal</h1><div class="lead">Use the account your administrator created for you.</div>
       <label>Username<input id="u" name="mj-user" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
       <label>Password<input id="pw" name="mj-pass" type="password" autocomplete="new-password"></label>
       <button class="p" id="go">Sign in</button></div></div></div>`;
@@ -149,11 +159,18 @@ function tabsFor(){
 function render(){
   const T = tabsFor(), title = (T.find(t => t[0] === S.tab) || [])[1] || '';
   const br = S.branches.find(b => b.id === S.me.branch_id)?.name || 'Both branches';
+  const unitName = S.me.branch_id ? br.toUpperCase() : 'SALES PORTAL';
+  const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
+    days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
+    req:'Next-day order by salesman, in cartons.' };
   $('#app').innerHTML = `
-    <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small>SALES SYSTEM</small></div></div>
+    <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav><div class="navlabel">Daily flow</div>${T.map(([k,l]) => `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
       <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.role)} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
-    <main><div class="top"><h1>${esc(title)}</h1><label>Date<input type="date" id="dt" value="${S.date}"></label></div><div id="v"></div></main>`;
+    <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${SUB[S.tab]||''}</p></div>
+      <div class="header-actions"><label>Date<input type="date" id="dt" value="${S.date}"></label></div></header>
+      <div id="v"></div>
+      <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
   $('#out').onclick = () => sb.auth.signOut();
   $('#dt').onchange = e => { S.date = e.target.value; S.dayId = null; view(); };
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
