@@ -490,14 +490,21 @@ async function vImport(){
       for (const [code, rs] of Object.entries(branchSplit(rows))) {
         const br = S.branches.find(b => b.code === code);
         if (!br) { out.push(`<p class="bad">${esc(code)}: unknown branch prefix, skipped</p>`); continue; }
-        const r = await rpc('import_sales', { p_branch:br.id, p_rows:rs, p_full_export:true });
+        // sent in parts of whole days (about 1,500 lines each) so a long period does not time out
+        const days = [...new Set(rs.map(x => x['Tran Date']))].sort(), parts = []; let cur = [];
+        days.forEach(d => { const dl = rs.filter(x => x['Tran Date'] === d); if (cur.length && cur.length + dl.length > 1500) { parts.push(cur); cur = []; } cur = cur.concat(dl); }); if (cur.length) parts.push(cur);
+        const r = { rows:0, new:0, already_there:0, cancelled:0, new_customers:0, customers_moved:0, from:days[0], to:days[days.length-1], unknown_items:'', not_salesman_sales_executives:'' };
+        for (const [k, part] of parts.entries()) { $('#out').innerHTML = `<p>${esc(br.name)}: part ${k+1} of ${parts.length}…</p>` + out.join('');
+          const x = await rpc('import_sales', { p_branch:br.id, p_rows:part, p_full_export:true });
+          ['rows','new','already_there','cancelled','new_customers','customers_moved'].forEach(f => r[f] += num(x[f]));
+          ['unknown_items','not_salesman_sales_executives'].forEach(f => { if (x[f]) r[f] = [...new Set((r[f] ? r[f] + ', ' : '').concat(x[f]).split(', ').filter(Boolean))].join(', '); }); }
         out.push(`<div class="card"><b>${esc(br.name)}</b> ${r.from} to ${r.to}<br>Lines ${r.rows} · new ${r.new} · already there ${r.already_there} · cancelled ${r.cancelled}
           · new customers ${r.new_customers} · customers moved ${r.customers_moved}
           ${r.unknown_items?`<br><span class="bad">Unknown items: ${esc(r.unknown_items)}</span>`:''}
           ${r.not_salesman_sales_executives?`<br><span class="muted">Not a salesman (store/office sales): ${esc(r.not_salesman_sales_executives)}</span>`:''}</div>`);
       }
       toast('Import finished');
-    } finally { $('#out').innerHTML += out.join(''); }
+    } catch (e) { out.push(`<p class="bad">Import stopped: ${esc(e.message || e)}</p>`); } finally { $('#out').innerHTML += out.join(''); }
   };
 }
 
