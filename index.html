@@ -66,18 +66,18 @@ function showQty(it, qty){ qty=num(qty); if(!qty) return ''; const s=split(it,qt
 const sellItems = () => S.items.filter(i => i.active && i.item_type !== 'MATERIAL').sort((a,b)=>(a.display_order||0)-(b.display_order||0));
 
 // ---------- start ----------
-sb.auth.onAuthStateChange((_e, session) => { if (!session) renderLogin(); });
+sb.auth.onAuthStateChange(e => { if (e === 'SIGNED_OUT') renderLogin(); });   // only on real logout, so typing is never wiped
 const { data:{ session } } = await sb.auth.getSession();
 session ? boot() : renderLogin();
 
 function renderLogin(){
   $('#app').innerHTML = `<div class="card login"><h3>Mahrjan System</h3>
-    <div class="row"><label style="flex:1">Username<input id="u" autocomplete="username"></label></div>
-    <div class="row"><label style="flex:1">Password<input id="pw" type="password" autocomplete="current-password"></label></div>
+    <div class="row"><label style="flex:1">Username<input id="u" name="mj-user" autocomplete="off" autocapitalize="none" spellcheck="false"></label></div>
+    <div class="row"><label style="flex:1">Password<input id="pw" name="mj-pass" type="password" autocomplete="new-password"></label></div>
     <button class="p" id="go" style="width:100%">Login</button></div>`;
   const go = async () => {
     const u = $('#u').value.trim().toLowerCase(); if (!u) return;
-    const { error } = await sb.auth.signInWithPassword({ email: u.includes('@') ? u : u + EMAIL_DOMAIN, password: $('#pw').value });
+    const { error } = await sb.auth.signInWithPassword({ email: u.includes('@') ? u : u + EMAIL_DOMAIN, password: $('#pw').value.trim() });
     if (error) return toast('Login failed: ' + error.message, false);
     boot();
   };
