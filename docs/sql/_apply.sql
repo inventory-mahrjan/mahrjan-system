@@ -1,3 +1,12 @@
+-- FIX 20-Nov: collections may be negative (as in the unit sheets); rebuild carton expense lines from the van-day counts
+alter table public.collections drop constraint if exists collections_amount_check;
+alter table public.collections add constraint collections_amount_check check (amount <> 0);
+delete from public.expenses where expense_type in ('CARTON SMALL','CARTON BIG');
+insert into public.expenses (van_day_id, expense_type, amount, note)
+select id, 'CARTON SMALL', round(carton_small * 0.50, 2), carton_small || ' @ 0.50' from public.van_day where coalesce(carton_small,0) > 0
+union all
+select id, 'CARTON BIG', round(carton_big * 0.25, 2), carton_big || ' @ 0.25' from public.van_day where coalesce(carton_big,0) > 0;
+
 create or replace function public.migrate_app_data(p_branch bigint, p_from date, p_data jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_unknown text; v_items text; n_days int; n jsonb := '{}';
@@ -65,6 +74,7 @@ begin
     from m_day m where v.salesman_id = m.sid and v.business_date = m.d;
 
   -- EXPENSE (cartons: the count goes on the van day; the carton trigger writes the expense line)
+  update public.van_day v set carton_small = null, carton_big = null from m_day m where v.salesman_id = m.sid and v.business_date = m.d;
   update public.van_day v set carton_small = z.cs, carton_big = z.cb
     from (select (x->>'date')::date d, public.mig_staff(p_branch, x->>'sm') sid,
                  sum(case when upper(x->>'type') = 'CARTON SMALL' then coalesce(nullif(split_part(x->>'note',' @',1),'')::numeric, (x->>'amount')::numeric / 0.5) end)::int cs,
@@ -107,7 +117,7 @@ begin
            case when upper(x->>'mode') in ('CASH','CHEQUE','TRANSFER') then upper(x->>'mode') else 'CASH' end md, (x->>'amount')::numeric amt
       from jsonb_array_elements(coalesce(p_data->'cols','[]')) with ordinality t(x, o)
       join public.van_day v on v.branch_id = p_branch and v.business_date = (x->>'date')::date and v.salesman_id = public.mig_staff(p_branch, x->>'sm')
-     where (x->>'date')::date >= p_from and coalesce((x->>'amount')::numeric,0) > 0) z;
+     where (x->>'date')::date >= p_from and coalesce((x->>'amount')::numeric,0) <> 0) z;
 
   -- REQUIREMENT (cartons, by required date)
   delete from public.requirement_lines r using (select distinct (x->>'date')::date d, public.mig_staff(p_branch, x->>'sm') sid from jsonb_array_elements(coalesce(p_data->'reqs','[]')) x where (x->>'date')::date >= p_from) z

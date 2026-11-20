@@ -85,6 +85,7 @@ begin
     from m_day m where v.salesman_id = m.sid and v.business_date = m.d;
 
   -- EXPENSE (cartons: the count goes on the van day; the carton trigger writes the expense line)
+  update public.van_day v set carton_small = null, carton_big = null from m_day m where v.salesman_id = m.sid and v.business_date = m.d;
   update public.van_day v set carton_small = z.cs, carton_big = z.cb
     from (select (x->>'date')::date d, public.mig_staff(p_branch, x->>'sm') sid,
                  sum(case when upper(x->>'type') = 'CARTON SMALL' then coalesce(nullif(split_part(x->>'note',' @',1),'')::numeric, (x->>'amount')::numeric / 0.5) end)::int cs,
@@ -127,7 +128,7 @@ begin
            case when upper(x->>'mode') in ('CASH','CHEQUE','TRANSFER') then upper(x->>'mode') else 'CASH' end md, (x->>'amount')::numeric amt
       from jsonb_array_elements(coalesce(p_data->'cols','[]')) with ordinality t(x, o)
       join public.van_day v on v.branch_id = p_branch and v.business_date = (x->>'date')::date and v.salesman_id = public.mig_staff(p_branch, x->>'sm')
-     where (x->>'date')::date >= p_from and coalesce((x->>'amount')::numeric,0) > 0) z;
+     where (x->>'date')::date >= p_from and coalesce((x->>'amount')::numeric,0) <> 0) z;
 
   -- REQUIREMENT (cartons, by required date)
   delete from public.requirement_lines r using (select distinct (x->>'date')::date d, public.mig_staff(p_branch, x->>'sm') sid from jsonb_array_elements(coalesce(p_data->'reqs','[]')) x where (x->>'date')::date >= p_from) z
