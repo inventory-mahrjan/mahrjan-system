@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mahrjan General Trading</title>
+<meta name="theme-color" content="#0d4a28">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mahrjan">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  html, body { margin: 0; height: 100%; background: #0d4a28; overflow: hidden; }
+  iframe { display: block; border: 0; width: 100%; height: 100%; }
+</style>
+<script>
+  if ('serviceWorker' in navigator) {
+    // A phone that already has the app: when a new version arrives, reload
+    // once so it shows straight away instead of on the next open.
+    var hadOld = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!hadOld || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('sw.js').then(function (r) { r.update(); }).catch(function () {});
+  }
+</script>
+</head>
+<body>
+<iframe src="app.html" title="Mahrjan Van Sales" allow="clipboard-write; fullscreen"></iframe>
+</body>
+</html>

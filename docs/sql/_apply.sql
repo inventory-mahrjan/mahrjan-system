@@ -99,16 +99,15 @@ begin
    where (x->>'date')::date >= p_from and coalesce(trim(x->>'customer'),'') <> ''
      and not exists (select 1 from public.customers c where (c.itrade_code = nullif(trim(x->>'head'),'')) or (c.branch_id = p_branch and upper(c.name) = upper(trim(x->>'customer'))));
   insert into public.collections (van_day_id, receipt_no, invoice_no, customer_id, mode, amount)
-  select v.id,
-         coalesce(nullif(regexp_replace(trim(x->>'tran'),'\.0$',''),''), 'NA-' || row_number() over ()),
-         nullif(regexp_replace(upper(trim(x->>'invoice')),'\.0$',''),''),
-         (select c.id from public.customers c where (c.itrade_code = nullif(trim(x->>'head'),'')) or (c.branch_id = p_branch and upper(c.name) = upper(trim(x->>'customer'))) order by (c.branch_id = p_branch) desc limit 1),
-         case when upper(x->>'mode') in ('CASH','CHEQUE','TRANSFER') then upper(x->>'mode') else 'CASH' end,
-         (x->>'amount')::numeric
-    from jsonb_array_elements(coalesce(p_data->'cols','[]')) x
-    join public.van_day v on v.branch_id = p_branch and v.business_date = (x->>'date')::date and v.salesman_id = public.mig_staff(p_branch, x->>'sm')
-   where (x->>'date')::date >= p_from and coalesce((x->>'amount')::numeric,0) > 0
-  on conflict (receipt_no, van_day_id) do update set amount = collections.amount + excluded.amount;
+  select vid, rno || case when k > 1 then '-' || k else '' end, inv, cid, md, amt from (
+    select v.id vid, coalesce(nullif(regexp_replace(trim(x->>'tran'),'\.0$',''),''), 'NA') rno,
+           row_number() over (partition by v.id, coalesce(nullif(regexp_replace(trim(x->>'tran'),'\.0$',''),''), 'NA') order by o) k,
+           nullif(regexp_replace(upper(trim(x->>'invoice')),'\.0$',''),'') inv,
+           (select c.id from public.customers c where (c.itrade_code = nullif(trim(x->>'head'),'')) or (c.branch_id = p_branch and upper(c.name) = upper(trim(x->>'customer'))) order by (c.branch_id = p_branch) desc limit 1) cid,
+           case when upper(x->>'mode') in ('CASH','CHEQUE','TRANSFER') then upper(x->>'mode') else 'CASH' end md, (x->>'amount')::numeric amt
+      from jsonb_array_elements(coalesce(p_data->'cols','[]')) with ordinality t(x, o)
+      join public.van_day v on v.branch_id = p_branch and v.business_date = (x->>'date')::date and v.salesman_id = public.mig_staff(p_branch, x->>'sm')
+     where (x->>'date')::date >= p_from and coalesce((x->>'amount')::numeric,0) > 0) z;
 
   -- REQUIREMENT (cartons, by required date)
   delete from public.requirement_lines r using (select distinct (x->>'date')::date d, public.mig_staff(p_branch, x->>'sm') sid from jsonb_array_elements(coalesce(p_data->'reqs','[]')) x where (x->>'date')::date >= p_from) z
