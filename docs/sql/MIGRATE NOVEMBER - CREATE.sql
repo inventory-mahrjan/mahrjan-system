@@ -96,7 +96,8 @@ begin
          case when upper(trim(x->>'type')) in ('FUEL','PARKING','SHELF RENT','CREDIT NOTE','OTHER') then upper(trim(x->>'type')) else 'OTHER' end,
          (x->>'amount')::numeric,
          (select c.id from public.customers c where c.branch_id = p_branch and (c.itrade_code = nullif(trim(x->>'head'),'') or upper(c.name) = upper(trim(x->>'customer'))) limit 1),
-         case when upper(trim(x->>'type')) in ('FUEL','PARKING','SHELF RENT','CREDIT NOTE','OTHER') then nullif(trim(x->>'note'),'')
+         case when upper(trim(x->>'type')) in ('FUEL','PARKING','SHELF RENT','CREDIT NOTE') then nullif(trim(x->>'note'),'')
+              when upper(trim(x->>'type')) = 'OTHER' then coalesce(nullif(trim(x->>'note'),''), 'OTHER')
               else trim(x->>'type') || coalesce(' — ' || nullif(trim(x->>'note'),''), '') end
     from jsonb_array_elements(coalesce(p_data->'exps','[]')) x
     join public.van_day v on v.branch_id = p_branch and v.business_date = (x->>'date')::date and v.salesman_id = public.mig_staff(p_branch, x->>'sm')
