@@ -16,11 +16,14 @@ jobs:
         with: { gradle-version: '8.7' }
       - name: Signing key
         run: keytool -genkeypair -keystore android/release.jks -alias mahrjan -keyalg RSA -keysize 2048 -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=Mahrjan General Trading, O=Mahrjan, C=AE"
-        env: { KS_PASS: ${{ github.run_id }}x }
+        env:
+          KS_PASS: "${{ github.run_id }}x"
       - name: Build
         working-directory: android
         run: gradle --no-daemon assembleRelease
-        env: { KS_PASS: ${{ github.run_id }}x, APP_VERSION_CODE: ${{ github.run_number }} }
+        env:
+          KS_PASS: "${{ github.run_id }}x"
+          APP_VERSION_CODE: "${{ github.run_number }}"
       - run: cp android/app/build/outputs/apk/release/app-release.apk Mahrjan-Van-Sales.apk
       - uses: softprops/action-gh-release@v2
         with:
