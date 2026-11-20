@@ -597,6 +597,10 @@
     throw new Error(NOT_YET);
   }
 
+  // Direct use by the portal page (same reports as the old portal, built live).
+  window.MJ_REPORTS = {
+    report: async function (unit, name, date, sm) { ME = null; var w = await pWho(); PU = UNIT_CODE[unit] ? unit : 'AL QUOZ'; return pReport(w, name, date, sm || ''); }
+  };
   // ---------- fetch: answer the app's "sheet" calls ----------
   var realFetch = window.fetch.bind(window);
   function reply(obj) { return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } }); }
