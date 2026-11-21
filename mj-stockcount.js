@@ -80,8 +80,11 @@
 
   // ---------------- counting ----------------
   var D = null, C = null;   // D = downloaded batch, C = current entry state
-  function count(id) { D = load(id); if (!D) { err = 'Download the batch first.'; V.view = 'list'; render(); return; } V.view = 'count'; V.id = id;
+  function count(id) { refreshMaster(id); D = load(id); if (!D) { err = 'Download the batch first.'; V.view = 'list'; render(); return; } V.view = 'count'; V.id = id;
     C = C && C.id === id ? C : { id: id, shelf: localStorage.getItem('mjsc_shelf') || '', cat: D.batch.categories[0], type: 'FRESH', found: null, msg: '' }; err = ''; render(); setTimeout(focusScan, 50); }
+  // when online, refresh the item list and BOM of a downloaded batch (office changes in Items & BOM reach the device); counted lines stay as they are
+  function refreshMaster(id) { if (!navigator.onLine) return; rpc('sc_download', { p_id: id }).then(function (data) { var d = load(id); if (!d) return;
+      d.items = data.items; d.bom = data.bom; d.countries = data.countries; store(id, d); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; } }).catch(function () {}); }
   function itemsBy(id) { return D.items.find(function (i) { return i.id === id; }); }
   function isRecount(id) { return !D.batch.recount_items || D.batch.recount_items.indexOf(id) >= 0; }
   function nm(i) { return i ? (i.s || i.n) : ''; }
