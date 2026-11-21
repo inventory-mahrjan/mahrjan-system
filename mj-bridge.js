@@ -722,7 +722,7 @@
     var U = up(sm || ''), men = {}, allQ = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
     L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
       var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
-      var usr = up(l.itrade_user), ex = up(l.sales_executive); if (usr && usr !== up(st.name) && usr !== up(st.itrade_name)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
+      var usr = up(l.itrade_user), ex = up(l.sales_executive); if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
       var who = up(st.name); if (U && who !== U) return;
       var it = l.item_id && m.itemById[l.item_id]; if (it && it.item_type !== 'FG') return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
       var q2 = Math.abs(num(l.qty)) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;

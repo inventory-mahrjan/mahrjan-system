@@ -131,7 +131,7 @@
 <script>/* loading % : counts database requests in flight; bar on top + "Loading… NN%" */
 (function(){var S=0,D=0,P=0,bar,lab,t;function ui(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#0f5f57;z-index:9999;transition:width .2s;width:0';lab=document.createElement('div');lab.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#0f5f57;color:#fff;font:600 12px system-ui;padding:3px 9px;border-radius:10px';document.body.appendChild(bar);document.body.appendChild(lab);}var on=S>D;bar.style.width=(on?P:100)+'%';bar.style.opacity=lab.style.opacity=on?1:0;lab.textContent='Loading… '+P+'%';document.querySelectorAll('.mjpct').forEach(function(e){e.textContent=P+'%';});}
 function step(){P=Math.max(P,Math.min(99,Math.round(D/Math.max(S,1)*100)));if(S===D){P=100;clearTimeout(t);t=setTimeout(function(){if(S===D){S=D=P=0;}},400);}if(document.body)ui();}
-var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=7"></script><script src="old-sheets.js?v=1"></script><script src="old-views.js?v=5"></script>
+var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=8"></script><script src="old-sheets.js?v=1"></script><script src="old-views.js?v=5"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -1147,22 +1147,22 @@ async function vPetty(){
 async function vStaff(){
   // Users (like the old portal's Users page): add, edit, disable, set or reset the password.
   loading(); let list;
-  try { list = await rpc('admin_user_list', {}); }
+  try { list = await rpc('admin_user_list', {}); const erp = await q(sb.from('staff').select('id,erp_user,erp_warehouse')).catch(() => []); list.forEach(u => Object.assign(u, erp.find(x => x.id === u.id) || {})); }
   catch (e) { $('#v').innerHTML = `<div class="card"><div class="notice">The Users page is not installed in the database yet. Run <b>docs/sql/USER ADMIN - CREATE.sql</b> in the Supabase SQL editor once.</div><p class="muted">${esc(e.message||e)}</p></div>`; return; }
   const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
   const co = id => id == null ? 'Both' : (S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz');
   S.uq = S.uq || '';
-  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + (u.username||'') + ' ' + (u.itrade_name||'')).toUpperCase().includes(S.uq.toUpperCase()));
+  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + (u.username||'') + ' ' + (u.itrade_name||'') + ' ' + (u.erp_user||'') + ' ' + (u.erp_warehouse||'')).toUpperCase().includes(S.uq.toUpperCase()));
   $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addu">Add user</button><label>Search<input id="uq" value="${esc(S.uq)}" placeholder="Name, role…"></label></div>${tools()}</div>
-    <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th>Company</th><th class="l">iTrade name</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
-    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(u.role)}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.itrade_name||'')}</td>
+    <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th>Company</th><th class="l">ERP user</th><th class="l">Sales Executive (ERP)</th><th class="l">Warehouse (ERP)</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
+    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(u.role)}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.erp_user||'')}</td><td class="l">${esc(u.itrade_name||'')}</td><td class="l">${esc(u.erp_warehouse||'')}</td>
       <td>${u.role === 'PACKER' ? '—' : u.has_login ? 'Yes' : '<span class="bad">No</span>'}</td><td>${u.last_sign_in ? esc(new Date(u.last_sign_in).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : ''}</td>
       <td>${u.active ? 'Yes' : '<span class="bad">Disabled</span>'}</td><td><button data-ed="${u.id}">Edit</button></td></tr>`).join('')}</table></div>
     <p class="muted" style="margin-top:8px">Username = name in small letters without spaces. The same username and password work in the app and the portal. Disabled users cannot sign in.</p></div>`;
   $('#uq').oninput = e => { S.uq = e.target.value; const c = e.target.selectionStart; vStaff().then(() => { const i = $('#uq'); if (i) { i.focus(); i.setSelectionRange(c, c); } }); };
   $('#addu').onclick = () => userDialog(null);
   $('#v').querySelectorAll('[data-ed]').forEach(b => b.onclick = () => userDialog(list.find(u => u.id === +b.dataset.ed)));
-  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{k:'role',l:'Role'},{l:'Company',f:u=>co(u.branch_id)},{k:'itrade_name',l:'iTrade name'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
+  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{k:'role',l:'Role'},{l:'Company',f:u=>co(u.branch_id)},{k:'erp_user',l:'ERP user'},{k:'itrade_name',l:'Sales Executive (ERP)'},{k:'erp_warehouse',l:'Warehouse (ERP)'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
 
   function userDialog(u){
     const d = document.createElement('dialog'); d.className = 'udlg';
@@ -1170,7 +1170,9 @@ async function vStaff(){
       <label>Name<input name="name" required value="${esc(u?.name||'')}" autocomplete="off"></label>
       <label>Role<select name="role">${roles.map(r => `<option ${r===(u?.role||'SALESMAN')?'selected':''}>${r}</option>`).join('')}</select></label>
       <label>Company<select name="br"><option value="">Both</option>${S.branches.slice().sort((x,y)=>x.code==='MGAZ'?-1:1).map(b => `<option value="${b.id}" ${(u ? u.branch_id===b.id : b.id===S.br)?'selected':''}>${co(b.id)}</option>`).join('')}</select></label>
-      <label class="itr">iTrade Sales Executive name<input name="itrade" value="${esc(u?.itrade_name||'')}" autocomplete="off"></label>
+      <label class="itr">Salesman name (ERP user)<input name="erpu" value="${esc(u?.erp_user||'')}" autocomplete="off"></label>
+      <label class="itr">Sales Executive (ERP)<input name="itrade" value="${esc(u?.itrade_name||'')}" autocomplete="off"></label>
+      <label class="itr">Warehouse (ERP)<input name="erpw" list="erpwl" value="${esc(u?.erp_warehouse||'')}" autocomplete="off"><datalist id="erpwl"></datalist></label>
       <label>Email (for reports)<input name="email" type="email" value="${esc(u?.email||'')}" autocomplete="off"></label>
       <label class="pw">${u && u.has_login ? 'New password (leave empty to keep)' : 'Password'}<input name="pw" type="password" autocomplete="new-password"></label>
       <label class="pw">Confirm password<input name="pw2" type="password" autocomplete="new-password"></label>
@@ -1179,15 +1181,17 @@ async function vStaff(){
       <div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="usv" value="ok">Save</button></div></form>`;
     document.body.append(d);
     const f = d.querySelector('form'), sync = () => { const pk = f.role.value === 'PACKER', sm = f.role.value === 'SALESMAN';
-      d.querySelectorAll('.pw').forEach(x => x.hidden = pk); d.querySelector('.itr').hidden = !sm;
+      d.querySelectorAll('.pw').forEach(x => x.hidden = pk); d.querySelectorAll('.itr').forEach(x => x.hidden = !sm);
       d.querySelector('.un').textContent = pk ? 'Packers do not sign in.' : 'Username: ' + (f.name.value.toLowerCase().replace(/[^a-z0-9]/g, '') || '…'); };
     f.role.onchange = sync; f.name.oninput = sync; sync();
+    q(sb.from('sales_lines').select('warehouse').not('warehouse', 'is', null).order('id', { ascending:false }).limit(3000)).then(L => { d.querySelector('#erpwl').innerHTML = [...new Set(L.map(x => x.warehouse))].sort().map(w => `<option value="${esc(w)}">`).join(''); }).catch(() => {});
     d.querySelector('#usv').onclick = async ev => { ev.preventDefault(); const st = d.querySelector('.st'); st.textContent = '';
       if (f.pw.value !== f.pw2.value) { st.textContent = 'The two passwords are not the same.'; return; }
       if (!u && f.role.value !== 'PACKER' && !f.pw.value) { st.textContent = 'Type a password for the new user.'; return; }
       ev.target.disabled = true;
       try { const r = await rpc('admin_user_save', { p_id: u ? u.id : null, p_name: f.name.value, p_role: f.role.value, p_branch: f.br.value ? +f.br.value : null,
           p_itrade: f.role.value === 'SALESMAN' ? f.itrade.value : (u?.itrade_name || ''), p_email: f.email.value, p_active: f.active.checked, p_password: f.role.value === 'PACKER' ? null : (f.pw.value || null) });
+        if (f.role.value === 'SALESMAN') await rpc('admin_user_erp', { p_id: r.id, p_erp_user: f.erpu.value, p_erp_warehouse: f.erpw.value });
         d.close(); d.remove(); toast((u ? 'Saved ' : 'Added ') + r.name + (r.username ? ' · username ' + r.username : ''));
         S.staff = await q(sb.from('staff').select('id,name,role,branch_id,active').order('name')); vStaff(); }
       catch (e) { st.textContent = e.message || String(e); ev.target.disabled = false; } };
