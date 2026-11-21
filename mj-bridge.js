@@ -357,6 +357,10 @@
       var wd = new Date(Date.now() + (new Date().getTimezoneOffset() + TZ_OFF) * 60000 - 2 * 3600000).toISOString().slice(0, 10);
       if (String(p.date) !== wd && String(p.date) !== today()) return { ok: false, error: 'Phone date is wrong (' + p.date + '). Set the phone to automatic date and time, then send again.' };
     }
+    // no back-date entry from the app: requirement is for today or later, a deleted bill is recorded on today's work day
+    var wd2 = new Date(Date.now() + (new Date().getTimezoneOffset() + TZ_OFF) * 60000 - 2 * 3600000).toISOString().slice(0, 10);
+    if (stage === 'REQUIREMENT' && String(p.forDate || p.date || '') < wd2) return { ok: false, error: 'Requirement for a past date is not allowed. Ask the office to correct it in the portal.' };
+    if ((stage === 'DELETE' || stage === 'UNDELETE') && p.date && String(p.date) < wd2) return { ok: false, error: 'Back date is not allowed in the app. Ask the office to correct it in the portal.' };
     var sm = p.salesman ? m.smByName(p.salesman) : null;
     var itemId = function (code) { var it = m.itemByCode[String(code).trim()]; if (!it) throw new Error('Item ' + code + ' is not in the item list'); return it.id; };
     var dayId = async function (create) { var c = await sb(); var d = (await q(c.from('van_day').select('id,status').eq('salesman_id', sm.id).eq('business_date', p.date)))[0];
