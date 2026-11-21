@@ -155,7 +155,7 @@ const rpc = (fn, args) => q(sb.rpc(fn, args));
 window.addEventListener('unhandledrejection', e => { if (e.reason && (e.reason.message || e.reason.code)) e.preventDefault(); });
 const has = (...r) => r.includes(S.me?.role);
 // ---------- role access (Admin → Role access). Falls back to the built-in defaults until the table exists ----------
-const ACC_DEF = { V:{ ACCOUNTANT:'ov dd load ret days settle close wh ite sc itstock imp req ds pc se wo qs sa lr vl co ex dc', RECEIVER:'load ret days wh ite sc req', SALESMAN:'days req', VIEWER:'ov dd days wh ite sc ds pc se wo qs sa lr vl co ex dc', PACKER:'' },
+const ACC_DEF = { V:{ ACCOUNTANT:'ov dd load ret days oe settle close wh ite sc itstock imp req ds pc se wo qs sa lr vl co ex dc', RECEIVER:'load ret days wh ite sc req', SALESMAN:'days req', VIEWER:'ov dd days wh ite sc ds pc se wo qs sa lr vl co ex dc', PACKER:'' },
                   E:{ ACCOUNTANT:'load ret days settle close wh sc itstock imp req pc', RECEIVER:'load ret wh sc req', SALESMAN:'days req', VIEWER:'', PACKER:'' } };
 async function loadAccess(){ const { data, error } = await sb.from('role_access').select('module,can_view,can_edit').eq('role', S.me.role);
   S.acc = error || !data?.length ? null : Object.fromEntries(data.map(a => [a.module, a])); }
@@ -212,7 +212,7 @@ async function boot(){
 function tabsFor(){
   const t = [], G = (g, ...x) => x.forEach(([k,l]) => { if (canV(k)) t.push([k,l,g]); });
   G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
-  G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
+  G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['oe','Office entry'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
   if (canV('wh')) t.push(['whr','Warehouse report','Reports']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
@@ -227,7 +227,7 @@ function render(){
   const brN = id => { const b = S.branches.find(x => x.id === id); return b ? (b.code === 'MGT' ? 'Ajman' : 'Al Quoz') : ''; }, br = S.brs.length > 1 ? 'Al Quoz + Ajman' : (S.branches.find(b => b.id === S.br)?.name || '');
   const unitName = S.brs.length > 1 ? 'SALES PORTAL' : br.toUpperCase();
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
-    days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
+    days:'Van day status, cash to hand over, settlement and closing.', oe:'Correct a salesman\'s loading, return, expense, collection, requirement or deleted bill for the date — like Office entry in the old portal.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
     req:'Next-day order by salesman, qty as the salesman gives it.', wh:'Production and cleaning batches: issue, return, differences and output.',
     ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Count batches: create here, the receiver counts offline in the app and posts; compare with iTrade, recount, expiry, shelves, tray & label usage.',
     ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
@@ -254,7 +254,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -1313,6 +1313,131 @@ async function vCheck(){
     <div class="card"><h3>Sales not linked to a salesman (store sales and unknown names)</h3>${table([{k:'who',l:'iTrade user / sales executive',left:1},{k:'n',l:'Lines',sum:1},{k:'net',l:'AED',money:1,sum:1}], noSm, { empty:'None.' })}</div>
     <div class="card"><h3>Salesman sales with no van day (not loaded)</h3>${table([{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'n',l:'Invoices',sum:1}], noDay, { empty:'None.' })}</div>
     <div class="card"><h3>Van days not closed (before today)</h3>${table([{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'status',l:'Status'}], open, { empty:'All closed.' })}</div>`;
+}
+
+// ---------- OFFICE ENTRY ----------
+// Admin / accountant correct a salesman's loading, return, expenses, collections, requirement and deleted bills for a date.
+// Opens straight away for the chosen salesman and date (no pull); every save shows what changes first and is logged.
+async function vOffice(){
+  const MODS = [['LOADING','Loading'],['RETURN','Return'],['EXPENSE','Expense'],['COLLECTION','Collection'],['REQUIREMENT','Requirement'],['DELETE','Delete bill']];
+  S.om = S.om || 'LOADING';
+  if (!S.customers.length) S.customers = await q(sb.from('customers').select('id,itrade_code,name').eq('active', true).order('name'));
+  $('#v').innerHTML = `<div class="card"><div class="row"><label>Salesman<select id="osm"><option value="">Select</option>${smOptions(S.osm)}</select></label>
+      <span class="muted" style="align-self:end">Date ${S.date} — change it at the top</span></div>
+    <div class="rtabs" style="margin:12px 0">${MODS.map(([k,l]) => `<button data-om="${k}" class="${S.om===k?'on':''}">${l}</button>`).join('')}</div><div id="og"></div></div>`;
+  $('#osm').onchange = e => { S.osm = +e.target.value || null; fill(); };
+  $('#v').querySelectorAll('[data-om]').forEach(b => b.onclick = () => { S.om = b.dataset.om; $('#v').querySelectorAll('[data-om]').forEach(x => x.classList.toggle('on', x === b)); fill(); });
+  const custVal = cid => { const c = S.customers.find(x=>x.id===cid); return c ? (c.itrade_code||'')+' | '+c.name : ''; };
+  const custId = v => S.customers.find(c => (c.itrade_code||'')+' | '+c.name === v)?.id || null;
+  const iname = id => item(id).short_name || item(id).name || ('#' + id);
+  const g = () => $('#og');
+  const save = async (module, head, lines, diff) => {
+    if (!confirm((diff.length ? 'Changes:\n' + diff.slice(0, 25).join('\n') + (diff.length > 25 ? '\n… and ' + (diff.length - 25) + ' more' : '') : 'No item changes.') + '\n\nSave ' + module.toLowerCase() + '?')) return;
+    try { await rpc('office_save', { p_salesman:S.osm, p_date:S.date, p_module:module, p_head:head, p_lines:lines }); toast('Saved'); fill(); } catch (e) { toast(e.message || String(e), false); }
+  };
+  const diffMap = (a, b, show) => { const out = []; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => { if (String(a[k] ?? '') !== String(b[k] ?? '')) out.push(iname(+k) + ':  ' + (a[k] == null ? '—' : show(a[k])) + '  →  ' + (b[k] == null ? 'removed' : show(b[k]))); }); return out; };
+  let seq = 0;
+  async function fill(){
+    const my = ++seq;
+    if (!S.osm) { g().innerHTML = '<p class="muted">Choose a salesman.</p>'; return; }
+    g().innerHTML = '<p class="muted">Loading… <b class="mjpct">0%</b></p>';
+    const day = (await q(sb.from('van_day').select('*').eq('salesman_id', S.osm).eq('business_date', S.date)))[0];
+    if (my !== seq) return;
+    const st = day ? `<p class="muted">Van day <span class="st ${day.status}">${day.status}</span>${day.status==='SETTLED'?' — saving sends it back to RETURNED, settle the cash again':''}${day.status==='CLOSED'?' — reopen it in Van days to correct':''}</p>` : '<p class="muted">No loading yet for this date.</p>';
+    const ro = day && day.status === 'CLOSED';
+    const m = S.om;
+    if (m === 'LOADING') {
+      const [lines, req] = await Promise.all([day ? q(sb.from('loading_lines').select('item_id,qty').eq('van_day_id', day.id)) : [], q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.osm).eq('required_date', S.date))]);
+      if (my !== seq) return;
+      const a = {}; lines.forEach(l => a[l.item_id] = num(l.qty));
+      g().innerHTML = st + `<div class="row"><label>Van (plate no.)<select id="ovan"><option value="">Select van</option>${S.vans.filter(x => S.brs.includes(x.branch_id)).map(x=>`<option value="${x.id}" ${day&&day.van_id===x.id?'selected':''}>${esc(x.van_no)}</option>`).join('')}</select></label>
+        <label>Start KM<input type="number" id="okm" style="width:110px" value="${day?.start_km ?? ''}"></label><label>Load temp<input type="number" id="otp" step="0.1" value="${day?.load_temp ?? ''}"></label></div>`
+        + qtyGrid(sellItems().map(it => ({ it, qty:a[it.id]||0, hint:(r => r ? 'Req ' + (+r.qty_cartons) : '')(req.find(x => x.item_id === it.id)) })))
+        + (ro ? '' : '<div class="row" style="margin-top:8px"><button class="p" id="osv">Save loading</button></div>');
+      $('#osv') && ($('#osv').onclick = () => { const ln = [...g().querySelectorAll('tr[data-id]')].map(tr => ({ item_id:+tr.dataset.id, qty:gridValue(tr) })).filter(x => x.qty > 0), b = {}; ln.forEach(x => b[x.item_id] = x.qty);
+        save('LOADING', { van_id:$('#ovan').value, start_km:$('#okm').value, load_temp:$('#otp').value }, ln, diffMap(a, b, v => v)); });
+    } else if (m === 'RETURN') {
+      if (!day) { g().innerHTML = st; return; }
+      const [rec, ret] = await Promise.all([q(sb.from('v_van_day_items').select('*').eq('van_day_id', day.id)), q(sb.from('return_lines').select('*').eq('van_day_id', day.id))]);
+      if (my !== seq) return;
+      const F = ['good','damage','expiry','waste','foc'], key = t => F.map(f => num(t[f])).join(' / ');
+      let ids = [...new Set([...rec.map(r=>r.item_id), ...ret.map(r=>r.item_id)])];
+      const a = {}; ret.forEach(t => { if (F.some(f => num(t[f]))) a[t.item_id] = key(t); });
+      const row = it => { const r = rec.find(x=>x.item_id===it.id)||{}, t = ret.find(x=>x.item_id===it.id)||{};
+        return `<tr data-id="${it.id}" data-exp="${num(r.expected_return)}"><td class="l">${esc(it.short_name||it.name)}</td><td>${num(r.load)}</td><td>${num(r.expected_return)}</td>
+        ${F.map(f=>`<td><input type="number" min="0" class="${f}" value="${num(t[f])||''}" ${ro?'disabled':''}></td>`).join('')}<td class="tot"></td><td class="df"></td></tr>`; };
+      const its = () => sellItems().filter(i => ids.includes(i.id));
+      g().innerHTML = st + `<div class="row"><label>End KM<input type="number" id="okm" style="width:110px" value="${day.end_km??''}"></label>
+        <label>Unload temp<input type="number" id="otp" step="0.1" value="${day.unload_temp??''}"></label>
+        <label>Carton small<input type="number" id="ocs" value="${day.carton_small||''}"></label><label>Carton big<input type="number" id="ocb" value="${day.carton_big||''}"></label>
+        <label>Add item<select id="oadd"><option value="">—</option>${sellItems().filter(i=>!ids.includes(i.id)).map(i=>`<option value="${i.id}">${esc(i.short_name||i.name)}</option>`).join('')}</select></label></div>
+        <div class="tw"><table id="ort"><tr><th class="l">Item</th><th>Load</th><th>Expected</th>${F.map(f=>`<th>${f}</th>`).join('')}<th>Total</th><th>Diff</th></tr>${its().map(row).join('')}</table></div>`
+        + (ro ? '' : '<div class="row" style="margin-top:8px"><button class="p" id="osv">Save return</button></div>');
+      const calc = tr => { const tot = F.reduce((s,f)=>s+num($('.'+f,tr).value),0), df = tot - num(tr.dataset.exp); tr.querySelector('.tot').textContent = tot; const c = tr.querySelector('.df'); c.textContent = df ? (df>0?'+':'')+df : ''; c.className = 'df ' + (df ? 'bad' : ''); };
+      const bind = () => g().querySelectorAll('tr[data-id]').forEach(tr => { calc(tr); tr.oninput = () => calc(tr); });
+      bind();
+      $('#oadd').onchange = e => { const id = +e.target.value; if (!id) return; ids.push(id); $('#ort').insertAdjacentHTML('beforeend', row(item(id))); e.target.selectedOptions[0].remove(); e.target.value = ''; bind(); };
+      $('#osv') && ($('#osv').onclick = () => { const ln = [...g().querySelectorAll('tr[data-id]')].map(tr => Object.fromEntries([['item_id',+tr.dataset.id], ...F.map(f=>[f, num($('.'+f,tr).value)])])), b = {};
+        ln.forEach(t => { if (F.some(f => t[f])) b[t.item_id] = key(t); });
+        save('RETURN', { end_km:$('#okm').value, unload_temp:$('#otp').value, carton_small:$('#ocs').value, carton_big:$('#ocb').value }, ln, diffMap(a, b, v => v + ' (G/D/E/W/F)')); });
+    } else if (m === 'EXPENSE' || m === 'COLLECTION') {
+      if (!day) { g().innerHTML = st; return; }
+      const ex = m === 'EXPENSE', rows = await q(sb.from(ex ? 'expenses' : 'collections').select('*').eq('van_day_id', day.id).order('id'));
+      if (my !== seq) return;
+      const ET = ['FUEL','PARKING','SHELF RENT','CREDIT NOTE','OTHER'], dis = ro ? 'disabled' : '';
+      const cart = ex ? rows.filter(e => /^CARTON/.test(e.expense_type)) : [], main = ex ? rows.filter(e => !/^CARTON/.test(e.expense_type)) : rows;
+      const exRow = e => `<div class="row er"><select class="t" ${dis}>${ET.map(t=>`<option ${t===e.expense_type?'selected':''}>${t}</option>`).join('')}</select>
+        <input type="number" step="0.01" class="a" value="${e.amount??''}" ${dis} style="width:100px" placeholder="Amount">
+        <input class="c" list="ocl" placeholder="Customer (shelf rent / credit note)" value="${esc(custVal(e.customer_id))}" ${dis} style="min-width:240px">
+        <input class="n" placeholder="Note" value="${esc(e.note||'')}" ${dis}><button class="d x" ${dis}>✕</button></div>`;
+      const coRow = c => `<div class="row cr"><input class="r" placeholder="Receipt no" value="${esc(c.receipt_no||'')}" ${dis} style="width:110px">
+        <input class="i" placeholder="Invoice no" value="${esc(c.invoice_no||'')}" ${dis} style="width:150px">
+        <input class="c" list="ocl" placeholder="Customer" value="${esc(custVal(c.customer_id))}" ${dis} style="min-width:240px">
+        <select class="m" ${dis}>${['CASH','CHEQUE','TRANSFER'].map(x=>`<option ${x===c.mode?'selected':''}>${x}</option>`).join('')}</select>
+        <input type="number" step="0.01" class="a" value="${c.amount??''}" ${dis} style="width:100px" placeholder="Amount"><button class="d x" ${dis}>✕</button></div>`;
+      const R = ex ? exRow : coRow, line = r => ex ? { expense_type:$('.t',r).value, amount:num($('.a',r).value), customer_id:custId($('.c',r).value), note:$('.n',r).value }
+        : { receipt_no:$('.r',r).value.trim(), invoice_no:$('.i',r).value.trim(), customer_id:custId($('.c',r).value), mode:$('.m',r).value, amount:num($('.a',r).value) };
+      const txt = l => ex ? `${l.expense_type} ${money(l.amount)}${l.note ? ' ' + l.note : ''}` : `${l.receipt_no} ${l.mode} ${money(l.amount)}`;
+      g().innerHTML = st + `<datalist id="ocl">${S.customers.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist><div id="orows">${main.map(R).join('')}</div>`
+        + (cart.length ? `<p class="muted">Cartons (from the return): ${cart.map(c => esc(c.expense_type + ' ' + money(c.amount))).join(', ')} — change them in Return.</p>` : '')
+        + (ro ? '' : `<div class="row" style="margin-top:8px"><button id="oad">+ Add</button><button class="p" id="osv">Save ${ex ? 'expenses' : 'collections'}</button></div>`);
+      const bindX = () => g().querySelectorAll('.x').forEach(b => b.onclick = () => b.closest('.row').remove());
+      bindX(); if (!main.length && !ro) { $('#orows').insertAdjacentHTML('beforeend', R(ex ? { expense_type:'FUEL' } : { mode:'CASH' })); bindX(); }
+      $('#oad') && ($('#oad').onclick = () => { $('#orows').insertAdjacentHTML('beforeend', R(ex ? { expense_type:'FUEL' } : { mode:'CASH' })); bindX(); });
+      $('#osv') && ($('#osv').onclick = () => { const ln = [...$('#orows').querySelectorAll(ex ? '.er' : '.cr')].map(line).filter(l => l.amount);
+        if (!ex && ln.some(l => !l.receipt_no || !l.customer_id)) return toast('Each collection needs receipt no and a customer from the list', false);
+        const before = main.map(l => txt({ ...l, amount:num(l.amount) })).sort(), after = ln.map(txt).sort(), diff = [];
+        before.filter(x => !after.includes(x)).forEach(x => diff.push('removed: ' + x)); after.filter(x => !before.includes(x)).forEach(x => diff.push('added: ' + x));
+        save(m, {}, ln, diff); });
+    } else if (m === 'REQUIREMENT') {
+      const req = await q(sb.from('requirement_lines').select('item_id,qty_cartons').eq('salesman_id', S.osm).eq('required_date', S.date));
+      if (my !== seq) return;
+      const a = {}; req.forEach(r => a[r.item_id] = +r.qty_cartons);
+      g().innerHTML = `<p class="muted">Requirement for ${S.date} (the order given for this date).</p><div class="tw"><table><tr><th class="l">Item</th><th>Qty</th></tr>${sellItems().map(it => `<tr data-id="${it.id}"><td class="l">${esc(it.short_name||it.name)}</td>
+        <td><input type="number" min="0" step="0.5" value="${a[it.id] ?? ''}"></td></tr>`).join('')}</table></div><div class="row" style="margin-top:8px"><button class="p" id="osv">Save requirement</button></div>`;
+      $('#osv').onclick = async () => { const ln = [...g().querySelectorAll('tr[data-id]')].map(tr => ({ item_id:+tr.dataset.id, qty_cartons:num($('input',tr).value) })).filter(x=>x.qty_cartons>0), b = {}; ln.forEach(x => b[x.item_id] = x.qty_cartons);
+        const diff = diffMap(a, b, v => v); if (!confirm((diff.length ? 'Changes:\n' + diff.join('\n') : 'No changes.') + '\n\nSave requirement?')) return;
+        try { await rpc('save_requirement', { p_salesman:S.osm, p_date:S.date, p_lines:ln }); toast('Requirement saved'); fill(); } catch (e) { toast(e.message || String(e), false); } };
+    } else {
+      const sm = S.staff.find(s => s.id === S.osm), br = sm.branch_id;
+      const [L, D] = await Promise.all([all(() => sb.from('sales_lines').select('invoice_no,customer_name,net_incl_vat,tran_type,cancelled,cancel_reason').eq('salesman_id', S.osm).eq('tran_date', S.date).order('id')),
+        q(sb.from('sales_deletes').select('*').eq('branch_id', br).eq('del_date', S.date).order('invoice'))]);
+      if (my !== seq) return;
+      const inv = {}; L.forEach(l => { const k = String(l.invoice_no||'').trim(); const o = inv[k] = inv[k] || { no:k, cust:l.customer_name, type:l.tran_type, net:0, del:false }; o.net += num(l.net_incl_vat); if (l.cancel_reason === 'DELETE LIST') o.del = true; });
+      const list = Object.values(inv).sort((x,y) => x.no.localeCompare(y.no));
+      g().innerHTML = `<p class="muted">Bills deleted in iTrade are kept out of sales and cash. ${list.length} bill(s) imported for ${esc(sm.name)} on ${S.date}.</p>
+        <div class="row"><input id="oinv" placeholder="Invoice no" style="width:200px"><button class="p" id="odel">Delete bill</button></div>
+        <div class="tw" style="margin-top:8px"><table><tr><th class="l">Invoice</th><th class="l">Customer</th><th>Type</th><th>AED</th><th>Status</th><th></th></tr>
+        ${list.map(o => `<tr class="${o.del?'warn':''}"><td class="l">${esc(o.no)}</td><td class="l">${esc(o.cust||'')}</td><td>${esc(o.type||'')}</td><td>${money(o.net)}</td><td>${o.del?'Deleted':''}</td>
+          <td><button data-inv="${esc(o.no)}" data-undo="${o.del?1:''}">${o.del?'Undo':'Delete'}</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">No bills imported for this date.</td></tr>'}</table></div>
+        ${D.length ? `<p class="muted" style="margin-top:8px">Delete list for this date (all salesmen): ${D.map(d => esc(d.invoice + (d.user_name ? ' (' + d.user_name + ')' : ''))).join(', ')}</p>` : ''}`;
+      const go = async (no, undo) => { if (!no) return toast('Enter the invoice no', false); if (!confirm((undo ? 'Undo delete of ' : 'Delete bill ') + no + '?')) return;
+        try { await rpc('app_delete', { p_branch:br, p_date:S.date, p_invoice:no, p_user:sm.name, p_undo:!!undo }); toast(undo ? 'Bill restored' : 'Bill deleted'); fill(); } catch (e) { toast(e.message || String(e), false); } };
+      $('#odel').onclick = () => go($('#oinv').value.trim(), false);
+      g().querySelectorAll('[data-inv]').forEach(b => b.onclick = () => go(b.dataset.inv, b.dataset.undo));
+    }
+  }
+  await fill();
 }
 
 // ---------- REQUIREMENT ----------
