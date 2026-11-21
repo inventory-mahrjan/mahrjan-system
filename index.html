@@ -1237,7 +1237,7 @@ async function vItems(){ const __t = S.nav;
     $('#iq').onchange = e => { S.iq = e.target.value; vItems(); };
     $('#addi').onclick = () => itemDialog(null);
     $('#v').querySelectorAll('[data-ei]').forEach(b => b.onclick = () => itemDialog(items.find(i => i.id === +b.dataset.ei)));
-    bindTools('Item master', [['Items', [{k:'display_order',l:'Order'},{k:'barcode',l:'Barcode'},{k:'itrade_code',l:'iTrade code'},{k:'name',l:'Name'},{k:'short_name',l:'Short name'},{l:'Type',f:i=>TY[i.item_type]},{k:'pcs_per_pack',l:'Pcs/pack'},{k:'packs_per_carton',l:'Packs/ctn'},{k:'pcs_per_carton',l:'Pcs/ctn'},{k:'pcs_per_tray',l:'Pcs/tray'},{k:'segment',l:'Segment'},{l:'Active',f:i=>i.active?'Yes':'No'}], shown]]);
+    bindTools('Item master', [['Items', [{k:'id',l:'ID'},{k:'display_order',l:'Order'},{k:'barcode',l:'Barcode'},{k:'itrade_code',l:'iTrade code'},{k:'name',l:'Name'},{k:'short_name',l:'Short name'},{l:'Type',f:i=>TY[i.item_type]},{k:'pcs_per_pack',l:'Pcs/pack'},{k:'packs_per_carton',l:'Packs/ctn'},{k:'pcs_per_carton',l:'Pcs/ctn'},{k:'pcs_per_tray',l:'Pcs/tray'},{k:'material_kind',l:'Material kind'},{k:'pcs_per_box',l:'Pcs per box'},{k:'unit_cost',l:'Unit cost AED'},{k:'segment',l:'Segment'},{l:'Active',f:i=>i.active?'Yes':'No'}], shown]]);
   } else if (S.itab === 'cty') {
     // country of origin list for the stock count (the app offers only these)
     const L = await q(sb.from('sc_countries').select('*').order('sort_order').order('name'));
