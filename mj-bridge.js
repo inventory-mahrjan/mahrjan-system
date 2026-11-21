@@ -525,7 +525,7 @@
     var D = await dayData(m, date), o = new Sheet_(name === 'SALESMAN SUMMARY' ? 12 : name === 'CASH SHEET' ? 10 : 15), pos = null, cx = null;
     if (name === 'LOADING SHEET') await loadingSheet_(o, m, D, sm, await readReqs(m, date));
     else if (name === 'SALESMAN SUMMARY') salesmanSummary_(o, m, D, sm);
-    else { var F = await cashFigures_(m, D), op = null;   // opening cash is typed by the accountant (no stored balance) cashRows_(o, F, op); cx = cashExport_(F, op); pos = cashPosition_(F, op).map(function (p) { return [p[0], '', p[1]]; }); }
+    else { var F = await cashFigures_(m, D), op = null; /* opening cash is typed by the accountant */ cashRows_(o, F, op); cx = cashExport_(F, op); pos = cashPosition_(F, op).map(function (p) { return [p[0], '', p[1]]; }); }
     return JSON.parse(JSON.stringify({ ok: true, name: name, date: date, salesman: sm, rows: o.rows, head: o.head, bold: o.bold, money: o.money, segs: o.segs, titles: o.titles, sign: o.sign, position: pos, cash: cx }));
   }
 
