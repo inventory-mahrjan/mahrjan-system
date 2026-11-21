@@ -1053,7 +1053,7 @@ async function vAnalysis(){ const __t = S.nav;
   bindRows($('#v'), G, g => {
     if (F.by === 'iv') { const L = rows.filter(r => r.invoice_no === g.key);
       // invoice opens in a popup (like the old portal): who entered it, the executive, each product line
-      const dlg = document.createElement('dialog'); dlg.className = 'udlg'; dlg.style.cssText = 'max-width:1100px;width:94vw';
+      const dlg = document.createElement('dialog'); dlg.className = 'udlg'; dlg.style.cssText = 'max-width:1320px;width:96vw';
       dlg.innerHTML = `<div class="row" style="justify-content:space-between;margin:0 0 4px"><h3 style="margin:0">${esc(g.key)}</h3><button id="dclose">Close</button></div>
         <p class="muted" style="margin:0 0 10px">${esc(L[0]?.tran_date||'')} · ${esc(saleName(L[0]||{}))} · ${esc(L[0]?.customer_name||g.sub||'')}${L[0]?.customer_code?' ('+esc(L[0].customer_code)+')':''} · ${esc(L[0]?.tender_type||'')} · ${L.length} line${L.length===1?'':'s'}</p>
         ${table([{k:'itrade_user',l:'Entered by',left:1},{k:'sales_executive',l:'Executive',left:1},{l:'Product',left:1,f:r=>r.item_name||(r.item_id?iNm(r.item_id):'')},{k:'item_code',l:'Code'},{k:'qty_base',l:'Qty',sum:1},{k:'unit',l:'Unit'},{k:'gross',l:'Gross',money:1,sum:1},{k:'disc',l:'Discount',money:1,sum:1},{k:'net',l:'Net',money:1,sum:1},{k:'vat',l:'VAT',money:1,sum:1},{k:'net_incl_vat',l:'Net incl. VAT',money:1,sum:1},{k:'profit',l:'Profit',money:1,sum:1}], L)}
