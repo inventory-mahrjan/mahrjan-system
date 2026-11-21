@@ -1,14 +1,13 @@
--- EMAIL VISIT FASTER - CREATE
--- The visit email timed out: it read every sale ever made to find each customer's last bill.
--- It only needs the last 31 days (older = "over 30 days / never"), so it now reads just those.
+-- EMAIL DATA FAST - CREATE
+-- The weekly / daily-check emails timed out: mail_data ran with the mailer login's row checks on every row.
+-- It now runs as the database owner (same as the other mail_* helpers) and itself allows only ADMIN / VIEWER logins.
 do $$ declare d text; begin
   d := pg_get_functiondef('public.mail_data(text,date,date)'::regprocedure);
-  if position('tran_date between t - 31 and t group by 1' in d) = 0 then
-    d := replace(d, 'where branch_id = b.id and tran_type = ''CR'' and not cancelled and tran_date <= t group by 1',
-                    'where branch_id = b.id and tran_type = ''CR'' and not cancelled and tran_date between t - 31 and t group by 1');
-    if position('tran_date between t - 31 and t group by 1' in d) = 0 then raise exception 'mail_data text not as expected - nothing changed'; end if;
+  if position('MAILDATA-GUARD' in d) = 0 then
+    d := regexp_replace(d, '\nbegin\n', E'\nbegin\n  /*MAILDATA-GUARD*/ if public.my_role() not in (''ADMIN'',''VIEWER'') then raise exception ''Not allowed''; end if;\n');
+    d := replace(d, 'SECURITY INVOKER', 'SECURITY DEFINER');
+    if position('SECURITY DEFINER' in d) = 0 then d := replace(d, 'LANGUAGE plpgsql', 'LANGUAGE plpgsql SECURITY DEFINER'); end if;
     execute d;
   end if;
 end $$;
-create index if not exists sales_lines_branch_date_idx on public.sales_lines (branch_id, tran_date);
-select 'visit email faster' as result;
+select prosecdef as definer, position('MAILDATA-GUARD' in prosrc) > 0 as guarded from pg_proc where oid = 'public.mail_data(text,date,date)'::regprocedure;
