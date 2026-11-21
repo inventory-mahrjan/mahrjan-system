@@ -1,4 +1,25 @@
--- APPROVED DEVICES - CREATE.sql (update): no auto-approve of another user's device
+-- APPROVED DEVICES - CREATE.sql (update): only approved devices; first device approved on registration
+create or replace function public.device_ok(p_staff bigint, p_role text) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select case
+    when p_role not in ('SALESMAN', 'RECEIVER') then true
+    when coalesce((select value from public.app_settings where key = 'DEVICE_LOCK'), 0) = 0 then true
+    when exists (select 1 from public.app_devices d where d.staff_id = p_staff and d.approved and d.device_id = public.req_device()) then true
+    else false end $$;
+
+-- same as before, plus the device check written inline (no extra function call: me() runs once per row in access rules)
+create or replace function public.me() returns public.staff
+language sql stable security definer set search_path to 'public' as $$
+  select s.* from public.staff s where s.auth_user_id = auth.uid() and s.active and s.can_login
+    and (s.role not in ('SALESMAN', 'RECEIVER')
+      or coalesce((select value from public.app_settings where key = 'DEVICE_LOCK'), 0) = 0
+      or exists (select 1 from public.app_devices d where d.staff_id = s.id and d.approved
+                 and d.device_id = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-mj-device', '')))
+  union all
+  select (jsonb_populate_record(null::public.staff, jsonb_build_object('name','SYSTEM','role','ADMIN','can_login',true,'active',true,'created_at',now()))).*
+  where auth.uid() is null and session_user in ('postgres','supabase_admin')
+  limit 1 $$;
+
 -- called by the app and the portal right after sign-in / on open
 create or replace function public.device_register(p_label text default null) returns jsonb
 language plpgsql security definer set search_path to 'public' as $$

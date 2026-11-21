@@ -3,7 +3,7 @@
 -- Enforced inside public.me(), which every access rule and app function already uses.
 -- Each app/portal install sends its own device id in the x-mj-device header.
 -- Setting DEVICE_LOCK (Admin → Settings): 0 = off, 1 = first device of a user is approved
--- automatically, every other device waits for the admin, 2 = the admin approves every device.
+-- automatically when the app registers it (never one already approved for someone else), every other device waits for the admin, 2 = the admin approves every device.
 -- Undo with: APPROVED DEVICES - REVERT.sql
 
 create table if not exists public.app_devices (
@@ -34,8 +34,6 @@ language sql stable security definer set search_path to 'public' as $$
     when p_role not in ('SALESMAN', 'RECEIVER') then true
     when coalesce((select value from public.app_settings where key = 'DEVICE_LOCK'), 0) = 0 then true
     when exists (select 1 from public.app_devices d where d.staff_id = p_staff and d.approved and d.device_id = public.req_device()) then true
-    when coalesce((select value from public.app_settings where key = 'DEVICE_LOCK'), 0) = 1
-         and not exists (select 1 from public.app_devices d where d.staff_id = p_staff) then true
     else false end $$;
 
 -- same as before, plus the device check written inline (no extra function call: me() runs once per row in access rules)
@@ -45,9 +43,7 @@ language sql stable security definer set search_path to 'public' as $$
     and (s.role not in ('SALESMAN', 'RECEIVER')
       or coalesce((select value from public.app_settings where key = 'DEVICE_LOCK'), 0) = 0
       or exists (select 1 from public.app_devices d where d.staff_id = s.id and d.approved
-                 and d.device_id = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-mj-device', ''))
-      or (coalesce((select value from public.app_settings where key = 'DEVICE_LOCK'), 0) = 1
-          and not exists (select 1 from public.app_devices d where d.staff_id = s.id)))
+                 and d.device_id = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-mj-device', '')))
   union all
   select (jsonb_populate_record(null::public.staff, jsonb_build_object('name','SYSTEM','role','ADMIN','can_login',true,'active',true,'created_at',now()))).*
   where auth.uid() is null and session_user in ('postgres','supabase_admin')
