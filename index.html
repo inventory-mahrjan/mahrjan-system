@@ -802,25 +802,29 @@ async function vItrade(){ const __t = S.nav;
   sec.push(['SALESMAN WASTAGE', 'Expiry and waste returned by the vans (packs)', sw, ['EXP','WST']]);
   const open = bs.filter(b => b.status === 'ISSUED').length;
   S.itx = sec;
-  const DG = ['WASTAGE – PRODUCTION', 'WASTAGE – CLEANING', 'SALESMAN WASTAGE'];
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
-      <button class="p" id="xl">Download Excel</button>${canE('imp') ? '<button id="zl">Loading zip (Store Issue)</button><button id="zr">Return zip (Store Issue)</button>' : ''}
+      <button class="p" id="xl">Download Excel</button>${canE('imp') ? '<button id="zl">Loading zip (Store Issue)</button><button id="zr">Return zip (Store Issue)</button><button id="zd">Damaged goods zip</button>' : ''}
       <span class="muted">${closed.length} closed batch(es), ${days.length} van day(s).${open ? ` <b class="bad">${open} batch(es) still open — not included.</b>` : ''}</span></div></div>
     ${sec.map(([t, sub, m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
       const tot = c => ids.reduce((a,id) => a + num(m[id][c]), 0), multi = cols.length > 1;
-      return `<div class="card"><div class="row" style="justify-content:space-between;margin:0"><h3>${t}</h3>${DG.includes(t) && ids.length ? `<button data-dg="${t}">Damaged goods file (iTrade .txt)</button>` : ''}</div><p class="muted" style="margin:-4px 0 8px">${sub}</p>${ids.length ? `<div class="tw"><table>
+      return `<div class="card"><div class="row" style="justify-content:space-between;margin:0"><h3>${t}</h3></div><p class="muted" style="margin:-4px 0 8px">${sub}</p>${ids.length ? `<div class="tw"><table>
         <tr><th class="l">Item</th><th>iTrade code</th>${cols.map(c => `<th>${c}</th>`).join('')}${multi?'<th>Total</th>':''}</tr>
         ${ids.map(id => { const it = item(id); return `<tr><td class="l">${esc(it.short_name||it.name)}</td><td>${esc(it.itrade_code||'')}</td>
           ${cols.map(c => `<td>${num(m[id][c]) || ''}</td>`).join('')}${multi?`<td><b>${cols.reduce((a,c)=>a+num(m[id][c]),0)}</b></td>`:''}</tr>`; }).join('')}
         <tr class="tot"><td class="l">Total</td><td></td>${cols.map(c => `<td>${tot(c)}</td>`).join('')}${multi?`<td>${cols.reduce((a,c)=>a+tot(c),0)}</td>`:''}</tr></table></div>` : '<p class="muted">Nothing for this period.</p>'}</div>`; }).join('')}`;
   $('#to').onchange = e => { S.ito = e.target.value; vItrade(); };
-  // iTrade Damaged Goods import file: one line per item = company code, iTrade code, (cost left blank), qty (all columns of the section added up)
-  $('#v').querySelectorAll('[data-dg]').forEach(b => b.onclick = () => {
-    const [t, , m, cols] = sec.find(x => x[0] === b.dataset.dg), code = S.branches.find(x => x.id === S.br)?.code || '';
-    const ids = Object.keys(m).map(Number).sort((a,c) => (item(a).display_order||0) - (item(c).display_order||0)).filter(id => cols.reduce((a,c) => a + num(m[id][c]), 0));
-    const txt = ids.map(id => { const it = item(id); return [code, it.itrade_code || it.barcode || '', '', cols.reduce((a,c) => a + num(m[id][c]), 0).toFixed(3)].join(','); }).join('\r\n') + '\r\n';
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type:'text/plain' }));
-    a.download = `DamagedGoods_${code}_${t.replace(/[^A-Z]+/g,'_').replace(/_+$/,'')}_${S.date}${S.ito !== S.date ? '_to_' + S.ito : ''}.txt`; a.click(); URL.revokeObjectURL(a.href);
+  // iTrade Damaged Goods zip: one .txt per wastage section, each line = company code, iTrade code, (cost blank), qty
+  $('#zd') && ($('#zd').onclick = () => {
+    const code = S.branches.find(x => x.id === S.br)?.code || 'MGAZ', dt = S.date + (S.ito !== S.date ? '_to_' + S.ito : ''), files = [];
+    [['WASTAGE – PRODUCTION','WASTAGE_PRODUCTION'], ['WASTAGE – CLEANING','WASTAGE_CLEANING'], ['SALESMAN WASTAGE','WASTAGE_SALESMAN GRV']].forEach(([t, fn]) => {
+      const [, , m, cols] = sec.find(x => x[0] === t), tot = id => cols.reduce((a,c) => a + num(m[id][c]), 0);
+      const L = Object.keys(m).map(Number).filter(id => tot(id) > 0).sort((a,c) => (item(a).display_order||0) - (item(c).display_order||0))
+        .map(id => [code, item(id).itrade_code || item(id).barcode || '', '', tot(id).toFixed(3)].join(','));
+      if (L.length) files.push({ name:`DamagedGoods_${code}_${fn}_${dt}.txt`, text:L.join('\r\n') + '\r\n' }); });
+    if (!files.length) return toast('No wastage for this period.', false);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(makeZip(files)); a.download = `DamagedGoods_${code}_${dt}.zip`; document.body.append(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    toast(`Downloaded ${a.download} · ${files.length} file${files.length === 1 ? '' : 's'}`);
   });
   $('#zl') && ($('#zl').onclick = () => itradeZip('LOADING')); $('#zr') && ($('#zr').onclick = () => itradeZip('RETURN'));
   $('#xl').onclick = async () => {
