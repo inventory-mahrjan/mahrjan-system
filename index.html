@@ -1368,9 +1368,10 @@ async function vOffice(){ const __t = S.nav;
   };
   const diffMap = (a, b, show) => { const out = []; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => { if (String(a[k] ?? '') !== String(b[k] ?? '')) out.push(iname(+k) + ':  ' + (a[k] == null ? '—' : show(a[k])) + '  →  ' + (b[k] == null ? 'removed' : show(b[k]))); }); return out; };
   let seq = 0;
-  const canEd = has('ADMIN','ACCOUNTANT');
+  // editing: admin always; accountant only today and the 3 days before (4 days), older days are locked
+  const locked = !has('ADMIN') && S.date < addDays(today(), -3), canEd = has('ADMIN') || (has('ACCOUNTANT') && !locked);
   const lock = () => { if (canEd) return; g().querySelectorAll('input,select,textarea').forEach(x => x.disabled = true);
-    g().querySelectorAll('#osv,#oad,#odel,#oinv,[data-inv],.x').forEach(x => x.remove()); if (!g().querySelector('.ro-note')) g().insertAdjacentHTML('afterbegin', '<p class="muted ro-note">View only — admin or accountant can change.</p>'); };
+    g().querySelectorAll('#osv,#oad,#odel,#oinv,[data-inv],.x').forEach(x => x.remove()); if (!g().querySelector('.ro-note')) g().insertAdjacentHTML('afterbegin', '<p class="muted ro-note">' + (locked && has('ACCOUNTANT') ? 'Locked — older than 4 days. Only admin can change it.' : 'View only — admin or accountant can change.') + '</p>'); };
   async function fill(){ try { await fill2(); lock(); } catch (e) { g().innerHTML = '<p class="bad">' + esc(e.message || String(e)) + '</p>'; } }
   async function fill2(){
     const my = ++seq;
