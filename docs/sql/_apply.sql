@@ -1,77 +1,26 @@
--- STOCK REPORT - CREATE.sql
--- Import of the iTrade "Stock Report as on <date>" (Itemcode, Item Name, Item No, QTY, Cost, Selling, StockValue).
--- Only the latest report per company is kept: a new import replaces the previous one for that company.
--- The Cost of every matched item becomes the item's cost (items.unit_cost), used for stock count values.
--- Undo with: STOCK REPORT - REVERT.sql (puts back the item costs from before this was installed)
+-- BARCODE FROM STOCK REPORT - CREATE.sql
+-- Sets the item master barcode (and iTrade code where it was the same as the old barcode) to the
+-- Itemcode of the latest stock report, for items matched by name whose barcode differs.
+-- Also links report item 1037 (name cut short in iTrade) to item 68.
+-- Old values are kept in item_barcode_backup. Undo with: BARCODE FROM STOCK REPORT - REVERT.sql
+create table if not exists public.item_barcode_backup (item_id bigint primary key, barcode text, itrade_code text, saved_at timestamptz default now());
+alter table public.item_barcode_backup enable row level security;
 
--- item costs before the first import, for the revert script
-create table if not exists public.stock_report_cost_backup as select id as item_id, unit_cost from public.items;
-alter table public.stock_report_cost_backup enable row level security;
+update public.stock_report_lines set item_id = 68 where item_no = '1037' and item_id is null and item_code = '6299006355855';
 
-create table if not exists public.stock_reports (
-  id bigserial primary key,
-  branch_id bigint not null references public.branches(id),
-  warehouse text not null,
-  as_on date not null,
-  file_name text,
-  line_count int not null default 0,
-  total_qty numeric(14,3) not null default 0,
-  total_value numeric(14,2) not null default 0,
-  imported_at timestamptz not null default now(),
-  imported_by text
-);
-create table if not exists public.stock_report_lines (
-  id bigserial primary key,
-  report_id bigint not null references public.stock_reports(id) on delete cascade,
-  item_id bigint references public.items(id),
-  item_code text, item_no text, item_name text,
-  qty numeric(14,3), cost numeric(12,4), selling numeric(12,4), stock_value numeric(14,2)
-);
-create index if not exists stock_report_lines_report_idx on public.stock_report_lines (report_id);
+with ch as (
+  select distinct on (i.id) i.id, i.barcode old_bc, i.itrade_code old_it, l.item_code new_bc, l.cost
+  from public.stock_report_lines l join public.items i on i.id = l.item_id
+  where i.barcode is distinct from l.item_code
+    and not exists (select 1 from public.items o where o.id <> i.id and (o.barcode = l.item_code or o.itrade_code = l.item_code))
+), bk as (
+  insert into public.item_barcode_backup (item_id, barcode, itrade_code)
+  select id, old_bc, old_it from ch on conflict (item_id) do nothing returning item_id
+)
+update public.items i set barcode = ch.new_bc,
+  itrade_code = case when i.itrade_code is null or i.itrade_code = ch.old_bc then ch.new_bc else i.itrade_code end,
+  unit_cost = case when ch.cost > 0 then ch.cost else i.unit_cost end, updated_at = now()
+from ch where ch.id = i.id;
 
-alter table public.stock_reports enable row level security;
-alter table public.stock_report_lines enable row level security;
-grant select on public.stock_reports, public.stock_report_lines to authenticated;
-drop policy if exists read_office on public.stock_reports;
-create policy read_office on public.stock_reports for select to authenticated
-  using (public.can_view('sri') and public.can_branch(branch_id));
-drop policy if exists read_office on public.stock_report_lines;
-create policy read_office on public.stock_report_lines for select to authenticated
-  using (exists (select 1 from public.stock_reports r where r.id = report_id));
-
--- menu entry + access (admin always; accountant view and import)
-insert into public.role_modules (module, label, grp, has_edit, sort) values ('sri', 'Stock report import', 'Daily flow', true, 12)
-  on conflict (module) do nothing;
-insert into public.role_access (role, module, can_view, can_edit) values ('ADMIN', 'sri', true, true), ('ACCOUNTANT', 'sri', true, true)
-  on conflict do nothing;
-
--- p_lines = [{"item_id":1,"item_code":"629..","item_no":"1001","item_name":"..","qty":2340,"cost":3.36,"selling":4,"stock_value":7853.68}, ...]
-create or replace function public.stock_report_save(p_branch bigint, p_warehouse text, p_as_on date, p_file text, p_lines jsonb)
-returns jsonb language plpgsql security definer set search_path to 'public' as $$
-declare rid bigint; n int; nc int;
-begin
-  perform public.require_role(array['M:sri'], p_branch);
-  if p_as_on is null or coalesce(trim(p_warehouse), '') = '' then raise exception 'Report date and warehouse are needed.'; end if;
-  if jsonb_array_length(coalesce(p_lines, '[]')) = 0 then raise exception 'The report has no lines.'; end if;
-  delete from public.stock_reports where branch_id = p_branch;     -- keep only the latest report
-  insert into public.stock_reports (branch_id, warehouse, as_on, file_name, imported_by)
-    values (p_branch, trim(p_warehouse), p_as_on, p_file, (public.me()).name) returning id into rid;
-  insert into public.stock_report_lines (report_id, item_id, item_code, item_no, item_name, qty, cost, selling, stock_value)
-    select rid, nullif(x->>'item_id', '')::bigint, x->>'item_code', x->>'item_no', x->>'item_name',
-           coalesce(nullif(x->>'qty', '')::numeric, 0), nullif(x->>'cost', '')::numeric, nullif(x->>'selling', '')::numeric,
-           coalesce(nullif(x->>'stock_value', '')::numeric, 0)
-    from jsonb_array_elements(p_lines) x;
-  get diagnostics n = row_count;
-  update public.stock_reports r set line_count = n,
-    total_qty = (select coalesce(sum(qty), 0) from public.stock_report_lines where report_id = rid),
-    total_value = (select coalesce(sum(stock_value), 0) from public.stock_report_lines where report_id = rid)
-  where r.id = rid;
-  update public.items i set unit_cost = l.cost, updated_at = now()
-  from public.stock_report_lines l
-  where l.report_id = rid and l.item_id = i.id and l.cost > 0 and i.unit_cost is distinct from l.cost;
-  get diagnostics nc = row_count;
-  return jsonb_build_object('id', rid, 'lines', n, 'costs_updated', nc);
-end $$;
-
-revoke all on function public.stock_report_save(bigint, text, date, text, jsonb) from public, anon;
-grant execute on function public.stock_report_save(bigint, text, date, text, jsonb) to authenticated;
+select i.id, i.name, b.barcode as old_barcode, i.barcode as new_barcode, i.itrade_code, i.unit_cost
+from public.item_barcode_backup b join public.items i on i.id = b.item_id order by i.id;
