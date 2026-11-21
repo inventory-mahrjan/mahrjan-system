@@ -7,7 +7,7 @@
 (function () {
   if (window.MJSC) return;
   var CAT = { RAW: 'Raw egg', FG: 'Finished goods', TRAY: 'Plain tray', LTRAY: 'Labelled tray', LABEL: 'Label roll' };
-  var TYPES = { RAW: ['FRESH', 'CLEANED', 'DAMAGE'], FG: ['FRESH', 'GRV', 'DAMAGE'] };
+  var TYPES = { RAW: ['FRESH', 'CLEANED'], FG: ['FRESH', 'GRV', 'DAMAGE'] };
   var TNAME = { FRESH: 'Fresh', GRV: 'GRV', CLEANED: 'Cleaned', DAMAGE: 'Damage' };
   var KEY = 'mjsc:', root = null, V = { view: 'list' }, LIST = [], busy = false, err = '';
 
