@@ -233,8 +233,8 @@
     return F;
   }
   function susOut_(F) { return (F.suspense || []).reduce(function (a, x) { return a + (x.given - x.cleared); }, 0); }
-  function cashPosition_(F, o) { o = Number(o) || 0; var cl = o + F.tot.cs - F.tot.gc + F.rc - F.pay - F.et - F.dep;
-    return [['OPENING CASH BALANCE', o], ['+ CASH SALES', F.tot.cs], ['− CASH SALES RETURN', F.tot.gc], ['+ CASH RECEIPTS', F.rc], ['− PAYMENTS', F.pay], ['− EXPENSES', F.et], ['− BANK DEPOSITS', F.dep], ['CLOSING BALANCE', cl], ['− SUSPENSE OUTSTANDING', susOut_(F)], ['CASH IN HAND', cl - susOut_(F)]]; }
+  function cashPosition_(F, o) { var blank = o == null || o === ''; o = Number(o) || 0; var cl = blank ? '' : o + F.tot.cs - F.tot.gc + F.rc - F.pay - F.et - F.dep;
+    return [['OPENING CASH BALANCE', blank ? '' : o], ['+ CASH SALES', F.tot.cs], ['− CASH SALES RETURN', F.tot.gc], ['+ CASH RECEIPTS', F.rc], ['− PAYMENTS', F.pay], ['− EXPENSES', F.et], ['− BANK DEPOSITS', F.dep], ['CLOSING BALANCE', cl], ['− SUSPENSE OUTSTANDING', susOut_(F)], ['CASH IN HAND', blank ? '' : cl - susOut_(F)]]; }
   function cashRows_(o, F, opening) {
     o.money = [2, 3, 4, 5, 6, 7, 8, 10]; var T = F.tot;
     var men = F.order.concat(['STORE']).map(function (k) { var r = F.rows[k]; return [k === 'STORE' ? 'STORE SALE' : k, r.cs, r.cr, r.gc, r.gr, r.FUEL, r.PARKING, r.CARTON]; });
@@ -495,7 +495,7 @@
     return Math.round(o * 100) / 100;
   }
   function cashExport_(F, opening) { var r2 = function (v) { return Math.round((Number(v) || 0) * 100) / 100; }, ref = function (v) { return v === '' || v == null ? '' : String(v); };
-    return { opening: r2(opening), dep: r2(F.dep),
+    return { opening: opening == null ? null : r2(opening), dep: r2(F.dep),
       men: F.order.concat(['STORE']).map(function (k) { var r = F.rows[k]; return [k === 'STORE' ? 'STORE SALE' : k, r2(r.cs), r2(r.cr), r2(r.gc), r2(r.gr), r2(r.FUEL), r2(r.PARKING), r2(r.CARTON)]; }),
       receipts: F.receipts.map(function (x) { return [ref(x.ref), x.part, r2(x.amount)]; }), payments: F.payments.map(function (x) { return [ref(x.ref), x.part, r2(x.amount)]; }),
       suspense: (F.suspense || []).filter(function (x) { return Math.abs(x.given - x.cleared) > 0.004; }).map(function (x) { return [x.name, r2(x.given - x.cleared)]; }) }; }
@@ -525,7 +525,7 @@
     var D = await dayData(m, date), o = new Sheet_(name === 'SALESMAN SUMMARY' ? 12 : name === 'CASH SHEET' ? 10 : 15), pos = null, cx = null;
     if (name === 'LOADING SHEET') await loadingSheet_(o, m, D, sm, await readReqs(m, date));
     else if (name === 'SALESMAN SUMMARY') salesmanSummary_(o, m, D, sm);
-    else { var F = await cashFigures_(m, D), op = (await openingFor_(m, date, s)) || 0; cashRows_(o, F, op); cx = cashExport_(F, op); pos = cashPosition_(F, op).map(function (p) { return [p[0], '', p[1]]; }); }
+    else { var F = await cashFigures_(m, D), op = null;   // opening cash is typed by the accountant (no stored balance) cashRows_(o, F, op); cx = cashExport_(F, op); pos = cashPosition_(F, op).map(function (p) { return [p[0], '', p[1]]; }); }
     return JSON.parse(JSON.stringify({ ok: true, name: name, date: date, salesman: sm, rows: o.rows, head: o.head, bold: o.bold, money: o.money, segs: o.segs, titles: o.titles, sign: o.sign, position: pos, cash: cx }));
   }
 
