@@ -33,7 +33,11 @@
   async function rpc(fn, args) { var c = await sb(); return q(c.rpc(fn, args)); }
   window.MJ_SB = sb;   // the app's Stock count screen uses the same signed-in client
   async function all(mk) { var out = []; for (var i = 0; ; i += 1000) { var d = await q(mk().range(i, i + 999)); out = out.concat(d); if (d.length < 1000) break; } return out; }
-  async function byIds(table, cols, key, ids) { var c = await sb(), out = []; for (var i = 0; i < ids.length; i += 150) { var part = ids.slice(i, i + 150); out = out.concat(await all(function () { return c.from(table).select(cols).in(key, part); })); } return out; }
+  async function byIds(table, cols, key, ids) { var c = await sb(), parts = []; for (var i = 0; i < ids.length; i += 150) parts.push(ids.slice(i, i + 150));
+    var res = await Promise.all(parts.map(function (part) { return all(function () { return c.from(table).select(cols).in(key, part).order('id'); }); })); return [].concat.apply([], res); }
+  // one query per day, run together (fast for long ranges); mk(day) builds the query for that day
+  async function perDay(from, to, mk) { var ds = []; for (var d = from; d <= to; d = new Date(Date.parse(d + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10)) ds.push(d);
+    var out = new Array(ds.length), k = 0; await Promise.all(Array.from({ length: Math.min(8, ds.length) }, async function () { while (k < ds.length) { var i = k++; out[i] = await all(function () { return mk(ds[i]); }); } })); return [].concat.apply([], out); }
 
   // ---------- helpers (same as the sheet script) ----------
   function num(v) { if (v === null || v === undefined || v === '') return 0; var n = Number(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
@@ -79,7 +83,7 @@
     var ids = daysA.map(function (d) { return d.id; });
     var res = await Promise.all([ids.length ? byIds('loading_lines', '*', 'van_day_id', ids) : [], ids.length ? byIds('return_lines', '*', 'van_day_id', ids) : [],
       ids.length ? byIds('expenses', '*', 'van_day_id', ids) : [], ids.length ? byIds('collections', '*', 'van_day_id', ids) : [],
-      all(function () { return c.from('sales_lines').select('*').eq('branch_id', m.br.id).gte('tran_date', from).lte('tran_date', to).order('id'); }),
+      perDay(from, to, function (d) { return c.from('sales_lines').select('*').eq('branch_id', m.br.id).eq('tran_date', d).order('id'); }),
       q(c.from('petty_cash').select('*').eq('branch_id', m.br.id).gte('entry_date', from).lte('entry_date', to)).catch(function () { return []; })]);
     var dOf = {}; daysA.forEach(function (d) { dOf[d.id] = d.business_date; });
     var out = {}, pick = function (arr, f) { var o = {}; arr.forEach(function (x) { var k = f(x); if (k) (o[k] = o[k] || []).push(x); }); return o; };
@@ -661,7 +665,7 @@
   }
   async function dayPrice(m, from, to) {
     var c = await sb(), f = addD(from, -14), o = { d: {}, all: {} };
-    var L = await all(function () { return c.from('sales_lines').select('tran_date,item_id,item_code,qty,net,tran_type,cancelled').eq('branch_id', m.br.id).eq('cancelled', false).gte('tran_date', f).lte('tran_date', to).order('id'); });
+    var L = await perDay(f, to, function (d) { return c.from('sales_lines').select('tran_date,item_id,item_code,qty,net,tran_type').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
     L.forEach(function (l) { var q2 = num(l.qty), n = num(l.net), cd = l.item_id && m.itemById[l.item_id] ? m.code(m.itemById[l.item_id]) : String(l.item_code || ''); if (!cd || q2 <= 0 || n <= 0 || up(l.tran_type) === 'SR') return;
       var a = o.all[cd] || (o.all[cd] = { n: 0, q: 0 }); a.n += n; a.q += q2; var D2 = o.d[l.tran_date] || (o.d[l.tran_date] = {}), x = D2[cd] || (D2[cd] = { n: 0, q: 0 }); x.n += n; x.q += q2; });
     return o;
@@ -677,7 +681,7 @@
   }
   function rankOf(m) { var pos = {}; readItems(m).forEach(function (i, k) { if (!(i.code in pos)) pos[i.code] = k; }); return function (cd) { return cd in pos ? pos[cd] : 1e9; }; }
   async function oShortExcess(m, sm, from, to) {
-    var V = await vsRange(m, from, to), P = await dayPrice(m, V.from, V.to), rk = rankOf(m);
+    var F = from < to ? from : to, T2 = from < to ? to : from, X = await Promise.all([vsRange(m, from, to), dayPrice(m, F, T2)]), V = X[0], P = X[1], rk = rankOf(m);
     if (String(sm) === 'ALL') {
       var warn = []; V.day.forEach(function (x) { if (/NO RETURN/.test(x.STATUS)) warn.push({ date: x.date, salesman: x.SALESMAN, msg: 'No return posted — stock left on van counted as short' }); });
       var men = {}, items = {}, detail = [], T = { excess: 0, short: 0, net: 0, value: 0 }, add = function (o, e, s2, v) { o.excess += e; o.short += s2; o.net += e - s2; o.value += v; };
@@ -700,7 +704,7 @@
     return addValues({ salesman: sm, route: info.route || '', van: info.van || '', from: V.from, to: V.to, days: dayList, items: list, detail: det, warn: warn2, excess: tex, short: tsh, net: tex - tsh, source: 'LIVE' }, P, 'se');
   }
   async function oReturnBreakdown(m, sm, from, to) {
-    var V = await vsRange(m, from, to), P = await dayPrice(m, V.from, V.to), rk = rankOf(m), U = up(sm || '');
+    var X = await Promise.all([vsRange(m, from, to), dayPrice(m, from < to ? from : to, from < to ? to : from)]), V = X[0], P = X[1], rk = rankOf(m), U = up(sm || '');
     var rows = V.stock.filter(function (x) { return x.TYPE !== 'RAW' && (!U || up(x.SALESMAN) === U) && (num(x.DMG) || num(x.EXP) || num(x.WST) || num(x.FOC)); });
     var K = ['DMG', 'EXP', 'WST', 'FOC'], byItem = {}, byMan = {}, detail = [], tot = { DMG: 0, EXP: 0, WST: 0, FOC: 0 };
     rows.forEach(function (x) { var cd = String(x.BARCODE), i = byItem[cd] || (byItem[cd] = { code: cd, name: x['ITEM NAME'], DMG: 0, EXP: 0, WST: 0, FOC: 0 }), mm = byMan[x.SALESMAN] || (byMan[x.SALESMAN] = { salesman: x.SALESMAN, DMG: 0, EXP: 0, WST: 0, FOC: 0 }), dl = { date: x.date, salesman: x.SALESMAN, code: cd, name: x['ITEM NAME'] };
@@ -711,7 +715,7 @@
   async function oQtySales(m, sm, from, to) {
     if (from > to) { var x0 = from; from = to; to = x0; }
     var c = await sb(), R2 = function (v) { return Math.round(v * 100) / 100; };
-    var L = await all(function () { return c.from('sales_lines').select('tran_date,item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive,cancelled,cancel_reason').eq('branch_id', m.br.id).gte('tran_date', from).lte('tran_date', to).order('id'); });
+    var L = await perDay(from, to, function (d) { return c.from('sales_lines').select('item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
     var list = [], seen = {}, noC = {};
     m.items.filter(function (it) { return it.item_type === 'FG' && m.code(it); }).sort(function (a, b) { return (a.display_order || 1e9) - (b.display_order || 1e9); }).forEach(function (it) {
       var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
