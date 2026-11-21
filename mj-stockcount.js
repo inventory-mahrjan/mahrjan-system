@@ -101,9 +101,14 @@
     var byCode = D.items.filter(function (i) { return i.bc === code || i.code === code || String(i.bc || '').toUpperCase() === code.toUpperCase(); });
     if (cat === 'RAW' || cat === 'FG') {
       it = byCode.find(function (i) { return i.t === (cat === 'RAW' ? 'RAW_EGG' : 'FG'); });
+      // raw egg has no barcode of its own: a finished-good barcode finds its raw egg through the BOM
+      var viaFg = null;
+      if (!it && cat === 'RAW') { viaFg = byCode.find(function (i) { return i.t === 'FG'; });
+        if (viaFg) { it = D.bom.filter(function (b) { return b.fg === viaFg.id; }).map(function (b) { return itemsBy(b.m); }).find(function (m) { return m && m.t === 'RAW_EGG'; }) || null;
+          if (!it) { beep(false); C.msg = 'No raw egg in the BOM of ' + nm(viaFg) + '. Ask the office to add it in Items & BOM.'; C.found = null; render(); return; } } }
       if (!it) { beep(false); C.msg = 'Not a ' + CAT[cat].toLowerCase() + ' barcode: ' + code; C.found = null; render(); return; }
       if (!isRecount(it.id)) { beep(false); C.msg = nm(it) + ' is not in this recount.'; render(); return; }
-      C.found = { cat: cat, items: [it], scanned: code };
+      C.found = { cat: cat, items: [it], scanned: code, fg: viaFg || undefined };
     } else {
       var fg = byCode.find(function (i) { return i.t === 'FG'; }) || byCode.find(function (i) { return i.t === 'MATERIAL'; });
       if (!fg) { beep(false); C.msg = 'Barcode not found: ' + code; C.found = null; render(); return; }
