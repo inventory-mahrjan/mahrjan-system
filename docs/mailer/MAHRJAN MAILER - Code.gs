@@ -355,6 +355,8 @@ function setup() {
 function testAll() { var y = day_(864e5 + 6 * 3600000), w = lastWeek_(), t = function (r, f, to) { try { Logger.log(r + ': ' + sendReport(r, f, to, true)); } catch (e) { Logger.log(r + ' FAILED: ' + e.message); } };
   ['VAN_LOAD','SALES_QTY','DAMAGE','GRV','VISIT','HEALTH'].forEach(function (r) { t(r, y, y); });
   ['VARIANCE','FOC','EXPIRY'].forEach(function (r) { t(r, w.from, w.to); }); t('QTY_MTD', y.slice(0, 8) + '01', y); }
+/** Send yesterday's visit report again (to check its layout). */
+function testVisit() { var y = day_(864e5 + 6 * 3600000); Logger.log('VISIT: ' + sendReport('VISIT', y, y, true)); }
 /** Send only the reports that are not sent yet (after a failed testAll). */
 function testRest() { var y = day_(864e5 + 6 * 3600000), w = lastWeek_(), t = function (r, f, to) { try { Logger.log(r + ': ' + sendReport(r, f, to)); } catch (e) { Logger.log(r + ' FAILED: ' + e.message); } };
   ['VAN_LOAD','SALES_QTY','DAMAGE','GRV','VISIT','HEALTH'].forEach(function (r) { t(r, y, y); });
