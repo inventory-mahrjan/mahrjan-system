@@ -306,7 +306,11 @@
     var m = await masters(unit);
     if (action === 'day') {
       var date = P.get('date') || today(), reqDate = P.get('reqdate') || date, D = await dayData(m, date);
-      return { ok: true, date: date, reqDate: reqDate, items: readItems(m), route: readRoute(m), customers: readCustomers(m), boards: D.boards, rets: D.rets, sales: D.salesMap, grv: D.grv,
+      /* each salesman's van: today's van day, else the last van he used (pre-fills the Board vehicle box) */
+      var lastVan = {}; try { var cv = await sb(); (await q(cv.from('van_day').select('salesman_id,van_id,business_date').eq('branch_id', m.br.id).lte('business_date', date).not('van_id', 'is', null).order('business_date', { ascending: false }).limit(400)))
+        .forEach(function (x) { if (!lastVan[x.salesman_id]) { var v = m.vans.filter(function (y) { return y.id === x.van_id; })[0]; if (v) lastVan[x.salesman_id] = v.van_no; } }); } catch (e) {}
+      var route = readRoute(m).map(function (r) { var st = m.salesmen.filter(function (x) { return up(x.name) === up(r.salesman); })[0]; if (st && lastVan[st.id]) r.van = lastVan[st.id]; return r; });
+      return { ok: true, date: date, reqDate: reqDate, items: readItems(m), route: route, customers: readCustomers(m), boards: D.boards, rets: D.rets, sales: D.salesMap, grv: D.grv,
         reqs: await readReqs(m, reqDate), exps: D.exps, cols: D.cols, office: D.office, temps: D.temps };
     }
     if (action === 'deletes') { var c = await sb(), dd = P.get('date') || '', du = up(P.get('user') || '');
