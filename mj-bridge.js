@@ -71,15 +71,26 @@
   }
 
   // ---------- one day's data in the shapes the sheet script reads ----------
-  async function dayData(m, date) {
+  async function dayData(m, date) { return (await dayRange(m, date, date))[date]; }
+  // every working day of a date range in one go (same objects as dayData)
+  async function dayRange(m, from, to) {
     var c = await sb();
-    var days = await q(c.from('van_day').select('*').eq('branch_id', m.br.id).eq('business_date', date));
-    var ids = days.map(function (d) { return d.id; });
+    var daysA = await all(function () { return c.from('van_day').select('*').eq('branch_id', m.br.id).gte('business_date', from).lte('business_date', to).order('id'); });
+    var ids = daysA.map(function (d) { return d.id; });
     var res = await Promise.all([ids.length ? byIds('loading_lines', '*', 'van_day_id', ids) : [], ids.length ? byIds('return_lines', '*', 'van_day_id', ids) : [],
       ids.length ? byIds('expenses', '*', 'van_day_id', ids) : [], ids.length ? byIds('collections', '*', 'van_day_id', ids) : [],
-      all(function () { return c.from('sales_lines').select('*').eq('branch_id', m.br.id).eq('tran_date', date).order('id'); }),
-      q(c.from('petty_cash').select('*').eq('branch_id', m.br.id).eq('entry_date', date)).catch(function () { return []; })]);
-    var D = { date: date, days: days, load: res[0], ret: res[1], exp: res[2], col: res[3], sales: res[4], petty: res[5] };
+      all(function () { return c.from('sales_lines').select('*').eq('branch_id', m.br.id).gte('tran_date', from).lte('tran_date', to).order('id'); }),
+      q(c.from('petty_cash').select('*').eq('branch_id', m.br.id).gte('entry_date', from).lte('entry_date', to)).catch(function () { return []; })]);
+    var dOf = {}; daysA.forEach(function (d) { dOf[d.id] = d.business_date; });
+    var out = {}, pick = function (arr, f) { var o = {}; arr.forEach(function (x) { var k = f(x); if (k) (o[k] = o[k] || []).push(x); }); return o; };
+    var L = pick(res[0], function (x) { return dOf[x.van_day_id]; }), R = pick(res[1], function (x) { return dOf[x.van_day_id]; }), E = pick(res[2], function (x) { return dOf[x.van_day_id]; }),
+        C2 = pick(res[3], function (x) { return dOf[x.van_day_id]; }), SL = pick(res[4], function (x) { return x.tran_date; }), P = pick(res[5], function (x) { return x.entry_date; }), DY = pick(daysA, function (x) { return x.business_date; });
+    for (var d = from; d <= to; d = new Date(Date.parse(d + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10))
+      out[d] = buildDay(m, d, DY[d] || [], L[d] || [], R[d] || [], E[d] || [], C2[d] || [], SL[d] || [], P[d] || []);
+    return out;
+  }
+  function buildDay(m, date, days, load, ret, exp, col, sales, petty) {
+    var D = { date: date, days: days, load: load, ret: ret, exp: exp, col: col, sales: sales, petty: petty };
     var smOfDay = {}; days.forEach(function (d) { smOfDay[d.id] = (m.staffById[d.salesman_id] || {}).name || ''; });
     var custById = {}; m.customers.forEach(function (x) { custById[x.id] = x; });
     var C = function (it) { return it ? m.code(it) : ''; };
@@ -598,9 +609,175 @@
     throw new Error(NOT_YET);
   }
 
+  // =====================================================================
+  // OLD PORTAL REPORTS (VAN STOCK / VAN DAY worked out live from the database, then the old engines)
+  // =====================================================================
+  var VD_HEAD = ['DATE','SALESMAN','ROUTE','VEHICLE','START KM','END KM','KM RUN','LOAD TEMP','UNLOAD TEMP','LOAD TIME','UNLOAD TIME','LOAD QTY','SALE QTY','RETURN QTY','EXCESS','SHORT','CASH SALES','CREDIT SALES','GRV','COLLECTIONS','EXPENSES','CARTON SMALL','CARTON BIG','CASH TO HAND OVER','STATUS','UPDATED','ID'];
+  function r2(v) { return Math.round(Number(v || 0) * 100) / 100; }
+  function addD(d, n) { return new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10); }
+  // one day → VAN STOCK rows (salesman × item) and VAN DAY rows (salesman), as buildDay_ of the old portal
+  async function vsDay(m, D, reqs, noKm) {
+    var items = readItems(m), meta = {}, pos = {}; items.forEach(function (i, k) { meta[i.code] = i; if (!(i.code in pos)) pos[i.code] = k; });
+    var boards = {}, rets = {}, sales = {}, money = {}, req = {};
+    Object.keys(D.boards).forEach(function (sm) { boards[up(sm)] = D.boards[sm]; });
+    Object.keys(D.rets).forEach(function (sm) { rets[up(sm)] = D.rets[sm]; });
+    D.lines.forEach(function (l) { if (l.cancelled || !l.user || !l.code) return; var sm = up(l.user), S2 = sales[sm] = sales[sm] || {}, x = S2[l.code] = S2[l.code] || { sale: 0, grv: 0, sv: 0, gv: 0, name: l.name }, M = money[sm] = money[sm] || { cs: 0, cr: 0, cg: 0, rg: 0 }, cash = /CASH/.test(up(l.tender));
+      if (l.qty >= 0) { x.sale += l.qty; x.sv += l.line; if (cash) M.cs += l.line; else M.cr += l.line; } else { x.grv += -l.qty; x.gv += Math.abs(l.line); if (cash) M.cg += Math.abs(l.line); else M.rg += Math.abs(l.line); } });
+    Object.keys(reqs || {}).forEach(function (sm) { var R = reqs[sm]; items.forEach(function (it) { var k = it.shortName || it.name; if (R[k]) (req[up(sm)] = req[up(sm)] || {})[it.code] = R[k]; }); });
+    var roster = {}; readRoute(m).forEach(function (x) { roster[up(x.salesman)] = x.salesman; });
+    var men = {}; [boards, rets].forEach(function (o) { Object.keys(o).forEach(function (s2) { men[s2] = 1; }); }); Object.keys(sales).forEach(function (s2) { if (roster[s2]) men[s2] = 1; });
+    var EX = {}, CO = {}; Object.keys(D.exps).forEach(function (s2) { EX[up(s2)] = D.exps[s2]; }); Object.keys(D.cols).forEach(function (s2) { CO[up(s2)] = D.cols[s2]; });
+    var stock = [], vday = [];
+    for (var sm of Object.keys(men).sort()) {
+      var name = roster[sm] || sm, info = man_(m, D, name), b = boards[sm] || {}, r = rets[sm] || {}, sl = sales[sm] || {}, q2 = req[sm] || {};
+      var hasB = Object.keys(b).some(function (c) { return b[c]; }), hasR = Object.keys(r).length > 0, codes = {};
+      [b, r, sl, q2].forEach(function (o) { Object.keys(o).forEach(function (c) { codes[c] = 1; }); });
+      var T = { load: 0, sale: 0, ret: 0, ex: 0, sh: 0 };
+      Object.keys(codes).sort(function (a, c) { return ((a in pos ? pos[a] : 1e9) - (c in pos ? pos[c] : 1e9)) || (a < c ? -1 : 1); }).forEach(function (c) {
+        var it = meta[c] || {}, x = sl[c] || { sale: 0, grv: 0, sv: 0, gv: 0, name: '' }, rr = r[c] || {}, g1 = num(rr.good), dm = num(rr.dmg), ep = num(rr.exp), ws = num(rr.wst), fc = num(rr.foc), tr = g1 + dm + ep + ws + fc, ld = num(b[c]);
+        var isRaw = it.type === 'RAW', diff = (hasR || hasB) && !isRaw ? Math.round((tr - (ld - x.sale + x.grv)) * 1000) / 1000 : 0, ex = diff > 0 ? diff : 0, sh = diff < 0 ? -diff : 0;
+        if (!ld && !x.sale && !x.grv && !tr && !q2[c]) return;
+        if (!isRaw) { T.load += ld; T.sale += x.sale - x.grv; T.ret += tr; T.ex += ex; T.sh += sh; }
+        stock.push({ date: D.date, DATE: D.date, SALESMAN: name, ROUTE: info.route || '', VEHICLE: info.van || '', BARCODE: c, 'ITEM NAME': it.name || x.name || c, TYPE: isRaw ? 'RAW' : 'FINISHED', REQ: num(q2[c]),
+          LOAD: ld, SALE: x.sale, GRV: x.grv, GOOD: g1, DMG: dm, EXP: ep, WST: ws, FOC: fc, 'TOTAL RETURN': tr, EXCESS: ex, SHORT: sh, 'SALE VALUE': r2(x.sv), 'GRV VALUE': r2(x.gv) }); });
+      var km = noKm ? { sk: '', ek: '' } : await kmFor_(m, D, name), t = D.temps[name] || {}, M2 = money[sm] || { cs: 0, cr: 0, cg: 0, rg: 0 }, E2 = EX[sm] || [], Cl = CO[sm] || [];
+      var small = 0, big = 0, expT = 0; E2.forEach(function (e) { var ty = up(e.type); expT += num(e.amount); if (/^CARTON\s*S/.test(ty)) small += cartonQty_(e); if (/^CARTON\s*B/.test(ty)) big += cartonQty_(e); });
+      var colT = Cl.reduce(function (a, x) { return a + num(x.amount); }, 0), sk = Number(km.sk), ek = Number(km.ek), run = km.sk !== '' && km.ek !== '' && !isNaN(sk) && !isNaN(ek) ? ek - sk : '';
+      var st = []; if (hasB && !hasR && T.sh) st.push('NO RETURN'); if (hasR && !hasB) st.push('NO LOADING'); if (hasB && !Object.keys(sl).length) st.push('NO SALES IMPORTED');
+      vday.push({ date: D.date, DATE: D.date, SALESMAN: name, ROUTE: info.route || '', VEHICLE: info.van || '', 'START KM': km.sk, 'END KM': km.ek, 'KM RUN': run,
+        'LOAD TEMP': t.load ? t.load.temp : '', 'UNLOAD TEMP': t.unload ? t.unload.temp : '', 'LOAD TIME': t.load ? t.load.time : '', 'UNLOAD TIME': t.unload ? t.unload.time : '',
+        'LOAD QTY': T.load, 'SALE QTY': T.sale, 'RETURN QTY': T.ret, EXCESS: T.ex, SHORT: T.sh, 'CASH SALES': r2(M2.cs), 'CREDIT SALES': r2(M2.cr), GRV: r2(M2.cg + M2.rg), COLLECTIONS: r2(colT), EXPENSES: r2(expT),
+        'CARTON SMALL': small, 'CARTON BIG': big, 'CASH TO HAND OVER': r2(M2.cs - M2.cg + colT - expT), STATUS: st.length ? st.join(', ') : 'OK', UPDATED: 'live', ID: 'VD-' + D.date.replace(/-/g, '') + '-' + sm });
+    }
+    return { stock: stock, day: vday };
+  }
+  async function vsRange(m, from, to) {
+    if (from > to) { var x = from; from = to; to = x; }
+    if ((Date.parse(to) - Date.parse(from)) / 864e5 > 92) throw new Error('Choose 92 days or less.');
+    var DR = await dayRange(m, from, to), stock = [], day = [], ds = Object.keys(DR).filter(function (d) { return DR[d].days.length || DR[d].sales.length; });
+    var RQ = await Promise.all(ds.map(function (d) { return readReqs(m, d).catch(function () { return {}; }); }));
+    for (var i = 0; i < ds.length; i++) { var r = await vsDay(m, DR[ds[i]], RQ[i], true); stock = stock.concat(r.stock); day = day.concat(r.day); }
+    return { stock: stock, day: day, from: from, to: to };
+  }
+  async function dayPrice(m, from, to) {
+    var c = await sb(), f = addD(from, -14), o = { d: {}, all: {} };
+    var L = await all(function () { return c.from('sales_lines').select('tran_date,item_id,item_code,qty,net,tran_type,cancelled').eq('branch_id', m.br.id).eq('cancelled', false).gte('tran_date', f).lte('tran_date', to).order('id'); });
+    L.forEach(function (l) { var q2 = num(l.qty), n = num(l.net), cd = l.item_id && m.itemById[l.item_id] ? m.code(m.itemById[l.item_id]) : String(l.item_code || ''); if (!cd || q2 <= 0 || n <= 0 || up(l.tran_type) === 'SR') return;
+      var a = o.all[cd] || (o.all[cd] = { n: 0, q: 0 }); a.n += n; a.q += q2; var D2 = o.d[l.tran_date] || (o.d[l.tran_date] = {}), x = D2[cd] || (D2[cd] = { n: 0, q: 0 }); x.n += n; x.q += q2; });
+    return o;
+  }
+  function priceAt(P, d, cd) { var x = P.d[d] && P.d[d][cd]; if (x && x.q) return x.n / x.q; x = P.all[cd]; return x && x.q ? x.n / x.q : 0; }
+  function addValues(r, P, kind) {
+    var pr = function (d, cd) { return priceAt(P, d, String(cd)); };
+    if (kind === 'se') { var by = {}, tv = 0; (r.detail || []).forEach(function (x) { var v = ((x.excess || 0) - (x.short || 0)) * pr(x.date, x.code); x.value = r2(v); by[x.code] = (by[x.code] || 0) + v; tv += v; }); (r.items || []).forEach(function (x) { x.value = r2(by[x.code] || 0); }); r.value = r2(tv); return r; }
+    var K = ['DMG', 'EXP', 'WST', 'FOC'], T = {}, I = {}, M = {}; K.forEach(function (k) { T[k + 'V'] = 0; });
+    (r.detail || []).forEach(function (x) { K.forEach(function (k) { var v = (x[k] || 0) * pr(x.date, x.code); x[k + 'V'] = r2(v); var i = I[x.code] = I[x.code] || {}, mm = M[x.salesman] = M[x.salesman] || {}; i[k] = (i[k] || 0) + v; mm[k] = (mm[k] || 0) + v; T[k + 'V'] += v; }); });
+    (r.items || []).forEach(function (x) { K.forEach(function (k) { x[k + 'V'] = r2((I[x.code] || {})[k] || 0); }); }); (r.men || []).forEach(function (mm) { K.forEach(function (k) { mm[k + 'V'] = r2((M[mm.salesman] || {})[k] || 0); }); });
+    K.forEach(function (k) { r.total[k + 'V'] = r2(T[k + 'V']); }); return r;
+  }
+  function rankOf(m) { var pos = {}; readItems(m).forEach(function (i, k) { if (!(i.code in pos)) pos[i.code] = k; }); return function (cd) { return cd in pos ? pos[cd] : 1e9; }; }
+  async function oShortExcess(m, sm, from, to) {
+    var V = await vsRange(m, from, to), P = await dayPrice(m, V.from, V.to), rk = rankOf(m);
+    if (String(sm) === 'ALL') {
+      var warn = []; V.day.forEach(function (x) { if (/NO RETURN/.test(x.STATUS)) warn.push({ date: x.date, salesman: x.SALESMAN, msg: 'No return posted — stock left on van counted as short' }); });
+      var men = {}, items = {}, detail = [], T = { excess: 0, short: 0, net: 0, value: 0 }, add = function (o, e, s2, v) { o.excess += e; o.short += s2; o.net += e - s2; o.value += v; };
+      V.stock.forEach(function (x) { if (x.TYPE === 'RAW') return; var e = num(x.EXCESS), s2 = num(x.SHORT); if (!e && !s2) return; var cd = String(x.BARCODE), v = (e - s2) * priceAt(P, x.date, cd), smn = x.SALESMAN;
+        add(men[smn] || (men[smn] = { salesman: smn, excess: 0, short: 0, net: 0, value: 0 }), e, s2, v); add(items[cd] || (items[cd] = { code: cd, name: x['ITEM NAME'], excess: 0, short: 0, net: 0, value: 0 }), e, s2, v); add(T, e, s2, v);
+        detail.push({ date: x.date, salesman: smn, code: cd, name: x['ITEM NAME'], excess: e, short: s2, net: e - s2, value: r2(v) }); });
+      var fix = function (o) { o.value = r2(o.value); return o; };
+      return { all: true, salesman: 'ALL SALESMEN', from: V.from, to: V.to, warn: warn,
+        men: Object.keys(men).map(function (k) { return fix(men[k]); }).sort(function (a, b) { return a.net - b.net || a.salesman.localeCompare(b.salesman); }),
+        items: Object.keys(items).map(function (k) { return fix(items[k]); }).sort(function (a, b) { return rk(a.code) - rk(b.code); }),
+        detail: detail.sort(function (a, b) { return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || a.salesman.localeCompare(b.salesman) || rk(a.code) - rk(b.code); }),
+        excess: T.excess, short: T.short, net: T.net, value: r2(T.value) };
+    }
+    var U = up(sm), rows = V.stock.filter(function (x) { return up(x.SALESMAN) === U && x.TYPE !== 'RAW'; }), days = V.day.filter(function (x) { return up(x.SALESMAN) === U; });
+    var warn2 = [], dayList = [], info = {}; days.forEach(function (x) { if (/NO RETURN/.test(x.STATUS)) warn2.push({ date: x.date, msg: 'No return posted — stock left on van counted as short' }); dayList.push(x.date); if (/NO LOADING/.test(x.STATUS)) warn2.push({ date: x.date, msg: 'Return posted but no loading' }); info = { route: x.ROUTE, van: x.VEHICLE }; });
+    var sum = {}, det = []; rows.forEach(function (x) { var e = num(x.EXCESS), s2 = num(x.SHORT); if (!e && !s2) return; var cd = String(x.BARCODE); det.push({ date: x.date, code: cd, name: x['ITEM NAME'], excess: e, short: s2 }); var t = sum[cd] || (sum[cd] = { code: cd, name: x['ITEM NAME'], excess: 0, short: 0 }); t.excess += e; t.short += s2; });
+    var list = Object.keys(sum).map(function (cd) { var t = sum[cd]; t.net = t.excess - t.short; return t; }).sort(function (a, b) { return rk(a.code) - rk(b.code); });
+    det.sort(function (a, b) { return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || rk(a.code) - rk(b.code); });
+    var tex = list.reduce(function (a, x) { return a + x.excess; }, 0), tsh = list.reduce(function (a, x) { return a + x.short; }, 0);
+    return addValues({ salesman: sm, route: info.route || '', van: info.van || '', from: V.from, to: V.to, days: dayList, items: list, detail: det, warn: warn2, excess: tex, short: tsh, net: tex - tsh, source: 'LIVE' }, P, 'se');
+  }
+  async function oReturnBreakdown(m, sm, from, to) {
+    var V = await vsRange(m, from, to), P = await dayPrice(m, V.from, V.to), rk = rankOf(m), U = up(sm || '');
+    var rows = V.stock.filter(function (x) { return x.TYPE !== 'RAW' && (!U || up(x.SALESMAN) === U) && (num(x.DMG) || num(x.EXP) || num(x.WST) || num(x.FOC)); });
+    var K = ['DMG', 'EXP', 'WST', 'FOC'], byItem = {}, byMan = {}, detail = [], tot = { DMG: 0, EXP: 0, WST: 0, FOC: 0 };
+    rows.forEach(function (x) { var cd = String(x.BARCODE), i = byItem[cd] || (byItem[cd] = { code: cd, name: x['ITEM NAME'], DMG: 0, EXP: 0, WST: 0, FOC: 0 }), mm = byMan[x.SALESMAN] || (byMan[x.SALESMAN] = { salesman: x.SALESMAN, DMG: 0, EXP: 0, WST: 0, FOC: 0 }), dl = { date: x.date, salesman: x.SALESMAN, code: cd, name: x['ITEM NAME'] };
+      K.forEach(function (k) { var v = num(x[k]); i[k] += v; mm[k] += v; tot[k] += v; dl[k] = v; }); detail.push(dl); });
+    return addValues({ salesman: sm || '', from: V.from, to: V.to, items: Object.keys(byItem).map(function (cd) { return byItem[cd]; }).sort(function (a, b) { return rk(a.code) - rk(b.code); }),
+      men: Object.keys(byMan).sort().map(function (k) { return byMan[k]; }), detail: detail.sort(function (a, b) { return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.salesman < b.salesman ? -1 : a.salesman > b.salesman ? 1 : 0) || rk(a.code) - rk(b.code); }), total: tot }, P, 'wo');
+  }
+  async function oQtySales(m, sm, from, to) {
+    if (from > to) { var x0 = from; from = to; to = x0; }
+    var c = await sb(), R2 = function (v) { return Math.round(v * 100) / 100; };
+    var L = await all(function () { return c.from('sales_lines').select('tran_date,item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive,cancelled,cancel_reason').eq('branch_id', m.br.id).gte('tran_date', from).lte('tran_date', to).order('id'); });
+    var list = [], seen = {}, noC = {};
+    m.items.filter(function (it) { return it.item_type === 'FG' && m.code(it); }).sort(function (a, b) { return (a.display_order || 1e9) - (b.display_order || 1e9); }).forEach(function (it) {
+      var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
+    var U = up(sm || ''), men = {}, allQ = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
+    L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
+      var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
+      var usr = up(l.itrade_user), ex = up(l.sales_executive); if (usr && usr !== up(st.name) && usr !== up(st.itrade_name)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
+      var who = up(st.name); if (U && who !== U) return;
+      var it = l.item_id && m.itemById[l.item_id]; if (it && it.item_type !== 'FG') return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
+      var q2 = Math.abs(num(l.qty)) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;
+      if (!seen[cd]) { seen[cd] = { code: cd, name: String(l.item_name || cd).replace(/\s+/g, ' ').trim(), pc: 0, cat: 'NORMAL', active: false, extra: true }; list.push(seen[cd]); }
+      add(men[who] || (men[who] = {}), cd, q2); add(allQ, cd, q2); });
+    var block = function (name, Q) { var G = ['NORMAL', 'PROMOTIONAL'].map(function (cat) { var rows = list.filter(function (i) { return i.cat === cat && Q[i.code]; }).map(function (i) { var q2 = Q[i.code] || 0, ct = i.pc > 0 ? R2(q2 / i.pc) : null; if (q2 && !(i.pc > 0)) noC[i.code] = i.name; return { code: i.code, name: i.name, pcs: q2, ctn: q2 ? ct : 0 }; });
+        return { cat: cat, rows: rows, pcs: rows.reduce(function (a, x) { return a + x.pcs; }, 0), ctn: R2(rows.reduce(function (a, x) { return a + (x.ctn || 0); }, 0)) }; }).filter(function (g) { return g.rows.length; });
+      return { name: name, groups: G, pcs: G.reduce(function (a, g) { return a + g.pcs; }, 0), ctn: R2(G.reduce(function (a, g) { return a + g.ctn; }, 0)) }; };
+    var names = Object.keys(men).sort(), blocks = (U ? [] : [block('ALL SALESMEN', allQ)]).concat(names.map(function (n) { return block(n, men[n]); }));
+    return { salesman: U ? (names[0] || U) : 'ALL SALESMEN', from: from, to: to, blocks: blocks, men: names, noCtn: Object.keys(noC).map(function (k) { return noC[k]; }) };
+  }
+  async function oWarehouse(m, from, to) {
+    if (from > to) { var x0 = from; from = to; to = x0; }
+    var c = await sb(), Bs = await all(function () { return c.from('wh_batches').select('*').eq('branch_id', m.br.id).gte('work_date', from).lte('work_date', to).order('id'); });
+    var Ls = Bs.length ? await byIds('wh_lines', '*', 'batch_id', Bs.map(function (b) { return b.id; })) : [];
+    var nm2 = function (id) { return (m.staffById[id] || {}).name || ''; }, it = function (id) { return m.itemById[id] || {}; }, cdOf = function (id) { var i = it(id); return m.code(i) || i.itrade_code || ''; };
+    var tm = function (v) { return v ? new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' }) : ''; };
+    var batches = Bs.map(function (b) { return { no: b.batch_no, process: b.process, work: b.work_date, shift: b.shift, status: b.status, issuedAt: tm(b.issued_at), by: nm2(b.issued_by),
+      staff: (b.staff_ids || []).map(nm2).join(', '), staffCount: (b.staff_ids || []).length, returnedAt: tm(b.returned_at), recvBy: nm2(b.received_by), eggs: num(b.issued_egg_pcs), packs: num(b.fg_packs),
+      good: num(b.good_egg_pcs), near: num(b.near_pcs), broken: num(b.broken_pcs), waste: num(b.waste_pcs), eggDiff: num(b.egg_diff), matDiff: num(b.mat_diff), hours: num(b.hours), beyond: num(b.beyond_hours), output: num(b.output_per_staff_hour), reprints: 0 }; });
+    var bOf = {}; Bs.forEach(function (b) { bOf[b.id] = b; });
+    var add = function (o, k, base, f, v) { if (!o[k]) o[k] = base; o[k][f] = (o[k][f] || 0) + v; };
+    var fg = {}, praw = {}, pmat = {}, craw = {}, cmat = {}, diffs = [];
+    Ls.forEach(function (l) { var b = bOf[l.batch_id]; if (!b) return; var p = b.process, ty = l.line_type, code = cdOf(l.item_id), name = it(l.item_id).name || '', q2 = num(l.qty), base = { code: code, name: name }, isRaw = it(l.item_id).item_type === 'RAW_EGG';
+      if (p === 'PRODUCTION') {
+        if (ty === 'FG') { add(fg, code, { code: code, name: name }, 'packs', q2); add(fg, code, fg[code], 'eggs', num(l.egg_pcs)); }
+        else if (ty === 'ISSUE RAW') add(praw, code, base, 'issued', q2); else if (ty === 'ISSUE MATERIAL') add(pmat, code, base, 'issued', q2);
+        else if (ty === 'BROKEN') add(praw, code, base, 'broken', q2); else if (ty === 'WASTE') add(praw, code, base, 'waste', q2); else if (ty === 'MATERIAL WASTE') add(pmat, code, base, 'waste', q2);
+        else if (ty === 'BALANCE') { if (isRaw) add(praw, code, base, 'balance', q2); else add(pmat, code, base, 'balance', q2); }
+      } else {
+        if (ty === 'ISSUE FG') { var rc = l.for_item_id && it(l.for_item_id).item_type === 'RAW_EGG' ? cdOf(l.for_item_id) : code; add(craw, rc, { code: rc, name: '' }, 'given', num(l.egg_pcs)); }
+        else if (ty === 'GOOD') add(craw, code, base, 'good', q2); else if (ty === 'NEAR EXPIRY') add(craw, code, base, 'near', q2); else if (ty === 'BROKEN') add(craw, code, base, 'broken', q2); else if (ty === 'WASTE') add(craw, code, base, 'waste', q2);
+        else if (ty === 'CHECK') { if (!craw[code]) craw[code] = base; craw[code].name = name; } else if (ty === 'MATERIAL REUSABLE') add(cmat, code, base, 'reuse', q2); else if (ty === 'MATERIAL WASTE') add(cmat, code, base, 'waste', q2);
+      }
+      if ((ty === 'BALANCE' || ty === 'CHECK') && num(l.difference)) diffs.push({ work: b.work_date, batch: b.batch_no, process: p, code: code, name: name, calc: num(l.calculated), qty: q2, diff: num(l.difference), reason: l.reason || '', by: nm2(b.received_by) }); });
+    Object.keys(craw).forEach(function (k) { if (!craw[k].name) { var i = m.items.filter(function (x) { return m.code(x) === k; })[0]; craw[k].name = i ? i.name : k; } });
+    var staff = {}; batches.forEach(function (b) { if (b.status !== 'CLOSED') return; var men = b.staff.split(',').map(function (x) { return x.trim(); }).filter(String), n = men.length || 1;
+      men.forEach(function (mn) { var s2 = staff[mn] || (staff[mn] = { name: mn, batches: 0, hours: 0, beyond: 0, packs: 0, cleaned: 0 }); s2.batches++; s2.hours += b.hours; s2.beyond += b.beyond; if (b.process === 'PRODUCTION') s2.packs += b.packs / n; else s2.cleaned += (b.good + b.near + b.broken + b.waste) / n; }); });
+    var vals = function (o) { return Object.keys(o).map(function (k) { return o[k]; }); };
+    return { unit: m.br.name, from: from, to: to, batches: batches, fg: vals(fg), praw: vals(praw), pmat: vals(pmat), craw: vals(craw), cmat: vals(cmat), diffs: diffs,
+      staff: vals(staff).map(function (s2) { s2.hours = r2(s2.hours); s2.beyond = r2(s2.beyond); s2.packs = Math.round(s2.packs); s2.cleaned = Math.round(s2.cleaned); s2.rate = s2.hours ? Math.round(s2.packs / s2.hours * 10) / 10 : 0; return s2; }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }) };
+  }
+  async function oVanDay(m, date) { var D = await dayData(m, date), r = await vsDay(m, D, await readReqs(m, date)); return { date: date, rows: r.day }; }
+  async function oCall(unit, fn, a) {
+    PU = UNIT_CODE[unit] ? unit : 'AL QUOZ'; var m = await masters(PU);
+    if (fn === 'portalShortExcess') return oShortExcess(m, String(a[1] || ''), String(a[2]), String(a[3]));
+    if (fn === 'portalReturnBreakdown') return oReturnBreakdown(m, String(a[1] || ''), String(a[2]), String(a[3]));
+    if (fn === 'portalQtySales') return oQtySales(m, String(a[1] || ''), String(a[2]), String(a[3]));
+    if (fn === 'portalSalesExecs') return (await oQtySales(m, '', String(a[1]), String(a[2]))).men;
+    if (fn === 'portalWarehouse') return oWarehouse(m, String(a[1]), String(a[2]));
+    if (fn === 'portalVanDay') return oVanDay(m, String(a[1]));
+    if (fn === 'portalVanRebuild') return { from: String(a[1] || ''), to: String(a[1] || ''), stock: 0, day: 0 };
+    if (fn === 'portalRoster') return pRoster();
+    throw new Error('Unknown request: ' + fn);
+  }
   // Direct use by the portal page (same reports as the old portal, built live).
   window.MJ_REPORTS = {
-    report: async function (unit, name, date, sm) { ME = null; var w = await pWho(); PU = UNIT_CODE[unit] ? unit : 'AL QUOZ'; return pReport(w, name, date, sm || ''); }
+    report: async function (unit, name, date, sm) { ME = null; var w = await pWho(); PU = UNIT_CODE[unit] ? unit : 'AL QUOZ'; return pReport(w, name, date, sm || ''); },
+    call: async function (unit, fn, args) { ME = null; await pWho(); return oCall(unit, fn, args || []); }
   };
   // ---------- fetch: answer the app's "sheet" calls ----------
   var realFetch = window.fetch.bind(window);

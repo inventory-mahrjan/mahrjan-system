@@ -128,7 +128,7 @@
 </head>
 <body>
 <div id="app"></div>
-<script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=5"></script><script src="old-sheets.js?v=1"></script>
+<script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=6"></script><script src="old-sheets.js?v=1"></script><script src="old-views.js?v=1"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -210,6 +210,7 @@ function tabsFor(){
   G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
   G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
+  if (canV('wh')) t.push(['whr','Warehouse report','Reports']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
   if (has('ADMIN')) t.push(['itm','Items & BOM','Admin'], ['stf','Users','Admin'], ['acc','Role access','Admin']);
   G('Admin', ['dc','Data check']);
@@ -249,7 +250,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -921,6 +922,15 @@ async function vDash(){
 }
 
 // ---------- DAILY SHEETS (A4) ----------
+// Old SALES_PORTAL report screens (old-views.js): same layout, print and Excel/CSV — data live from the database, one company at a time.
+function vOld(name){
+  const code = S.branches.find(b => b.id === S.br)?.code || 'MGAZ';
+  window.PortalSession = { username: S.me.name, role: S.me.role, unit: code === 'MGT' ? 'AJMAN' : 'AL QUOZ', unitName: code === 'MGT' ? 'MAHRJAN GENERAL TRADING LLC-AJMAN' : 'MAHRJAN GENERAL TRADING LLC-ALQUOZ' };
+  if (window.__oldUnit !== window.PortalSession.unit) { if (window.__oldUnit) window.__mkOldViews(); window.__seRoster = null; window.__oldUnit = window.PortalSession.unit; }
+  $('#v').innerHTML = '<div id="oldv"></div>';
+  window[name].render();
+}
+
 async function vSheets(){
   // Old SALES_PORTAL daily sheets screen (old-sheets.js): same layout, print A4, Save PDF, Excel and CSV — data live from the database.
   const CO = { MGAZ: 'MAHRJAN GENERAL TRADING LLC-ALQUOZ', MGT: 'MAHRJAN GENERAL TRADING LLC-AJMAN' };
