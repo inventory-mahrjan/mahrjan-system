@@ -553,7 +553,7 @@ async function vWarehouse(){ const __t = S.nav;
 // ---------- STOCK COUNT ----------
 // ---------- STOCK COUNT (batches: created here, counted offline in the app, posted, compared) ----------
 const SC_CAT = { RAW:'Raw egg', FG:'Finished goods', TRAY:'Plain tray', LTRAY:'Labelled tray', LABEL:'Label roll' };
-const SC_TYPE = { FRESH:'Fresh', GRV:'GRV', CLEANED:'Cleaned', DAMAGE:'Damage' };
+const SC_TYPE = { FRESH:'Fresh', GRV:'Repacked', CLEANED:'Cleaned', DAMAGE:'Damage' };
 async function vStock(){ const __t = S.nav;
   if (S.scb) return vStockBatch(S.scb);
   loading();
@@ -647,12 +647,12 @@ async function vStockBatch(id){ const __t = S.nav;
   if (S.sctab === 'sum') {
     body = `<div class="card"><div class="row"><label>Flag when difference over (%)<input type="number" id="lim" value="${S.sclim}" style="width:80px"></label><label>and at least (cartons / boxes)<input type="number" id="min" value="${S.scmin}" style="width:80px"></label>
       ${hasSys ? `<span class="muted">${flagged.length} item${flagged.length===1?'':'s'} flagged</span>` : '<span class="muted">Upload the iTrade stock to compare.</span>'}</div>
-      <div class="tw"><table><tr><th class="l">Item</th><th>Category</th><th>Fresh</th><th>GRV / Cleaned</th><th>Damage</th><th>Plain</th><th>Labelled / roll</th><th>Total counted</th>${hasSys?'<th>iTrade</th><th>Difference</th><th>%</th><th>AED</th>':''}</tr>
+      <div class="tw"><table><tr><th class="l">Item</th><th>Category</th><th>Fresh</th><th>Repacked / Cleaned</th><th>Damage</th><th>Plain</th><th>Labelled / roll</th><th>Total counted</th>${hasSys?'<th>iTrade</th><th>Difference</th><th>%</th><th>AED</th>':''}</tr>
       ${rows.map(r => `<tr class="${r.flag?'warn':''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${[...r.cats].map(c=>SC_CAT[c]).join(', ') || (r.it.item_type==='FG'?'Finished goods':r.it.item_type==='RAW_EGG'?'Raw egg':'Material')}</td>
         <td>${r.FRESH?+r.FRESH.toFixed(2):''}</td><td>${(r.GRV+r.CLEANED)?+(r.GRV+r.CLEANED).toFixed(2):''}</td><td>${r.DAMAGE?+r.DAMAGE.toFixed(2):''}</td><td>${r.PLAIN?+r.PLAIN.toFixed(2):''}</td><td>${r.LAB?+r.LAB.toFixed(2):''}</td>
         <td><b>${show(r.it, r.tot)}</b> ${unitOf(r.it)}</td>${hasSys ? `<td>${r.sys==null?'—':show(r.it, r.sys)}</td><td class="${r.df?'bad':''}">${r.df==null?'—':(r.df>0?'+':'')+(+r.df.toFixed(2))}</td><td>${r.sys==null?'':r.pct.toFixed(1)}</td><td>${r.val==null||!r.it.unit_cost?'':(r.val>0?'+':'')+r.val.toFixed(2)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="12" class="muted">Nothing counted yet.</td></tr>'}
       ${hasSys ? `<tr class="tot"><td class="l" colspan="11">Value of differences (items with a cost in Items & BOM)</td><td>${rows.reduce((a,r)=>a+(r.val||0),0).toFixed(2)}</td></tr>` : ''}</table></div></div>`;
-    xl = [['Summary', [{l:'Item',f:r=>r.it.name},{l:'Fresh',f:r=>r.FRESH},{l:'GRV/Cleaned',f:r=>r.GRV+r.CLEANED},{l:'Damage',f:r=>r.DAMAGE},{l:'Plain',f:r=>r.PLAIN},{l:'Labelled/roll',f:r=>r.LAB},{l:'Total',f:r=>r.tot},{l:'Unit',f:r=>unitOf(r.it)},{l:'iTrade',f:r=>r.sys??''},{l:'Difference',f:r=>r.df??''},{l:'AED',f:r=>r.val??''},{l:'Flag',f:r=>r.flag?'RECOUNT':''}], rows]];
+    xl = [['Summary', [{l:'Item',f:r=>r.it.name},{l:'Fresh',f:r=>r.FRESH},{l:'Repacked/Cleaned',f:r=>r.GRV+r.CLEANED},{l:'Damage',f:r=>r.DAMAGE},{l:'Plain',f:r=>r.PLAIN},{l:'Labelled/roll',f:r=>r.LAB},{l:'Total',f:r=>r.tot},{l:'Unit',f:r=>unitOf(r.it)},{l:'iTrade',f:r=>r.sys??''},{l:'Difference',f:r=>r.df??''},{l:'AED',f:r=>r.val??''},{l:'Flag',f:r=>r.flag?'RECOUNT':''}], rows]];
   } else if (S.sctab === 'ent') {
     const edit = office;
     body = `<div class="card"><p class="muted">${edit ? (posted ? 'Posted count — you can still correct a line or add one; every change is recorded.' : 'Lines saved from the app so far. You can correct them here.') : ''}</p>

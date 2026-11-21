@@ -172,7 +172,7 @@ function jobStockCount() {
       rows.push([CAT[o.cat] || o.cat, x.short_name || x.name || ('#' + o.id), o.fresh, o.other, o.dmg, o.tot].concat(hasSys ? [sys == null ? '' : sys, dif, v] : [])); });
     var D = { summary: {}, units: [{ branch_id: b.branch_id, unit: br[b.branch_id] || '', note: hasSys ? '' : 'iTrade stock not uploaded for this batch yet — differences not shown.',
       sections: [{ heading: 'Batch ' + b.batch_no + ' · counted ' + b.count_date + ' · ' + L.length + ' entries', num_from: 2,
-        columns: ['Category', 'Item', 'Fresh', 'GRV / Cleaned', 'Damage', 'Counted'].concat(hasSys ? ['iTrade', 'Difference', 'Difference AED'] : []), rows: rows,
+        columns: ['Category', 'Item', 'Fresh', 'Repacked / Cleaned', 'Damage', 'Counted'].concat(hasSys ? ['iTrade', 'Difference', 'Difference AED'] : []), rows: rows,
         total: hasSys ? ['Total', '', '', '', '', '', '', '', Math.round(val * 100) / 100] : null }] }] };
     var rc = (rpc_('mail_recipients', { p_report: 'STOCK_COUNT' }) || []).filter(function (x) { return !x.branch_id || String(x.branch_id) === String(b.branch_id); });
     if (!rc.length) { Logger.log('STOCK_COUNT ' + b.batch_no + ': nobody ticked'); return; }
