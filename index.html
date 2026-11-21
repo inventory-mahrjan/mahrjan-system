@@ -928,7 +928,9 @@ function vOld(name){
   window.PortalSession = { username: S.me.name, role: S.me.role, unit: code === 'MGT' ? 'AJMAN' : 'AL QUOZ', unitName: code === 'MGT' ? 'MAHRJAN GENERAL TRADING LLC-AJMAN' : 'MAHRJAN GENERAL TRADING LLC-ALQUOZ' };
   if (window.__oldUnit !== window.PortalSession.unit) { if (window.__oldUnit) window.__mkOldViews(); window.__seRoster = null; window.__oldUnit = window.PortalSession.unit; }
   $('#v').innerHTML = '<div id="oldv"></div>';
-  window[name].render();
+  // no "Show report" wait: the report opens straight away and follows every date / salesman change
+  const box = $('#oldv'); box.addEventListener('change', e => { const f = e.target.closest('form'); if (f && e.target.matches('input,select')) f.requestSubmit(); });
+  window[name].render(); box.querySelector('form')?.requestSubmit();
 }
 
 async function vSheets(){
