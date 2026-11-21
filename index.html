@@ -222,7 +222,7 @@ function tabsFor(){
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
   if (canV('wh')) t.push(['whr','Warehouse report','Reports']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
-  if (has('ADMIN')) t.push(['itm','Items & BOM','Admin'], ['stf','Users','Admin'], ['em','Email reports','Admin'], ['acc','Role access','Admin']);
+  if (has('ADMIN')) t.push(['itm','Items & BOM','Admin'], ['stf','Users','Admin'], ['em','Email reports','Admin'], ['set','Settings','Admin'], ['acc','Role access','Admin']);
   G('Admin', ['dc','Data check']);
   if (!t.length) t.push(['none','No access','']);
   return t;
@@ -240,7 +240,7 @@ function render(){
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
-    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', em:'Who gets which scheduled email, and what was sent.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
+    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', em:'Who gets which scheduled email, and what was sent.', set:'Rates used by the system, such as the carton rates.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
@@ -260,7 +260,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ S.nav = (S.nav || 0) + 1; clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ S.nav = (S.nav || 0) + 1; clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, set:vSettings, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -1506,6 +1506,18 @@ async function vEmail(){ const __t = S.nav;
         toast('Saved'); } catch (e) { toast(e.message || String(e), false); } };
   };
   draw();
+}
+
+// ---------- SETTINGS (admin) ----------
+async function vSettings(){
+  loading();
+  const L = await q(sb.from('app_settings').select('*').order('key'));
+  $('#v').innerHTML = `<div class="card"><h3>Rates</h3><p class="muted">Carton rate = AED charged per empty carton returned (small / big). A new rate is used for returns saved from now on; days already saved keep their amount.</p>
+    <div class="tw" style="max-width:560px"><table><tr><th class="l">Setting</th><th>Value</th><th>Last changed</th></tr>${L.map(x => `<tr><td class="l">${esc(x.label || x.key)}</td><td><input type="number" step="0.01" min="0" data-k="${esc(x.key)}" value="${x.value}" style="width:100px"></td><td class="muted">${new Date(x.updated_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})}</td></tr>`).join('')}</table></div>
+    <div class="row" style="margin-top:8px"><button class="p" id="ssv">Save</button></div></div>`;
+  $('#ssv').onclick = async () => { try { for (const i of $('#v').querySelectorAll('[data-k]')) { const v = Number(i.value); if (!(v >= 0)) return toast('Enter a valid rate', false);
+      const x = L.find(y => y.key === i.dataset.k); if (Number(x.value) !== v) await q(sb.from('app_settings').update({ value:v, updated_at:new Date().toISOString() }).eq('key', i.dataset.k)); }
+    toast('Saved'); vSettings(); } catch (e) { toast(e.message || String(e), false); } };
 }
 
 // ---------- REQUIREMENT ----------
