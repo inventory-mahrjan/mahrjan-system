@@ -123,7 +123,9 @@
 #osh .skel{display:block;background:linear-gradient(90deg,#eceeea 25%,#f6f7f4 37%,#eceeea 63%);background-size:400% 100%;animation:skel 1.3s ease infinite;border-radius:7px}
   @media print{ @page{size:A4;margin:10mm} body{background:#fff} .sidebar,.header-actions,.noprint,footer,.msg,#xl,#pr{display:none!important}
     main{margin:0;padding:0;max-width:none;gap:10px} .card{border:0;padding:0} .sheet{break-after:page} .tw{overflow:visible;border:0;max-height:none!important}
-    table{font-size:10.5px} th,td{padding:4px 6px} th{position:static;-webkit-print-color-adjust:exact;print-color-adjust:exact} input,select{border:0;padding:0} }
+    table{font-size:10.5px} th,td{padding:4px 6px} th{position:static;-webkit-print-color-adjust:exact;print-color-adjust:exact} input,select{border:0;padding:0}
+    .printonly{display:block!important} main:has(.screp) > header{display:none!important} }
+  .printonly{display:none}
   .link-btn{border:0;background:none;color:var(--muted);padding:0;text-decoration:underline;text-underline-offset:2px;font-size:13px}
 </style>
 </head>
@@ -624,6 +626,9 @@ async function vStockBatch(id){ const __t = S.nav;
   const sys = {}; SY.forEach(x => sys[x.item_id] = num(x.qty)); const hasSys = SY.length > 0;
   const unitOf = it => it.item_type === 'FG' ? 'packs' : 'pcs';
   const big = it => it.item_type === 'FG' ? (it.packs_per_carton || 0) : it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 0) : (it.pcs_per_box || 0);
+  const splitTxt = (it, v) => { v = Math.round(num(v) * 100) / 100; if (!v) return ''; const neg = v < 0; v = Math.abs(v); const k = big(it), t = it.item_type === 'RAW_EGG' ? num(it.pcs_per_tray) || 30 : 0;
+    const u = it.item_type === 'RAW_EGG' ? ['ctn','tray','pcs'] : it.item_type === 'FG' ? ['box','','pkts'] : ['box','','pcs'], c = k ? Math.floor(v / k) : 0, r1 = +(v - c * k).toFixed(2), tr = t ? Math.floor(r1 / t) : 0;
+    return (neg ? '-' : '') + [c, tr, +(r1 - tr * t).toFixed(2)].map((x, i) => x && u[i] ? x + ' ' + u[i] : '').filter(Boolean).join(', '); };
   const show = (it, v) => { v = num(v); const k = big(it); if (!k || !v) return v ? String(+v.toFixed(2)) : '0'; const c = Math.floor(v / k), r = +(v - c * k).toFixed(2);
     return `${+v.toFixed(2)} <span class="muted">(${c} ${it.item_type==='FG'?'ctn':it.item_type==='RAW_EGG'?'ctn':'box'}${r ? ' + ' + r : ''})</span>`; };
   // per item
@@ -640,24 +645,32 @@ async function vStockBatch(id){ const __t = S.nav;
   const shelves = [...new Set(L.map(l => l.shelf).filter(Boolean))].sort(), prevShelves = [...new Set(PL.map(l => l.shelf).filter(Boolean))].sort();
   const missingShelves = prevShelves.filter(x => !shelves.includes(x));
   const tabs = [['sum','Summary'],['ent','Entries'],['shelf','Shelves'],['exp','Expiry & country'],['use','Tray & label usage']];
-  const head = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button id="bk">← All batches</button>
+  const dtm = v => v ? new Date(v).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  const PH = `<div class="printonly"><div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #0f5f57;padding-bottom:6px"><img src="${LOGO}" style="height:38px">
+      <div><div style="font-weight:800;font-size:15px">MAHRJAN GENERAL TRADING LLC – ${esc(String(co).toUpperCase())}</div><div style="font-weight:700;font-size:12.5px;letter-spacing:.04em">STOCK COUNT REPORT — ${esc((tabs.find(t => t[0] === S.sctab) || [,''])[1].toUpperCase())}</div></div></div>
+    <table style="margin:6px 0 4px;font-size:10.5px"><tr><td class="l"><b>Batch</b> ${esc(b.batch_no)}</td><td class="l"><b>Count date</b> ${b.count_date}</td><td class="l"><b>Type</b> ${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'}</td><td class="l"><b>Counted by</b> ${esc(nm(b.counted_by))}</td><td class="l"><b>Status</b> ${({OPEN:'Open',DOWNLOADED:'Counting',POSTED:'Posted',CANCELLED:'Cancelled'})[b.status]}</td></tr>
+      <tr><td class="l" colspan="2"><b>Categories</b> ${b.categories.map(c => SC_CAT[c]).join(', ')}</td><td class="l"><b>Cut-off</b> ${dtm(b.cutoff_at)}</td><td class="l"><b>Posted</b> ${dtm(b.posted_at)}</td><td class="l"><b>Printed</b> ${dtm(new Date())}</td></tr></table></div>`;
+  const head = `<div class="card screp">${PH}<div class="noprint"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button id="bk">← All batches</button>
       <b style="font-size:16px">${esc(b.batch_no)}</b><span>${co} · ${b.count_date} · ${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'} · counted by ${esc(nm(b.counted_by))}</span>
       <span class="${posted?'ok':''}">${({OPEN:'Open — not downloaded yet',DOWNLOADED:'Counting in the app',POSTED:'Posted',CANCELLED:'Cancelled'})[b.status]}</span></div>${tools()}</div>
     <p class="muted" style="margin:6px 0 0">Categories: ${b.categories.map(c => SC_CAT[c]).join(', ')}${b.cutoff_at ? ' · cut-off ' + new Date(b.cutoff_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}${b.posted_at ? ' · posted ' + new Date(b.posted_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}${b.edited_at && posted ? ' · edited ' + new Date(b.edited_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}${b.note ? ' · ' + esc(b.note) : ''}</p>
     ${office ? `<div class="row" style="margin-top:10px">${!posted && b.status !== 'CANCELLED' ? '<button id="eb">Change batch</button><button id="cb">Cancel batch</button>' : ''}${!posted && has('ADMIN') ? '<button id="db" class="danger" style="color:#b0432e">Delete batch</button>' : ''}
       ${b.status !== 'CANCELLED' ? '<label>iTrade stock for this count (.xlsx)<input type="file" id="sf" accept=".xlsx,.xls,.csv"></label>' : ''}
       ${posted && flagged.length ? `<button class="p" id="rc">Recount ${flagged.length} flagged item${flagged.length>1?'s':''}</button>` : ''}</div>` : ''}
-    <div class="rtabs" style="margin-top:12px">${tabs.map(([k,l]) => `<button data-t="${k}" class="${S.sctab===k?'on':''}">${l}${k==='exp'&&nearExp.length?' ⚠':''}</button>`).join('')}</div></div>`;
+    <div class="rtabs" style="margin-top:12px">${tabs.map(([k,l]) => `<button data-t="${k}" class="${S.sctab===k?'on':''}">${l}${k==='exp'&&nearExp.length?' ⚠':''}</button>`).join('')}</div></div></div>`;
   let body = '', xl = [];
   if (S.sctab === 'sum') {
-    body = `<div class="card"><div class="row"><label>Flag when difference over (%)<input type="number" id="lim" value="${S.sclim}" style="width:80px"></label><label>and at least (cartons / boxes)<input type="number" id="min" value="${S.scmin}" style="width:80px"></label>
+    body = `<div class="card"><div class="row noprint"><label>Flag when difference over (%)<input type="number" id="lim" value="${S.sclim}" style="width:80px"></label><label>and at least (cartons / boxes)<input type="number" id="min" value="${S.scmin}" style="width:80px"></label>
       ${hasSys ? `<span class="muted">${flagged.length} item${flagged.length===1?'':'s'} flagged</span>` : '<span class="muted">Upload the iTrade stock to compare.</span>'}</div>
       <div class="tw"><table><tr><th class="l">Item</th><th>Category</th><th>Fresh</th><th>Repacked / Cleaned</th><th>Damage</th><th>Plain</th><th>Labelled / roll</th><th>Total counted</th>${hasSys?'<th>iTrade</th><th>Difference</th><th>%</th><th>AED</th>':''}</tr>
       ${rows.map(r => `<tr class="${r.flag?'warn':''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${[...r.cats].map(c=>SC_CAT[c]).join(', ') || (r.it.item_type==='FG'?'Finished goods':r.it.item_type==='RAW_EGG'?'Raw egg':'Material')}</td>
         <td>${r.FRESH?+r.FRESH.toFixed(2):''}</td><td>${(r.GRV+r.CLEANED)?+(r.GRV+r.CLEANED).toFixed(2):''}</td><td>${r.DAMAGE?+r.DAMAGE.toFixed(2):''}</td><td>${r.PLAIN?+r.PLAIN.toFixed(2):''}</td><td>${r.LAB?+r.LAB.toFixed(2):''}</td>
         <td><b>${show(r.it, r.tot)}</b> ${unitOf(r.it)}</td>${hasSys ? `<td>${r.sys==null?'—':show(r.it, r.sys)}</td><td class="${r.df?'bad':''}">${r.df==null?'—':(r.df>0?'+':'')+(+r.df.toFixed(2))}</td><td>${r.sys==null?'':r.pct.toFixed(1)}</td><td>${r.val==null||!r.it.unit_cost?'':(r.val>0?'+':'')+r.val.toFixed(2)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="12" class="muted">Nothing counted yet.</td></tr>'}
       ${hasSys ? `<tr class="tot"><td class="l" colspan="11">Value of differences (items with a cost in Items & BOM)</td><td>${rows.reduce((a,r)=>a+(r.val||0),0).toFixed(2)}</td></tr>` : ''}</table></div></div>`;
-    xl = [['Summary', [{l:'Item',f:r=>r.it.name},{l:'Fresh',f:r=>r.FRESH},{l:'Repacked/Cleaned',f:r=>r.GRV+r.CLEANED},{l:'Damage',f:r=>r.DAMAGE},{l:'Plain',f:r=>r.PLAIN},{l:'Labelled/roll',f:r=>r.LAB},{l:'Total',f:r=>r.tot},{l:'Unit',f:r=>unitOf(r.it)},{l:'iTrade',f:r=>r.sys??''},{l:'Difference',f:r=>r.df??''},{l:'AED',f:r=>r.val??''},{l:'Flag',f:r=>r.flag?'RECOUNT':''}], rows]];
+    const z = v => num(v) ? +num(v).toFixed(2) : '', catOf = r => [...r.cats].map(c=>SC_CAT[c]).join(', ') || (r.it.item_type==='FG'?'Finished goods':r.it.item_type==='RAW_EGG'?'Raw egg':'Material');
+    xl = [['Summary', [{l:'Item',f:r=>r.it.name},{l:'Category',f:catOf},{l:'Fresh',f:r=>z(r.FRESH)},{l:'Repacked/Cleaned',f:r=>z(r.GRV+r.CLEANED)},{l:'Damage',f:r=>z(r.DAMAGE)},{l:'Plain',f:r=>z(r.PLAIN)},{l:'Labelled/roll',f:r=>z(r.LAB)},
+      {l:'Total counted',f:r=>+num(r.tot).toFixed(2)},{l:'Counted (ctn / tray / pcs)',f:r=>splitTxt(r.it, r.tot)},{l:'Unit',f:r=>r.it.item_type==='FG'?'pkts':'pcs'},
+      ...(hasSys ? [{l:'iTrade',f:r=>r.sys??''},{l:'iTrade (ctn / tray / pcs)',f:r=>r.sys==null?'':splitTxt(r.it, r.sys)},{l:'Difference',f:r=>r.df==null?'':+r.df.toFixed(2)},{l:'Diff %',f:r=>r.sys==null?'':+r.pct.toFixed(1)},{l:'Value AED',f:r=>r.val==null||!r.it.unit_cost?'':r.val,money:1,sum:1},{l:'Flag',f:r=>r.flag?'RECOUNT':''}] : [])], rows]];
   } else if (S.sctab === 'ent') {
     const edit = office;
     body = `<div class="card"><p class="muted">${edit ? (posted ? 'Posted count — you can still correct a line or add one; every change is recorded.' : 'Lines saved from the app so far. You can correct them here.') : ''}</p>
@@ -683,7 +696,7 @@ async function vStockBatch(id){ const __t = S.nav;
     const U = it => it.item_type === 'RAW_EGG' ? ['ctn','tray','pcs'] : it.item_type === 'FG' ? ['box','','pkts'] : ['box','','pcs'];
     ex.forEach(r => { const p = split(r.it, r.qty), u = U(r.it); r.split = p.map((v, i) => v && u[i] ? v + ' ' + u[i] : '').filter(Boolean).join(', ') || '0';
       r.qty = +r.qty.toFixed(2); r.unit = r.it.item_type === 'FG' ? 'pkts' : 'pcs'; });
-    body = `<div class="card"><div class="row"><label>Near expiry within (days)<input type="number" id="ned" value="${S.scexp}" style="width:80px"></label>${nearExp.length ? `<span class="bad">${nearExp.length} entr${nearExp.length>1?'ies':'y'} expire by ${soon}</span>` : '<span class="ok">Nothing near expiry.</span>'}</div>
+    body = `<div class="card"><div class="row noprint"><label>Near expiry within (days)<input type="number" id="ned" value="${S.scexp}" style="width:80px"></label>${nearExp.length ? `<span class="bad">${nearExp.length} entr${nearExp.length>1?'ies':'y'} expire by ${soon}</span>` : '<span class="ok">Nothing near expiry.</span>'}</div>
       <div class="tw"><table class="ctr"><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Qty</th><th>Total (pcs / pkts)</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${esc(r.split)}</td><td><b>${r.qty}</b> ${r.unit}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
     xl = [['Expiry & country', [{l:'Item',f:r=>r.it.name},{k:'exp',l:'Expiry'},{k:'country',l:'Country'},{k:'split',l:'Qty'},{k:'qty',l:'Total (pcs / pkts)'},{k:'unit',l:'Unit'}], ex]];
   } else {
@@ -884,6 +897,19 @@ function table(cols, rows, opt = {}){
 }
 const bindRows = (root, rows, fn) => root.querySelectorAll('[data-row]').forEach(tr => tr.onclick = () => fn(rows[+tr.dataset.row]));
 async function toExcel(name, sheets){   // sheets: [[sheetName, cols, rows]]
+  if (window.mahrjanXlsx) {   // formatted: company + report title, green header, borders, bold totals, columns sized to the data
+    const brn = S.branches.find(b => b.id === S.br)?.name || '', per = (S.from && RANGE.has(S.tab) && S.from !== S.date ? S.from + ' to ' : '') + S.date;
+    const out = sheets.map(([sn, cols, rows]) => {
+      const val = (c, r) => { const v = c.f ? c.f(r) : r[c.k]; return typeof v === 'number' ? r2(v) : v ?? ''; };
+      const body = rows.map(r => cols.map(c => { const v = val(c, r); return { v, s: typeof v === 'number' && c.money ? 6 : 5 }; }));
+      const tot = cols.some(c => c.sum) && rows.length ? [cols.map((c, i) => ({ v: i === 0 ? 'Total' : c.sum ? r2(rows.reduce((a, r) => a + num(c.f ? c.f(r) : r[c.k]), 0)) : '', s: c.money ? 8 : 7 }))] : [];
+      const widths = cols.map((c, i) => Math.min(48, Math.max(8, String(c.l).length + 2, ...body.map(r => String(r[i].v ?? '').length + 2))));
+      return { name: sn, landscape: true, widths, heights: [22, 18],
+        rows: [[{ v:'MAHRJAN GENERAL TRADING LLC — ' + brn.toUpperCase(), s:14 }], [{ v:(name + ' — ' + sn).toUpperCase() + '   ·   ' + per, s:15 }], [], cols.map(c => ({ v:c.l, s:9 })), ...body, ...tot] };
+    });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(window.mahrjanXlsx(out)); a.download = `${name} - ${brn} - ${per}.xlsx`; document.body.append(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); return;
+  }
   const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm'), wb = XLSX.utils.book_new(), brn = S.branches.find(b => b.id === S.br)?.name || '';
   sheets.forEach(([sn, cols, rows]) => {
     const val = (c, r) => { const v = c.f ? c.f(r) : r[c.k]; return typeof v === 'number' ? r2(v) : v ?? ''; };
