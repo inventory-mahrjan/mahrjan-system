@@ -83,8 +83,8 @@
   function count(id) { refreshMaster(id); D = load(id); if (!D) { err = 'Download the batch first.'; V.view = 'list'; render(); return; } V.view = 'count'; V.id = id;
     C = C && C.id === id ? C : { id: id, shelf: localStorage.getItem('mjsc_shelf') || '', cat: D.batch.categories[0], type: 'FRESH', found: null, msg: '' }; err = ''; render(); setTimeout(focusScan, 50); }
   // when online, refresh the item list and BOM of a downloaded batch (office changes in Items & BOM reach the device); counted lines stay as they are
-  function refreshMaster(id) { if (!navigator.onLine) return; rpc('sc_download', { p_id: id }).then(function (data) { var d = load(id); if (!d) return;
-      d.items = data.items; d.bom = data.bom; d.countries = data.countries; store(id, d); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; } }).catch(function () {}); }
+  function refreshMaster(id) { if (!navigator.onLine) return Promise.resolve(false); return rpc('sc_download', { p_id: id }).then(function (data) { var d = load(id); if (!d) return;
+      d.items = data.items; d.bom = data.bom; d.countries = data.countries; store(id, d); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; } return true; }).catch(function () { return false; }); }
   function itemsBy(id) { return D.items.find(function (i) { return i.id === id; }); }
   function isRecount(id) { return !D.batch.recount_items || D.batch.recount_items.indexOf(id) >= 0; }
   function nm(i) { return i ? (i.s || i.n) : ''; }
@@ -108,6 +108,8 @@
       var viaFg = null;
       if (!it && cat === 'RAW') { viaFg = byCode.find(function (i) { return i.t === 'FG'; });
         if (viaFg) { it = D.bom.filter(function (b) { return b.fg === viaFg.id; }).map(function (b) { return itemsBy(b.m); }).find(function (m) { return m && m.t === 'RAW_EGG'; }) || null;
+          if (!it && !C.retried) { C.retried = true; C.msg = 'Checking the BOM…'; render(); refreshMaster(V.id).then(function () { scan(code); }); return; }
+          C.retried = false;
           if (!it) { beep(false); C.msg = 'No raw egg in the BOM of ' + nm(viaFg) + '. Ask the office to add it in Items & BOM.'; C.found = null; render(); return; } } }
       if (!it) { beep(false); C.msg = 'Not a ' + CAT[cat].toLowerCase() + ' barcode: ' + code; C.found = null; render(); return; }
       if (!isRecount(it.id)) { beep(false); C.msg = nm(it) + ' is not in this recount.'; render(); return; }
@@ -120,7 +122,7 @@
       if (!list.some(function (m) { return isRecount(m.id); })) { beep(false); C.msg = 'Not in this recount.'; render(); return; }
       C.found = { cat: cat, items: list, scanned: code, fg: fg };
     }
-    beep(true); C.msg = ''; C.v = {}; C.exp = ''; C.country = C.country || ''; render();
+    C.retried = false; beep(true); C.msg = ''; C.v = {}; C.exp = ''; C.country = C.country || ''; render();
     setTimeout(function () { var f = root.querySelector('.q input'); if (f) f.focus(); }, 30);
   }
   function addEntry() {
