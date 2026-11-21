@@ -680,10 +680,12 @@ async function vStockBatch(id){ const __t = S.nav;
     // split total into carton (box for material) / tray / pcs (packs for finished goods)
     const split = (it, v) => { v = Math.round(num(v) * 100) / 100; const k = big(it), t = it.item_type === 'RAW_EGG' ? num(it.pcs_per_tray) || 30 : 0;
       const c = k ? Math.floor(v / k) : 0, r1 = +(v - c * k).toFixed(2), tr = t ? Math.floor(r1 / t) : 0; return [c, tr, +(r1 - tr * t).toFixed(2)]; };
-    ex.forEach(r => { [r.ctn, r.tray, r.pcs] = split(r.it, r.qty); r.qty = +r.qty.toFixed(2); r.unit = unitOf(r.it); });
+    const U = it => it.item_type === 'RAW_EGG' ? ['ctn','tray','pcs'] : it.item_type === 'FG' ? ['box','','pkts'] : ['box','','pcs'];
+    ex.forEach(r => { const p = split(r.it, r.qty), u = U(r.it); r.split = p.map((v, i) => v && u[i] ? v + ' ' + u[i] : '').filter(Boolean).join(', ') || '0';
+      r.qty = +r.qty.toFixed(2); r.unit = r.it.item_type === 'FG' ? 'pkts' : 'pcs'; });
     body = `<div class="card"><div class="row"><label>Near expiry within (days)<input type="number" id="ned" value="${S.scexp}" style="width:80px"></label>${nearExp.length ? `<span class="bad">${nearExp.length} entr${nearExp.length>1?'ies':'y'} expire by ${soon}</span>` : '<span class="ok">Nothing near expiry.</span>'}</div>
-      <div class="tw"><table><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Ctn</th><th>Tray</th><th>Pcs</th><th>Total (pcs / packets)</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${r.ctn||''}</td><td>${r.tray||''}</td><td>${r.pcs||''}</td><td><b>${r.qty}</b> ${r.unit}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
-    xl = [['Expiry & country', [{l:'Item',f:r=>r.it.name},{k:'exp',l:'Expiry'},{k:'country',l:'Country'},{k:'ctn',l:'Ctn'},{k:'tray',l:'Tray'},{k:'pcs',l:'Pcs'},{k:'qty',l:'Total (pcs / packets)'},{k:'unit',l:'Unit'}], ex]];
+      <div class="tw"><table><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Qty</th><th>Total (pcs / pkts)</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${esc(r.split)}</td><td><b>${r.qty}</b> ${r.unit}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
+    xl = [['Expiry & country', [{l:'Item',f:r=>r.it.name},{k:'exp',l:'Expiry'},{k:'country',l:'Country'},{k:'split',l:'Qty'},{k:'qty',l:'Total (pcs / pkts)'},{k:'unit',l:'Unit'}], ex]];
   } else {
     // tray & label usage: last count + received − used in production = expected; compare with this count
     let use = [];
