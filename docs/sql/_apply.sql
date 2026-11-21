@@ -1,16 +1,17 @@
--- =====================================================================
--- FIX ME FUNCTION - CREATE
--- me() listed the staff columns one by one for the SYSTEM row, so adding a column to staff (email)
--- broke it ("each UNION query must have the same number of columns") and nobody could sign in.
--- Same result as before, now independent of the number of staff columns.
--- Revert: FIX ME FUNCTION - REVERT.sql
--- =====================================================================
-create or replace function public.me() returns public.staff
-language sql stable security definer set search_path to 'public' as $function$
-  select s.* from public.staff s where s.auth_user_id = auth.uid() and s.active and s.can_login
-  union all
-  select (jsonb_populate_record(null::public.staff, jsonb_build_object('name','SYSTEM','role','ADMIN','can_login',true,'active',true,'created_at',now()))).*
-   where auth.uid() is null and session_user in ('postgres','supabase_admin')
-  limit 1
-$function$;
-select (public.me()).name as who;
+-- STOCK COUNT DELETE BATCH - CREATE
+-- Admin can delete a stock count batch that is not posted (its entries and iTrade figures go with it).
+create or replace function public.sc_delete_batch(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare b public.sc_batches;
+begin
+  select * into b from public.sc_batches where id = p_id;
+  if b.id is null then raise exception 'Batch not found.'; end if;
+  perform public.require_role(array['ADMIN'], b.branch_id);
+  if b.status = 'POSTED' then raise exception 'A posted batch cannot be deleted.'; end if;
+  if exists (select 1 from public.sc_batches where parent_id = p_id) then raise exception 'This batch has a recount batch. Delete the recount first.'; end if;
+  delete from public.sc_lines where batch_id = p_id;
+  delete from public.sc_system where batch_id = p_id;
+  delete from public.sc_batches where id = p_id;
+end $$;
+grant execute on function public.sc_delete_batch(bigint) to authenticated;
+select 'sc_delete_batch ready' as result;
