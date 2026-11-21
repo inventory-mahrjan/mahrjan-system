@@ -258,7 +258,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ S.nav = (S.nav || 0) + 1; clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -349,11 +349,11 @@ async function vReturn(){
 }
 
 // ---------- VAN DAYS ----------
-async function vDays(){
+async function vDays(){ const __t = S.nav;
   if (S.dayId) return vDay(S.dayId);
   const days = await q(sb.from('van_day').select('*').eq('business_date', S.date).in('branch_id', S.brs).order('id'));
   const cash = days.length ? await q(sb.from('v_van_day_cash').select('*').in('van_day_id', days.map(d => d.id))) : [];
-  $('#v').innerHTML = `<div class="card"><h3>Van days — ${S.date}</h3>${days.length ? `<div class="tw"><table>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><h3>Van days — ${S.date}</h3>${days.length ? `<div class="tw"><table>
     <tr><th class="l">Salesman</th><th>Van</th><th>Status</th><th>Cash sales</th><th>Credit sales</th><th>Cash to hand over</th><th>Counted</th><th></th></tr>
     ${days.map(d => { const c = cash.find(x=>x.van_day_id===d.id)||{}; const exp = d.cash_expected ?? c.cash_to_hand_over;
       return `<tr><td class="l">${esc(S.staff.find(s=>s.id===d.salesman_id)?.name)}</td><td>${esc(S.vans.find(v=>v.id===d.van_id)?.van_no||'')}</td>
@@ -363,7 +363,7 @@ async function vDays(){
   $('#v').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { S.dayId = +b.dataset.d; vDays(); });
 }
 
-async function vDay(id){
+async function vDay(id){ const __t = S.nav;
   const [day] = await q(sb.from('van_day').select('*').eq('id', id));
   const closed = day.status === 'CLOSED';
   const [rec, cash, exps, cols] = await Promise.all([
@@ -379,7 +379,7 @@ async function vDay(id){
   const custVal = cid => { const c = S.customers.find(x=>x.id===cid); return c ? (c.itrade_code||'')+' | '+c.name : ''; };
   const custId = v => S.customers.find(c => (c.itrade_code||'')+' | '+c.name === v)?.id || null;
 
-  $('#v').innerHTML = `<div class="card"><div class="row"><button id="bk">← Back</button><h3 style="margin:0">${esc(sm)} — ${day.business_date}
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row"><button id="bk">← Back</button><h3 style="margin:0">${esc(sm)} — ${day.business_date}
       <span class="st ${day.status}">${day.status}</span></h3></div>
     <p class="muted">KM ${day.start_km??'-'} → ${day.end_km??'-'} · Temp ${day.load_temp??'-'} / ${day.unload_temp??'-'} · Cartons small ${day.carton_small||0}, big ${day.carton_big||0}</p></div>
 
@@ -446,8 +446,8 @@ async function vDay(id){
 }
 
 // ---------- SALES IMPORT ----------
-async function vImport(){
-  $('#v').innerHTML = `<div class="card"><h3>Sales import (iTrade Periodical Sales Detailed Report)</h3>
+async function vImport(){ const __t = S.nav;
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><h3>Sales import (iTrade Periodical Sales Detailed Report)</h3>
     <p class="muted">Export the report from iTrade for the dates you want (Excel or CSV) and choose the file. The company of each invoice comes from its Company Name (or the MGAZ / MGT invoice prefix). Company and Warehouse are saved with every line.
     Invoices already imported are skipped; an invoice changed in iTrade since the last import is replaced with the new lines. Invoices missing from the file for its dates are marked cancelled.</p>
     <div class="row"><input type="file" id="f" accept=".xlsx,.xls,.csv"><button class="p" id="go" disabled>Import</button></div><div id="out"></div></div>`;
@@ -521,11 +521,11 @@ async function vImport(){
 
 
 // ---------- WAREHOUSE ----------
-async function vWarehouse(){
+async function vWarehouse(){ const __t = S.nav;
   const bs = await q(sb.from('wh_batches').select('*').eq('branch_id', S.br).eq('work_date', S.date).order('id'));
   const nm = id => S.staff.find(s => s.id === id)?.name || '';
   const sum = (p, k) => bs.filter(b => b.process === p && b.status === 'CLOSED').reduce((a,b) => a + num(b[k]), 0);
-  $('#v').innerHTML = `<div class="card"><h3>Summary</h3><div class="tw"><table>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><h3>Summary</h3><div class="tw"><table>
       <tr><th class="l">Process</th><th>Batches</th><th>Open</th><th>Issued eggs</th><th>FG packs</th><th>Good / near exp</th><th>Broken</th><th>Waste</th><th>Egg diff</th><th>Material diff</th></tr>
       ${['PRODUCTION','CLEANING'].map(p => `<tr><td class="l">${p === 'PRODUCTION' ? 'Production' : 'Cleaning'}</td><td>${bs.filter(b=>b.process===p&&b.status!=='CANCELLED').length}</td>
         <td>${bs.filter(b=>b.process===p&&b.status==='ISSUED').length}</td><td>${sum(p,'issued_egg_pcs')}</td><td>${p==='PRODUCTION'?sum(p,'fg_packs'):''}</td>
@@ -554,7 +554,7 @@ async function vWarehouse(){
 // ---------- STOCK COUNT (batches: created here, counted offline in the app, posted, compared) ----------
 const SC_CAT = { RAW:'Raw egg', FG:'Finished goods', TRAY:'Plain tray', LTRAY:'Labelled tray', LABEL:'Label roll' };
 const SC_TYPE = { FRESH:'Fresh', GRV:'GRV', CLEANED:'Cleaned', DAMAGE:'Damage' };
-async function vStock(){
+async function vStock(){ const __t = S.nav;
   if (S.scb) return vStockBatch(S.scb);
   loading();
   const from = addDays(S.date, -60);
@@ -564,7 +564,7 @@ async function vStock(){
   const co = id => S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz';
   const canMake = has('ADMIN','ACCOUNTANT');
   const st = b => ({ OPEN:'Open', DOWNLOADED:'Counting', POSTED:'Posted', CANCELLED:'Cancelled' })[b.status];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0">${canMake ? '<button class="p" id="nb">New count batch</button>' : ''}
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0">${canMake ? '<button class="p" id="nb">New count batch</button>' : ''}
       <span class="muted">Create the batch here; the receiver downloads it in the app (Warehouse → Stock count), counts offline and posts.</span></div>${tools()}</div>
     <div class="tw"><table><tr><th class="l">Batch</th><th>Company</th><th>Count date</th><th>Type</th><th class="l">Counted by</th><th class="l">Categories</th><th>Status</th><th>Entries</th><th>Posted</th><th></th></tr>
     ${bs.map(b => `<tr><td class="l">${esc(b.batch_no)}${b.parent_id ? ' <span class="muted">recount</span>' : ''}</td><td>${co(b.branch_id)}</td><td>${b.count_date}</td><td>${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'}</td>
@@ -603,7 +603,7 @@ function scBatchDialog(b, recount){
   d.addEventListener('close', () => d.remove()); d.showModal();
 }
 
-async function vStockBatch(id){
+async function vStockBatch(id){ const __t = S.nav;
   loading();
   const b = (await q(sb.from('sc_batches').select('*').eq('id', id)))[0];
   if (!b) { S.scb = null; return vStock(); }
@@ -695,7 +695,7 @@ async function vStockBatch(id){
       ${use.map(r => `<tr class="${r.waste>0?'warn':''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${+r.last.toFixed(0)}</td><td><input type="number" min="0" data-rcv="${r.id}" value="${r.rcv||''}" style="width:80px"></td><td>${+r.used.toFixed(0)}</td><td>${+r.exp.toFixed(0)}</td><td>${+r.now.toFixed(0)}</td><td class="${r.waste>0?'bad':''}">${+r.waste.toFixed(0)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No trays or labels counted.</td></tr>'}</table></div>`}</div>`;
     xl = [['Tray & label usage', [{l:'Item',f:r=>r.it.name},{k:'last',l:'Last count'},{k:'rcv',l:'Received'},{k:'used',l:'Used'},{k:'exp',l:'Expected'},{k:'now',l:'Counted'},{k:'waste',l:'Wastage'}], use]];
   }
-  $('#v').innerHTML = head + body;
+  if (__t !== S.nav) return; $('#v').innerHTML = head + body;
   bindTools(b.batch_no, xl);
   $('#bk').onclick = () => { S.scb = null; vStock(); };
   $('#v').querySelectorAll('[data-t]').forEach(x => x.onclick = () => { S.sctab = x.dataset.t; vStockBatch(id); });
@@ -776,7 +776,7 @@ async function itradeZip(kind){
   toast(`Downloaded ${a.download} · ${files.length} salesman file${files.length === 1 ? '' : 's'}`);
 }
 
-async function vItrade(){
+async function vItrade(){ const __t = S.nav;
   S.ito = S.ito && S.ito >= S.date ? S.ito : S.date;
   const [bs, days] = await Promise.all([
     q(sb.from('wh_batches').select('id,process,status').eq('branch_id', S.br).gte('work_date', S.date).lte('work_date', S.ito)),
@@ -797,7 +797,7 @@ async function vItrade(){
   sec.push(['SALESMAN WASTAGE', 'Expiry and waste returned by the vans (packs)', sw, ['EXP','WST']]);
   const open = bs.filter(b => b.status === 'ISSUED').length;
   S.itx = sec;
-  $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
       <button class="p" id="xl">Download Excel</button>${canE('imp') ? '<button id="zl">Loading zip (Store Issue)</button><button id="zr">Return zip (Store Issue)</button>' : ''}
       <span class="muted">${closed.length} closed batch(es), ${days.length} van day(s).${open ? ` <b class="bad">${open} batch(es) still open — not included.</b>` : ''}</span></div></div>
     ${sec.map(([t, sub, m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
@@ -876,7 +876,7 @@ const kpi = (l, v, sub = '') => `<div class="kpi"><span>${esc(l)}</span><b>${v}<
 function aggregate(rows, keyF, init, add){ const m = new Map(); rows.forEach(r => { const k = keyF(r); if (k == null) return; if (!m.has(k)) m.set(k, init(r)); add(m.get(k), r); }); return [...m.values()]; }
 
 // ---------- OVERVIEW ----------
-async function vOverview(){
+async function vOverview(){ const __t = S.nav;
   loading();
   const [sales, days] = await Promise.all([getSales(), getDays()]);
   const [cash, coll, exp] = await Promise.all([getCash(days), getColl(days), getExp(days)]);
@@ -890,7 +890,7 @@ async function vOverview(){
   const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); o.inv.add(r.invoice_no); if (r.tran_type === 'CR') o.cust.add(r.customer_code); })
     .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size })).sort((a,b) => b.net - a.net);
   const it = aggregate(sales, r => r.item_id || r.item_code, r => ({ name:r.item_id ? iNm(r.item_id) : r.item_name, qty:0, net:0 }), (o,r) => { o.qty += num(r.qty_base); o.net += num(r.net_incl_vat); }).sort((a,b) => b.net - a.net).slice(0, 15);
-  $('#v').innerHTML = `<div class="kpis">
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">
       ${kpi('Net sales', 'AED ' + money(sum(sales,'net_incl_vat')), 'incl. VAT, after returns')}
       ${kpi('Sales', 'AED ' + money(sum(cr,'net_incl_vat')), new Set(cr.map(r => r.invoice_no)).size + ' invoices')}
       ${kpi('Returns', 'AED ' + money(-sum(rt,'net_incl_vat')), new Set(rt.map(r => r.invoice_no)).size + ' returns')}
@@ -921,14 +921,14 @@ async function dayRows(){
       cash_sales:num(c.cash_sales), cash_returns:num(c.cash_returns), credit:num(c.credit_sales), coll:num(c.collections), exp:num(c.expenses), hand:num(c.cash_to_hand_over),
       counted:d?.cash_counted, diff:d?.cash_counted != null ? num(d.cash_counted) - num(d.cash_expected ?? c.cash_to_hand_over) : null, items:I, flags }; });
 }
-async function vDash(){
+async function vDash(){ const __t = S.nav;
   loading(); const R = await dayRows();
   const cols = [{k:'name',l:'Salesman',left:1},{k:'van',l:'Van'},{l:'Status',html:r => `<span class="st ${r.status}">${r.status}</span>`,f:r=>r.status},{k:'load',l:'Load',sum:1},{k:'sale',l:'Sale',sum:1},{k:'grv',l:'GRV',sum:1},{k:'ret',l:'Return',sum:1},
     {k:'short',l:'Short',sum:1,cls:r=>r.short?'bad':''},{k:'excess',l:'Excess',sum:1,cls:r=>r.excess?'bad':''},{k:'cash_sales',l:'Cash sales',money:1,sum:1},{k:'credit',l:'Credit',money:1,sum:1},
     {k:'coll',l:'Collections',money:1,sum:1},{k:'exp',l:'Expenses',money:1,sum:1},{k:'hand',l:'To hand over',money:1,sum:1},{l:'Counted',f:r=>r.counted==null?'':num(r.counted),money:1,sum:1},
     {l:'Cash diff',f:r=>r.diff==null?'':r.diff,money:1,sum:1,cls:r=>r.diff?'bad':''},{l:'Problems',left:1,f:r=>r.flags.join(', '),cls:r=>r.flags.length?'bad':''}];
   const bad = R.filter(r => r.flags.length).length;
-  $('#v').innerHTML = `<div class="kpis">${kpi('Salesmen', R.length)}${kpi('Closed', R.filter(r=>r.status==='CLOSED').length)}${kpi('With problems', bad)}${kpi('Cash to hand over','AED '+money(R.reduce((a,r)=>a+r.hand,0)))}</div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">${kpi('Salesmen', R.length)}${kpi('Closed', R.filter(r=>r.status==='CLOSED').length)}${kpi('With problems', bad)}${kpi('Cash to hand over','AED '+money(R.reduce((a,r)=>a+r.hand,0)))}</div>
     <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Today at a glance — ${S.date}</h3>${tools()}</div>${table(cols, R, { click:1 })}
     <p class="muted" style="margin-top:8px">Click a salesman to open the day in Van days.</p></div>`;
   bindRows($('#v'), R, r => { if (r.day) { S.tab = 'days'; S.dayId = r.day.id; render(); } });
@@ -937,17 +937,17 @@ async function vDash(){
 
 // ---------- DAILY SHEETS (A4) ----------
 // Old SALES_PORTAL report screens (old-views.js): same layout, print and Excel/CSV — data live from the database, one company at a time.
-function vOld(name){
+function vOld(name){ const __t = S.nav;
   const code = S.branches.find(b => b.id === S.br)?.code || 'MGAZ';
   window.PortalSession = { username: S.me.name, role: S.me.role, unit: code === 'MGT' ? 'AJMAN' : 'AL QUOZ', unitName: code === 'MGT' ? 'MAHRJAN GENERAL TRADING LLC-AJMAN' : 'MAHRJAN GENERAL TRADING LLC-ALQUOZ' };
   if (window.__oldUnit !== window.PortalSession.unit) { if (window.__oldUnit) window.__mkOldViews(); window.__seRoster = null; window.__oldUnit = window.PortalSession.unit; }
-  $('#v').innerHTML = '<div id="oldv"></div>';
+  if (__t !== S.nav) return; $('#v').innerHTML = '<div id="oldv"></div>';
   // no "Show report" wait: the report opens straight away and follows every date / salesman change
   const box = $('#oldv'); box.addEventListener('change', e => { const f = e.target.closest('form'); if (f && e.target.matches('input,select')) f.requestSubmit(); });
   window[name].render(); box.querySelector('form')?.requestSubmit();
 }
 
-async function vSheets(){
+async function vSheets(){ const __t = S.nav;
   // Old SALES_PORTAL daily sheets screen (old-sheets.js): same layout, print A4, Save PDF, Excel and CSV — data live from the database.
   const CO = { MGAZ: 'MAHRJAN GENERAL TRADING LLC-ALQUOZ', MGT: 'MAHRJAN GENERAL TRADING LLC-AJMAN' };
   const code = id => S.branches.find(b => b.id === id)?.code || 'MGAZ', unit = id => code(id) === 'MGT' ? 'AJMAN' : 'AL QUOZ';
@@ -963,7 +963,7 @@ async function vSheets(){
       return { ok: true, name: type, date: day, salesman: '', parts: ds, rows, head: [], bold: [], position: null, cash: null };
     }
   };
-  $('#v').innerHTML = '<div id="osh"><section id="workbookReports"></section></div>';
+  if (__t !== S.nav) return; $('#v').innerHTML = '<div id="osh"><section id="workbookReports"></section></div>';
   window.MahrjanReports.reset(); window.MahrjanReports.render('');
 }
 
@@ -973,7 +973,7 @@ function groupToggle(opts){ S.grp = opts.some(o => o[0] === S.grp) ? S.grp : opt
   return `<label>Show<select id="grp">${opts.map(([k,l]) => `<option value="${k}" ${k===S.grp?'selected':''}>${l}</option>`).join('')}</select></label>`; }
 
 // ---------- SHORT & EXCESS ----------
-async function vShort(){
+async function vShort(){ const __t = S.nav;
   loading(); const X = (await rangeItems()).filter(x => num(x.short) || num(x.excess));
   const by = { sm:x => x.d.salesman_id, it:x => x.item_id, sd:x => x.d.business_date + '|' + x.d.salesman_id + '|' + x.item_id };
   const g = groupToggle([['sm','Salesman-wise'],['it','Item-wise'],['sd','Date-wise detail']]);
@@ -982,13 +982,13 @@ async function vShort(){
     .sort((a,b) => S.grp === 'it' ? a.io - b.io : S.grp === 'sd' ? (a.date < b.date ? -1 : a.date > b.date ? 1 : a.sm.localeCompare(b.sm) || a.io - b.io) : a.sm.localeCompare(b.sm));
   const cols = [...(S.grp === 'sd' ? [{k:'date',l:'Date'}] : []), ...(S.grp !== 'it' ? [{k:'sm',l:'Salesman',left:1}] : []), ...(S.grp !== 'sm' ? [{k:'item',l:'Item',left:1}] : []),
     {k:'short',l:'Short',sum:1,cls:r=>r.short?'bad':''},{k:'excess',l:'Excess',sum:1},{l:'Net',f:r=>r.excess-r.short,sum:1},{k:'val',l:'Value AED (sale rate)',money:1,sum:1}];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows)}
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows)}
     <p class="muted" style="margin-top:8px">Excess / short = total return − (load − sale + GRV), per van day and item. Value uses the salesman's own average sale rate for that item and day.</p></div>`;
   $('#grp').onchange = e => { S.grp = e.target.value; vShort(); }; bindTools('Short and excess', [['Short & excess', cols, rows]]);
 }
 
 // ---------- FOC & WRITE-OFFS ----------
-async function vWriteoff(){
+async function vWriteoff(){ const __t = S.nav;
   loading(); const [X, sales] = await Promise.all([rangeItems(), getSales()]);
   const rate = {}; aggregate(sales.filter(r => r.tran_type === 'CR' && r.item_id), r => r.item_id, r => ({ id:r.item_id, q:0, v:0 }), (o,r) => { o.q += num(r.qty_base); o.v += num(r.net_incl_vat); }).forEach(o => rate[o.id] = o.q ? o.v / o.q : 0);
   const W = X.filter(x => num(x.damage) || num(x.expiry) || num(x.waste) || num(x.foc));
@@ -999,26 +999,26 @@ async function vWriteoff(){
     .sort((a,b) => S.grp === 'it' ? a.io - b.io : a.sm.localeCompare(b.sm) || a.io - b.io);
   const cols = [...(S.grp !== 'it' ? [{k:'sm',l:'Salesman',left:1}] : []), ...(S.grp !== 'sm' ? [{k:'item',l:'Item',left:1}] : []),
     {k:'damage',l:'Damage',sum:1},{k:'expiry',l:'Expiry',sum:1},{k:'waste',l:'Waste',sum:1},{k:'foc',l:'FOC',sum:1},{l:'Total',f:r=>r.damage+r.expiry+r.waste+r.foc,sum:1},{k:'val',l:'Value AED',money:1,sum:1}];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows)}
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows)}
     <p class="muted" style="margin-top:8px">Quantities from the van returns. Value = qty × the item's average selling price (incl. VAT) in this period.</p></div>`;
   $('#grp').onchange = e => { S.grp = e.target.value; vWriteoff(); }; bindTools('FOC and write-offs', [['FOC & write-offs', cols, rows]]);
 }
 
 // ---------- QTY BY SALESMAN ----------
-async function vQty(){
+async function vQty(){ const __t = S.nav;
   loading(); const sales = (await getSales()).filter(r => r.item_id);
   S.qu = S.qu || 'ctn';
   const ids = [...new Set(sales.map(r => r.item_id))].sort((a,b) => ord(a) - ord(b));
   const rows = aggregate(sales, saleName, r => ({ sm:saleName(r), q:{} }), (o,r) => o.q[r.item_id] = (o.q[r.item_id] || 0) + num(r.qty_base)).sort((a,b) => a.sm.localeCompare(b.sm));
   const cv = (id, v) => S.qu === 'ctn' ? v / per(item(id)) : v;
   const cols = [{k:'sm',l:'Salesman',left:1}, ...ids.map(id => ({ l:iNm(id), sum:1, f:r => nz(cv(id, num(r.q[id]))) })), ...(S.qu === 'ctn' ? [{ l:'Total cartons', sum:1, f:r => r2(ids.reduce((a,id) => a + cv(id, num(r.q[id])), 0)) }] : [])];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><label>Unit<select id="qu"><option value="ctn" ${S.qu==='ctn'?'selected':''}>Cartons</option><option value="pcs" ${S.qu==='pcs'?'selected':''}>Packs / pieces</option></select></label>${tools()}</div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><label>Unit<select id="qu"><option value="ctn" ${S.qu==='ctn'?'selected':''}>Cartons</option><option value="pcs" ${S.qu==='pcs'?'selected':''}>Packs / pieces</option></select></label>${tools()}</div>
     ${table(cols, rows)}<p class="muted" style="margin-top:8px">Net qty (sales less returns) from the imported iTrade sales. Raw egg in pieces, finished goods in packs.</p></div>`;
   $('#qu').onchange = e => { S.qu = e.target.value; vQty(); }; bindTools('Qty by salesman', [['Qty by salesman', cols, rows]]);
 }
 
 // ---------- SALES ANALYSIS ----------
-async function vAnalysis(){
+async function vAnalysis(){ const __t = S.nav;
   loading(); const all = await getSales();
   const F = S.saf = S.saf || { sm:'', item:'', cust:'', tender:'', type:'NET', by:'sm' };
   const sms = [...new Set(all.map(saleName))].sort(), its = [...new Set(all.filter(r => r.item_id).map(r => r.item_id))].sort((a,b) => ord(a) - ord(b));
@@ -1035,7 +1035,7 @@ async function vAnalysis(){
     ...(F.by !== 'iv' ? [{k:'invoices',l:'Invoices',sum:1}] : []), ...(!['cu','iv'].includes(F.by) ? [{k:'customers',l:'Customers'}] : []),
     {k:'qty',l:'Qty',sum:1},{k:'gross',l:'Gross',money:1,sum:1},{k:'disc',l:'Discount',money:1,sum:1},{k:'net',l:'Net',money:1,sum:1},{k:'vat',l:'VAT',money:1,sum:1},{k:'tot',l:'Net incl. VAT',money:1,sum:1},{k:'profit',l:'Profit',money:1,sum:1}];
   const sel = (id, lab, opts, v) => `<label>${lab}<select id="${id}">${opts.map(([k,l]) => `<option value="${esc(k)}" ${String(k)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
-  $('#v').innerHTML = `<div class="card"><div class="row">
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row">
       ${sel('f_by','Group by',[['sm','Salesman'],['cu','Customer'],['it','Item'],['iv','Invoice'],['dt','Date'],['td','Cash / credit']],F.by)}
       ${sel('f_sm','Salesman',[['','All salesmen'],...sms.map(s=>[s,s])],F.sm)}
       ${sel('f_item','Item',[['','All items'],...its.map(i=>[i,iNm(i)])],F.item)}
@@ -1060,7 +1060,7 @@ async function vAnalysis(){
 }
 
 // ---------- LOADING & RETURN ----------
-async function vLoadRet(){
+async function vLoadRet(){ const __t = S.nav;
   loading(); const X = await rangeItems();
   const g = groupToggle([['sm','Salesman-wise'],['it','Item-wise'],['si','Salesman and item'],['dt','Date-wise']]);
   const key = { sm:x => x.d.salesman_id, it:x => x.item_id, si:x => x.d.salesman_id + '|' + x.item_id, dt:x => x.d.business_date }[S.grp];
@@ -1069,38 +1069,38 @@ async function vLoadRet(){
     .sort((a,b) => S.grp === 'it' ? a.io - b.io : S.grp === 'dt' ? (a.date < b.date ? -1 : 1) : a.sm.localeCompare(b.sm) || a.io - b.io);
   const cols = [...(S.grp === 'dt' ? [{k:'date',l:'Date'}] : []), ...(['sm','si'].includes(S.grp) ? [{k:'sm',l:'Salesman',left:1}] : []), ...(['it','si'].includes(S.grp) ? [{k:'item',l:'Item',left:1}] : []),
     ...K.map(k => ({ k, l:{load:'Load',sale:'Sale',grv:'GRV',good:'Good',damage:'Dmg',expiry:'Exp',waste:'Wst',foc:'FOC',total_return:'Total return',short:'Short',excess:'Excess'}[k], sum:1, cls:k==='short'||k==='excess'?(r=>r[k]?'bad':''):null }))];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows, { max:700 })}
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between">${g}${tools()}</div>${table(cols, rows, { max:700 })}
     <p class="muted" style="margin-top:8px">Packs for finished goods, pieces for raw egg. Totals mix both units when items are combined.</p></div>`;
   $('#grp').onchange = e => { S.grp = e.target.value; vLoadRet(); }; bindTools('Loading and return', [['Loading & return', cols, rows]]);
 }
 
 // ---------- VAN LOG ----------
-async function vVanLog(){
+async function vVanLog(){ const __t = S.nav;
   loading(); const days = await getDays();
   const rows = days.map(d => ({ ...d, sm:smNm(d.salesman_id), van:S.vans.find(v => v.id === d.van_id)?.van_no || '', km:d.end_km != null && d.start_km != null ? d.end_km - d.start_km : '' }))
     .sort((a,b) => a.business_date < b.business_date ? -1 : a.business_date > b.business_date ? 1 : a.sm.localeCompare(b.sm));
   const cols = [{k:'business_date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'van',l:'Van'},{l:'Status',k:'status'},{k:'start_km',l:'Start KM'},{k:'end_km',l:'End KM'},{k:'km',l:'KM run',sum:1},
     {l:'Load time',f:r=>(r.load_time||'').slice(0,5)},{k:'load_temp',l:'Load °C'},{l:'Unload time',f:r=>(r.unload_time||'').slice(0,5)},{k:'unload_temp',l:'Unload °C',cls:r=>num(r.unload_temp)>8?'bad':''},{k:'carton_small',l:'Ctn small',sum:1},{k:'carton_big',l:'Ctn big',sum:1}];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:flex-end">${tools()}</div>${table(cols, rows, { max:700 })}</div>`;
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:flex-end">${tools()}</div>${table(cols, rows, { max:700 })}</div>`;
   bindTools('Van log', [['Van log', cols, rows]]);
 }
 
 // ---------- COLLECTIONS ----------
-async function vCollections(){
+async function vCollections(){ const __t = S.nav;
   loading(); const days = await getDays(); const [C, cu] = await Promise.all([getColl(days), getCust()]); const dm = new Map(days.map(d => [d.id, d]));
   const rows = C.map(c => { const d = dm.get(c.van_day_id), k = cu.find(x => x.id === c.customer_id) || {}; return { ...c, date:d?.business_date, sm:smNm(d?.salesman_id), cust:k.name || '', code:k.itrade_code || '' }; })
     .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.sm.localeCompare(b.sm));
   const byMode = aggregate(rows, r => r.sm + '|' + r.mode, r => ({ sm:r.sm, mode:r.mode, n:0, amount:0 }), (o,r) => { o.n++; o.amount += num(r.amount); }).sort((a,b) => a.sm.localeCompare(b.sm));
   const c1 = [{k:'sm',l:'Salesman',left:1},{k:'mode',l:'Mode'},{k:'n',l:'Receipts',sum:1},{k:'amount',l:'Amount AED',money:1,sum:1}];
   const c2 = [{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'receipt_no',l:'Receipt'},{k:'invoice_no',l:'Invoice'},{k:'code',l:'Code'},{k:'cust',l:'Customer',left:1},{k:'mode',l:'Mode'},{k:'amount',l:'Amount AED',money:1,sum:1}];
-  $('#v').innerHTML = `<div class="kpis">${['CASH','CHEQUE','TRANSFER'].map(m => kpi(m.charAt(0)+m.slice(1).toLowerCase(), 'AED ' + money(rows.filter(r=>r.mode===m).reduce((a,r)=>a+num(r.amount),0)))).join('')}${kpi('Total','AED '+money(rows.reduce((a,r)=>a+num(r.amount),0)), rows.length+' receipts')}</div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">${['CASH','CHEQUE','TRANSFER'].map(m => kpi(m.charAt(0)+m.slice(1).toLowerCase(), 'AED ' + money(rows.filter(r=>r.mode===m).reduce((a,r)=>a+num(r.amount),0)))).join('')}${kpi('Total','AED '+money(rows.reduce((a,r)=>a+num(r.amount),0)), rows.length+' receipts')}</div>
     <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Salesman and mode</h3>${tools()}</div>${table(c1, byMode)}</div>
     <div class="card"><h3>Receipts</h3>${table(c2, rows, { max:600 })}</div>`;
   bindTools('Collections', [['By salesman', c1, byMode], ['Receipts', c2, rows]]);
 }
 
 // ---------- EXPENSES ----------
-async function vExpenses(){
+async function vExpenses(){ const __t = S.nav;
   loading(); const days = await getDays(); const [E, cu] = await Promise.all([getExp(days), getCust()]); const dm = new Map(days.map(d => [d.id, d]));
   const rows = E.map(e => { const d = dm.get(e.van_day_id); return { ...e, date:d?.business_date, sm:smNm(d?.salesman_id), cust:cu.find(x => x.id === e.customer_id)?.name || '' }; })
     .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.sm.localeCompare(b.sm));
@@ -1108,7 +1108,7 @@ async function vExpenses(){
   const piv = aggregate(rows, r => r.sm, r => ({ sm:r.sm, t:{} }), (o,r) => o.t[r.expense_type] = (o.t[r.expense_type] || 0) + num(r.amount)).sort((a,b) => a.sm.localeCompare(b.sm));
   const c1 = [{k:'sm',l:'Salesman',left:1}, ...types.map(t => ({ l:t.charAt(0)+t.slice(1).toLowerCase(), money:1, sum:1, f:r => num(r.t[t]) })), { l:'Total', money:1, sum:1, f:r => Object.values(r.t).reduce((a,v) => a + v, 0) }];
   const c2 = [{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'expense_type',l:'Type'},{k:'cust',l:'Customer',left:1},{k:'note',l:'Note',left:1},{k:'amount',l:'Amount AED',money:1,sum:1}];
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Salesman and type</h3>${tools()}</div>${table(c1, piv)}</div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Salesman and type</h3>${tools()}</div>${table(c1, piv)}</div>
     <div class="card"><h3>Expense lines</h3>${table(c2, rows, { max:600 })}</div>`;
   bindTools('Expenses', [['By salesman', c1, piv], ['Lines', c2, rows]]);
 }
@@ -1116,10 +1116,10 @@ async function vExpenses(){
 // ---------- PETTY CASH ----------
 const PT = [['RECEIPT','Receipt',1],['PAYMENT','Payment',-1],['FOOD ALLOWANCE','Food allowance',-1],['TRAVEL ALLOWANCE','Travel allowance',-1],['DEPOSIT','Bank deposit',-1],['SUSPENSE','Suspense given',-1],['SUSPENSE CLEARED','Suspense cleared',1]];
 const pdir = t => (PT.find(x => x[0] === t) || [0,0,-1])[2];
-async function vPetty(){
+async function vPetty(){ const __t = S.nav;
   loading();
   const { error:pe } = await sb.from('petty_cash').select('id').limit(1);
-  if (pe) { $('#v').innerHTML = `<div class="card"><div class="notice">Petty cash is not installed in the database yet. Run <b>docs/sql/PETTY CASH - CREATE.sql</b> in the Supabase SQL editor once, then reload this page.</div></div>`; return; }
+  if (pe) { if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="notice">Petty cash is not installed in the database yet. Run <b>docs/sql/PETTY CASH - CREATE.sql</b> in the Supabase SQL editor once, then reload this page.</div></div>`; return; }
   const [L, cs, sus] = await Promise.all([
     q(sb.from('petty_cash').select('*').eq('branch_id', S.br).eq('entry_date', S.date).order('line_no')),
     // opening and the vans' cash come from the daily cash sheet (same figures as Daily sheets → Cash sheet)
@@ -1136,7 +1136,7 @@ async function vPetty(){
   const draw = () => {
     const tin = lines.filter(l => pdir(l.line_type) > 0).reduce((a,l) => a + num(l.amount), 0), tout = lines.filter(l => pdir(l.line_type) < 0).reduce((a,l) => a + num(l.amount), 0);
     const oin = lines.reduce((a, l) => a + Math.max(0, eff(l)), 0), oout = -lines.reduce((a, l) => a + Math.min(0, eff(l)), 0), net = vans + oin - oout, susT = openSus.reduce((a, o) => a + o.amount, 0);
-    $('#v').innerHTML = `<div class="kpis">${kpi('From vans (net)', 'AED ' + money(vans), 'cash sales − returns − van payments')}${kpi('Office in', 'AED ' + money(oin), 'receipts')}${kpi('Office out', 'AED ' + money(oout), 'payments and bank deposits')}${kpi('Net cash for the day', 'AED ' + money(net), 'opening is entered by the accountant in the cash sheet' + (susT ? ' · suspense open ' + money(susT) : ''))}</div>
+    if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">${kpi('From vans (net)', 'AED ' + money(vans), 'cash sales − returns − van payments')}${kpi('Office in', 'AED ' + money(oin), 'receipts')}${kpi('Office out', 'AED ' + money(oout), 'payments and bank deposits')}${kpi('Net cash for the day', 'AED ' + money(net), 'opening is entered by the accountant in the cash sheet' + (susT ? ' · suspense open ' + money(susT) : ''))}</div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${tools(E ? '<button id="add">Add line</button><button class="p" id="sv">Save day</button>' : '')}</div>
       <div class="tw"><table><tr><th>#</th><th class="l">Type</th><th class="l">Ref</th><th class="l">Particulars</th><th class="l">Narration</th><th>For date</th><th>In</th><th>Out</th>${E ? '<th class="noprint"></th>' : ''}</tr>
         ${lines.map((l,i) => E ? `<tr data-i="${i}"><td>${i+1}</td><td class="l"><select data-k="line_type">${PT.map(([k,lb]) => `<option value="${k}" ${k===l.line_type?'selected':''}>${lb}</option>`).join('')}</select></td>
@@ -1159,16 +1159,16 @@ async function vPetty(){
 }
 
 // ---------- STAFF (admin) ----------
-async function vStaff(){
+async function vStaff(){ const __t = S.nav;
   // Users (like the old portal's Users page): add, edit, disable, set or reset the password.
   loading(); let list;
   try { list = await rpc('admin_user_list', {}); const erp = await q(sb.from('staff').select('id,erp_user,erp_warehouse')).catch(() => []); list.forEach(u => Object.assign(u, erp.find(x => x.id === u.id) || {})); }
-  catch (e) { $('#v').innerHTML = `<div class="card"><div class="notice">The Users page is not installed in the database yet. Run <b>docs/sql/USER ADMIN - CREATE.sql</b> in the Supabase SQL editor once.</div><p class="muted">${esc(e.message||e)}</p></div>`; return; }
+  catch (e) { if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="notice">The Users page is not installed in the database yet. Run <b>docs/sql/USER ADMIN - CREATE.sql</b> in the Supabase SQL editor once.</div><p class="muted">${esc(e.message||e)}</p></div>`; return; }
   const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
   const co = id => id == null ? 'Both' : (S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz');
   S.uq = S.uq || '';
   const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + (u.username||'') + ' ' + (u.itrade_name||'') + ' ' + (u.erp_user||'') + ' ' + (u.erp_warehouse||'')).toUpperCase().includes(S.uq.toUpperCase()));
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addu">Add user</button><label>Search<input id="uq" value="${esc(S.uq)}" placeholder="Name, role…"></label></div>${tools()}</div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addu">Add user</button><label>Search<input id="uq" value="${esc(S.uq)}" placeholder="Name, role…"></label></div>${tools()}</div>
     <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th>Company</th><th class="l">ERP user</th><th class="l">Sales Executive (ERP)</th><th class="l">Warehouse (ERP)</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
     ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(u.role)}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.erp_user||'')}</td><td class="l">${esc(u.itrade_name||'')}</td><td class="l">${esc(u.erp_warehouse||'')}</td>
       <td>${u.role === 'PACKER' ? '—' : u.has_login ? 'Yes' : '<span class="bad">No</span>'}</td><td>${u.last_sign_in ? esc(new Date(u.last_sign_in).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : ''}</td>
@@ -1215,7 +1215,7 @@ async function vStaff(){
 }
 
 // ---------- ITEMS & BOM (ADMIN) ----------
-async function vItems(){
+async function vItems(){ const __t = S.nav;
   loading();
   const [items, rec] = await Promise.all([q(sb.from('items').select('*').order('display_order', { nullsFirst:false })), q(sb.from('item_recipe').select('*').order('id'))]);
   const TY = { FG:'Finished goods', RAW_EGG:'Raw egg', MATERIAL:'Packing material' };
@@ -1224,7 +1224,7 @@ async function vItems(){
   const tabs = `<div class="rtabs" style="margin-bottom:12px"><button data-it="items" class="${S.itab==='items'?'on':''}">Item master</button><button data-it="bom" class="${S.itab==='bom'?'on':''}">BOM (recipe)</button></div>`;
   if (S.itab === 'items') {
     const shown = items.filter(i => (!S.ity || i.item_type === S.ity) && (!S.iq || [i.name, i.short_name, i.barcode, i.itrade_code].join(' ').toUpperCase().includes(S.iq.toUpperCase())));
-    $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addi">Add item</button>
+    if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addi">Add item</button>
       <label>Type<select id="ity"><option value="">All</option>${Object.entries(TY).map(([k,l]) => `<option value="${k}" ${k===S.ity?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Search<input id="iq" value="${esc(S.iq)}" placeholder="Name, code…"></label></div>${tools()}</div>
       <div class="tw"><table><tr><th>Order</th><th class="l">Barcode</th><th class="l">iTrade code</th><th class="l">Name</th><th class="l">Short name</th><th>Type</th><th>Pcs / pack</th><th>Packs / ctn</th><th>Pcs / ctn</th><th>Pcs / tray</th><th>Kind</th><th>Pcs / box</th><th>Cost</th><th>Segment</th><th>Active</th><th></th></tr>
@@ -1241,7 +1241,7 @@ async function vItems(){
     if (!fgs.some(f => f.id === S.ifg)) S.ifg = fgs[0]?.id;
     const fg = items.find(i => i.id === S.ifg) || {}, lines = rec.filter(r => r.fg_item_id === S.ifg);
     const rows = fgs.map(f => { const L = rec.filter(r => r.fg_item_id === f.id && r.active); return { f, n: L.length, raw: L.filter(r => items.find(i => i.id === r.raw_item_id)?.item_type === 'RAW_EGG').map(r => nm(r.raw_item_id)).join(', ') }; });
-    $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="align-items:flex-start;gap:20px">
+    if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="align-items:flex-start;gap:20px">
       <div style="flex:1;min-width:260px"><div class="tw" style="max-height:70vh"><table><tr><th class="l">Finished good</th><th>Lines</th><th class="l">Raw egg</th></tr>
         ${rows.map(r => `<tr data-fg="${r.f.id}" style="cursor:pointer;${r.f.id===S.ifg?'background:var(--soft)':''}"><td class="l">${esc(r.f.short_name||r.f.name)}</td><td class="${r.n?'':'bad'}">${r.n||'None'}</td><td class="l">${esc(r.raw)}</td></tr>`).join('')}</table></div></div>
       <div style="flex:1.4;min-width:320px"><h3 style="margin-top:0">${esc(fg.name||'')}</h3><p class="muted">Quantity per carton of ${fg.packs_per_carton||'?'} packs. Per pack is worked out automatically. Issue, unwrap and wastage in the warehouse use this.</p>
@@ -1295,13 +1295,13 @@ async function vItems(){
 }
 
 // ---------- ROLE ACCESS (ADMIN) ----------
-async function vAccess(){
+async function vAccess(){ const __t = S.nav;
   loading();
   const [M, A] = await Promise.all([sb.from('role_modules').select('*').order('sort'), sb.from('role_access').select('*')]);
-  if (M.error || A.error) { $('#v').innerHTML = `<div class="card"><div class="notice">Role access is not installed in the database yet. Run <b>docs/sql/ROLE ACCESS - CREATE.sql</b> in the Supabase SQL editor once (after PETTY CASH - CREATE.sql), then reload this page.</div></div>`; return; }
+  if (M.error || A.error) { if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="notice">Role access is not installed in the database yet. Run <b>docs/sql/ROLE ACCESS - CREATE.sql</b> in the Supabase SQL editor once (after PETTY CASH - CREATE.sql), then reload this page.</div></div>`; return; }
   const roles = ['ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
   const get = (r, m) => A.data.find(a => a.role === r && a.module === m) || { can_view:false, can_edit:false };
-  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Role access</h3><div class="row" style="margin:0"><button id="rs">Undo changes</button><button class="p" id="sv">Save access</button></div></div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Role access</h3><div class="row" style="margin:0"><button id="rs">Undo changes</button><button class="p" id="sv">Save access</button></div></div>
     <p class="muted" style="margin-bottom:12px">View = the page shows. Edit = can post or change (Edit includes View). ADMIN always has full access. Branch rules and "salesman sees only his own day" always apply. Every change is kept in the audit log.</p>
     <div class="tw"><table><tr><th class="l" rowspan="2">Page / action</th><th rowspan="2">ADMIN</th>${roles.map(r => `<th colspan="2">${r}</th>`).join('')}</tr>
       <tr>${roles.map(() => '<th>View</th><th>Edit</th>').join('')}</tr>
@@ -1321,13 +1321,13 @@ async function vAccess(){
 }
 
 // ---------- DATA CHECK ----------
-async function vCheck(){
+async function vCheck(){ const __t = S.nav;
   loading(); const [sales, days] = await Promise.all([getSales(), getDays()]);
   const noItem = aggregate(sales.filter(r => !r.item_id), r => r.item_code, r => ({ code:r.item_code, name:r.item_name, n:0 }), (o) => o.n++);
   const noSm = aggregate(sales.filter(r => !r.salesman_id), r => r.sales_executive || r.itrade_user || '(blank)', r => ({ who:r.sales_executive || r.itrade_user || '(blank)', n:0, net:0 }), (o,r) => { o.n++; o.net += num(r.net_incl_vat); });
   const noDay = aggregate(sales.filter(r => r.salesman_id && !r.van_day_id), r => r.tran_date + '|' + r.salesman_id, r => ({ date:r.tran_date, sm:smNm(r.salesman_id), inv:new Set() }), (o,r) => o.inv.add(r.invoice_no)).map(o => ({ ...o, n:o.inv.size }));
   const open = days.filter(d => d.status !== 'CLOSED' && d.business_date < today()).map(d => ({ date:d.business_date, sm:smNm(d.salesman_id), status:d.status }));
-  $('#v').innerHTML = `<div class="kpis">${kpi('Items not in master', noItem.length)}${kpi('Sales with no salesman', noSm.reduce((a,o)=>a+o.n,0) + ' lines')}${kpi('Sales with no van day', noDay.length)}${kpi('Van days not closed', open.length)}</div>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">${kpi('Items not in master', noItem.length)}${kpi('Sales with no salesman', noSm.reduce((a,o)=>a+o.n,0) + ' lines')}${kpi('Sales with no van day', noDay.length)}${kpi('Van days not closed', open.length)}</div>
     <div class="card"><h3>Item codes not in the item master</h3>${table([{k:'code',l:'iTrade code'},{k:'name',l:'Item name',left:1},{k:'n',l:'Lines',sum:1}], noItem, { empty:'All item codes are mapped.' })}</div>
     <div class="card"><h3>Sales not linked to a salesman (store sales and unknown names)</h3>${table([{k:'who',l:'iTrade user / sales executive',left:1},{k:'n',l:'Lines',sum:1},{k:'net',l:'AED',money:1,sum:1}], noSm, { empty:'None.' })}</div>
     <div class="card"><h3>Salesman sales with no van day (not loaded)</h3>${table([{k:'date',l:'Date'},{k:'sm',l:'Salesman',left:1},{k:'n',l:'Invoices',sum:1}], noDay, { empty:'None.' })}</div>
@@ -1337,11 +1337,11 @@ async function vCheck(){
 // ---------- OFFICE ENTRY ----------
 // Admin / accountant correct a salesman's loading, return, expenses, collections, requirement and deleted bills for a date.
 // Opens straight away for the chosen salesman and date (no pull); every save shows what changes first and is logged.
-async function vOffice(){
+async function vOffice(){ const __t = S.nav;
   const MODS = [['LOADING','Loading'],['RETURN','Return'],['EXPENSE','Expense'],['COLLECTION','Collection'],['REQUIREMENT','Requirement'],['DELETE','Delete bill']];
   S.om = S.om || 'LOADING';
   if (!S.customers.length) S.customers = await q(sb.from('customers').select('id,itrade_code,name').eq('active', true).order('name'));
-  $('#v').innerHTML = `<div class="card"><div class="row"><label>Salesman<select id="osm"><option value="">Select</option>${smOptions(S.osm)}</select></label>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row"><label>Salesman<select id="osm"><option value="">Select</option>${smOptions(S.osm)}</select></label>
       <span class="muted" style="align-self:end">Date ${S.date} — change it at the top</span></div>
     <div class="rtabs" style="margin:12px 0">${MODS.map(([k,l]) => `<button data-om="${k}" class="${S.om===k?'on':''}">${l}</button>`).join('')}</div><div id="og"></div></div>`;
   $('#osm').onchange = e => { S.osm = +e.target.value || null; fill(); };
@@ -1465,7 +1465,7 @@ async function vOffice(){
 
 // ---------- EMAIL REPORTS (admin) ----------
 // Who gets which scheduled email (sent by the "Mahrjan Mailer" Apps Script) and what was sent.
-async function vEmail(){
+async function vEmail(){ const __t = S.nav;
   loading();
   const REP = [['VAN_LOAD','Van load 11:00'],['SALES_QTY','Daily sales qty'],['DAMAGE','Sales & damage'],['GRV','GRV vs damage'],['VISIT','Visit status'],['HEALTH','Daily check'],
     ['VARIANCE','Weekly short & excess'],['FOC','Weekly FOC'],['EXPIRY','Weekly expiry'],['QTY_MTD','Monthly qty (MTD)'],['STOCK_COUNT','Weekly stock count'],['ALERTS','Report not sent'],['BACKUP','Backup']];
@@ -1476,7 +1476,7 @@ async function vEmail(){
     ${REP.map(([k]) => `<td><input type="checkbox" data-r="${k}" ${(r.reports||[]).includes(k)?'checked':''}></td>`).join('')}
     <td><input type="checkbox" data-k="active" ${r.active!==false?'checked':''}></td><td><button class="d" data-x="${i}">✕</button></td></tr>`;
   const draw = () => {
-    $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Who gets which email</h3><div class="row" style="margin:0"><button id="ead">Add person</button><button class="p" id="esv">Save</button></div></div>
+    if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Who gets which email</h3><div class="row" style="margin:0"><button id="ead">Add person</button><button class="p" id="esv">Save</button></div></div>
       <p class="muted">Tick the reports each person gets. "Both" = Al Quoz and Ajman. The emails are sent by the Mahrjan Mailer script in Google (see the cheat sheet).</p>
       <div class="tw"><table><tr><th class="l">Name</th><th class="l">Email</th><th>Company</th>${REP.map(([,l]) => `<th style="font-size:11px">${l}</th>`).join('')}<th>Active</th><th></th></tr>${R.map(row).join('') || ''}</table></div></div>
       <div class="card"><h3>Last emails</h3>${table([{l:'Sent at',f:x=>new Date(x.sent_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})},{k:'report',l:'Report'},{k:'period',l:'Period'},{k:'recipient',l:'To',left:1},{k:'status',l:'Status',cls:x=>x.status==='FAILED'?'bad':''},{k:'note',l:'Note',left:1}], L, { empty:'Nothing sent yet. The mailer is not set up or has not run.' })}</div>`;
@@ -1497,10 +1497,10 @@ async function vEmail(){
 }
 
 // ---------- REQUIREMENT ----------
-async function vRequirement(){
+async function vRequirement(){ const __t = S.nav;
   const isSm = S.me.role === 'SALESMAN';
   S.rsm = isSm ? S.me.id : S.rsm; S.rdate = S.rdate || today(1);
-  $('#v').innerHTML = `<div class="card"><h3>Requirement</h3><div class="row">
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><h3>Requirement</h3><div class="row">
     ${isSm ? '' : `<label>Salesman<select id="sm"><option value="">Select</option>${smOptions(S.rsm)}</select></label>`}
     <label>For date<input type="date" id="rd" value="${S.rdate}"></label></div><div id="g"></div></div>`;
   $('#sm') && ($('#sm').onchange = e => { S.rsm = +e.target.value || null; fill(); });
