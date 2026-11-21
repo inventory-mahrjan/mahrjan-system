@@ -59,7 +59,7 @@
     var m = M[unit]; if (m && Date.now() - m.at < 300000) return m;
     var c = await sb(), code = UNIT_CODE[unit] || 'MGAZ';
     var br = (await q(c.from('branches').select('*'))).filter(function (b) { return b.code === code; })[0]; if (!br) throw new Error('Company ' + unit + ' not found');
-    var res = await Promise.all([q(c.from('items').select('*').order('display_order')), q(c.from('staff').select('id,name,role,branch_id,itrade_name,active,can_login')),
+    var res = await Promise.all([q(c.from('items').select('*').order('display_order')), q(c.from('staff').select('id,name,role,branch_id,itrade_name,erp_user,erp_warehouse,active,can_login')),
       q(c.from('vans').select('*')), q(c.from('routes').select('*')), all(function () { return c.from('customers').select('id,itrade_code,name,branch_id,active').eq('branch_id', br.id); }),
       all(function () { return c.from('customer_assignment').select('customer_id,salesman_id,route_id').is('to_date', null); }), q(c.from('v_fg_bom').select('*'))]);
     m = { at: Date.now(), unit: unit, br: br, items: res[0], staff: res[1], vans: res[2], routes: res[3], customers: res[4], assign: res[5], bom: res[6] };
