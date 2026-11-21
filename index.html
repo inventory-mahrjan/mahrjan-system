@@ -1120,17 +1120,23 @@ async function vPetty(){
   loading();
   const { error:pe } = await sb.from('petty_cash').select('id').limit(1);
   if (pe) { $('#v').innerHTML = `<div class="card"><div class="notice">Petty cash is not installed in the database yet. Run <b>docs/sql/PETTY CASH - CREATE.sql</b> in the Supabase SQL editor once, then reload this page.</div></div>`; return; }
-  const [L, opening, sus] = await Promise.all([
+  const [L, cs, sus] = await Promise.all([
     q(sb.from('petty_cash').select('*').eq('branch_id', S.br).eq('entry_date', S.date).order('line_no')),
-    rpc('petty_opening', { p_branch:S.br, p_date:S.date }),
+    // opening and the vans' cash come from the daily cash sheet (same figures as Daily sheets → Cash sheet)
+    window.MJ_REPORTS.report(S.branches.find(b => b.id === S.br)?.code === 'MGT' ? 'AJMAN' : 'AL QUOZ', 'CASH SHEET', S.date, '').catch(() => null),
     fetchAll(() => sb.from('petty_cash').select('entry_date,line_type,party,ref,amount').eq('branch_id', S.br).in('line_type', ['SUSPENSE','SUSPENSE CLEARED']).lte('entry_date', S.date).order('entry_date'))]);
   const E = canE('pc');
+  // effect of office lines on the cash sheet closing: receipts in; payments, allowances and this day's bank deposits out (suspense only changes cash in hand)
+  const eff = l => { const t = l.line_type, a = num(l.amount); if (t === 'RECEIPT') return a; if (['PAYMENT','FOOD ALLOWANCE','TRAVEL ALLOWANCE'].includes(t)) return -a; if (t === 'DEPOSIT' && (!l.for_date || l.for_date === S.date)) return -a; return 0; };
+  const P = k => num(((cs && cs.position) || []).find(x => x[0] === k)?.[2]);
+  const opening = P('OPENING CASH BALANCE'), vans = P('CLOSING BALANCE') - opening - L.reduce((a, l) => a + eff(l), 0);
   let lines = L.map(l => ({ line_type:l.line_type, ref:l.ref || '', party:l.party, note:l.note || '', for_date:l.for_date || '', amount:num(l.amount) }));
   const openSus = aggregate(sus, r => r.party.trim().toUpperCase(), r => ({ party:r.party, given:'', amount:0 }), (o,r) => { if (r.line_type === 'SUSPENSE') { o.amount += num(r.amount); o.given = o.given || r.entry_date; } else o.amount -= num(r.amount); })
     .filter(o => r2(o.amount) > 0);
   const draw = () => {
     const tin = lines.filter(l => pdir(l.line_type) > 0).reduce((a,l) => a + num(l.amount), 0), tout = lines.filter(l => pdir(l.line_type) < 0).reduce((a,l) => a + num(l.amount), 0);
-    $('#v').innerHTML = `<div class="kpis">${kpi('Opening', 'AED ' + money(opening))}${kpi('Cash in', 'AED ' + money(tin))}${kpi('Cash out', 'AED ' + money(tout))}${kpi('Closing', 'AED ' + money(num(opening) + tin - tout))}</div>
+    const oin = lines.reduce((a, l) => a + Math.max(0, eff(l)), 0), oout = -lines.reduce((a, l) => a + Math.min(0, eff(l)), 0), close = opening + vans + oin - oout, susT = openSus.reduce((a, o) => a + o.amount, 0);
+    $('#v').innerHTML = `<div class="kpis">${kpi('Opening', 'AED ' + money(opening), 'from the cash sheet')}${kpi('From vans (net)', 'AED ' + money(vans), 'cash sales − returns − van payments')}${kpi('Office in / out', money(oin) + ' / ' + money(oout), 'receipts / payments and deposits')}${kpi('Closing', 'AED ' + money(close), 'cash in hand ' + money(close - susT) + (susT ? ' after suspense' : ''))}</div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${tools(E ? '<button id="add">Add line</button><button class="p" id="sv">Save day</button>' : '')}</div>
       <div class="tw"><table><tr><th>#</th><th class="l">Type</th><th class="l">Ref</th><th class="l">Particulars</th><th class="l">Narration</th><th>For date</th><th>In</th><th>Out</th>${E ? '<th class="noprint"></th>' : ''}</tr>
         ${lines.map((l,i) => E ? `<tr data-i="${i}"><td>${i+1}</td><td class="l"><select data-k="line_type">${PT.map(([k,lb]) => `<option value="${k}" ${k===l.line_type?'selected':''}>${lb}</option>`).join('')}</select></td>
