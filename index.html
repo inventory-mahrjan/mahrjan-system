@@ -210,7 +210,9 @@ async function boot(){
 }
 
 function tabsFor(){
-  const t = [], G = (g, ...x) => x.forEach(([k,l]) => { if (canV(k)) t.push([k,l,g]); });
+  // Loading, Return and Requirement are inside Office entry: shown separately only to users without Office entry
+  const inOE = ['load','ret','req'], hasOE = canV('oe');
+  const t = [], G = (g, ...x) => x.forEach(([k,l]) => { if (canV(k) && !(hasOE && inOE.includes(k))) t.push([k,l,g]); });
   G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
   G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['oe','Office entry'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
