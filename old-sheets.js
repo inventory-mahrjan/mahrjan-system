@@ -56,9 +56,9 @@ function cashXlsx_(d){
  const exp=r2(tot(5)+tot(6)+tot(7)),close=r2(C.opening+tot(1)-tot(3)+rec-pay-exp-C.dep),hand=r2(close-sus);
  [['OPENING CASH BALANCE',C.opening],['+ CASH SALES',tot(1),'B'+tr],['− CASH SALES RETURN',tot(3),'D'+tr],['+ CASH RECEIPTS',rec,'F'+tt],['− PAYMENTS',pay,'J'+tt],
   ['− EXPENSES',exp,'F'+tr+'+G'+tr+'+H'+tr],['− BANK DEPOSITS',C.dep],['CLOSING BALANCE',close,'J3+J4-J5+J6-J7-J8-J9',1],['− SUSPENSE OUTSTANDING',sus,'M'+tt],
-  ['CASH IN HAND',hand,'J10-J11',1],['SHORT/EXCESS',r2(-hand),'SUM(M3:M13)-J12',1]]
+  ['CASH IN HAND',hand,'J10-J11',1],['SHORT/EXCESS','','IF(COUNT(L3:L13)=0,"",SUM(M3:M13)-J12)',1]]
   .forEach((p,i)=>{set(3+i,9,p[0],p[3]?S.b:S.t);set(3+i,10,p[1],p[3]?S.bn:S.n,p[2]);});
- [0.25,0.5,1,5,10,20,50,100,200,500,1000].forEach((a,i)=>{set(3+i,11,a,S.t);set(3+i,12,'',S.q);set(3+i,13,0,S.n,'L'+(3+i)+'*K'+(3+i));});
+ [0.25,0.5,1,5,10,20,50,100,200,500,1000].forEach((a,i)=>{set(3+i,11,a,S.t);set(3+i,12,'',S.q);set(3+i,13,'',S.n,'IF(L'+(3+i)+'="","",L'+(3+i)+'*K'+(3+i)+')');});
  box(tb,1,6,'RECEIPTS',S.ti,1);box(tb,7,10,'PAYMENTS',S.ti,1);box(tb,11,13,'SUSPENSE',S.ti,1);
  set(tb+1,1,'REF',S.h);box(tb+1,2,5,'PARTICULARS',S.h,1);set(tb+1,6,'AMOUNT',S.h);
  set(tb+1,7,'REF',S.h);box(tb+1,8,9,'PARTICULARS',S.h,1);set(tb+1,10,'AMOUNT',S.h);
