@@ -11,8 +11,9 @@ begin
   for b in select id, code, case when code = 'MGT' then 'AJMAN' else 'AL QUOZ' end unit from public.branches where active order by case when code = 'MGT' then 2 else 1 end loop
     if rep = 'DAMAGE' then
       with sl as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,''))))) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled),
-      rate as (select item_id, sum(net) / nullif(sum(qty_base),0) r from public.sales_lines
-                where branch_id = b.id and tran_type = 'CR' and not cancelled and qty_base > 0 and tran_date between d - 13 and d group by item_id),
+      -- price of that day (net excl. VAT per pc/pack); if the item was not sold that day, the last 14 days' average (same as the old portal)
+      rate as (select item_id, coalesce(sum(net) filter (where tran_date = d) / nullif(sum(qty_base) filter (where tran_date = d),0), sum(net) / nullif(sum(qty_base),0)) r from public.sales_lines
+                where branch_id = b.id and tran_type = 'CR' and not cancelled and qty_base > 0 and tran_date between d - 14 and d group by item_id),
       rl as (select vd.salesman_id, r.item_id, sum(r.damage) dq, sum(r.waste) wq from public.return_lines r join public.van_day vd on vd.id = r.van_day_id
               where vd.branch_id = b.id and vd.business_date = d group by 1,2),
       men as (select own_sid salesman_id from sl where own_sid is not null union select salesman_id from public.van_day where branch_id = b.id and business_date = d),
