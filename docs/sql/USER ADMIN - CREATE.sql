@@ -8,6 +8,7 @@
 -- Revert: USER ADMIN - REVERT.sql
 -- =====================================================================
 alter table public.staff add column if not exists email text;
+-- me() must not depend on the number of staff columns: see FIX ME FUNCTION - CREATE.sql (run together)
 
 create or replace function public.admin_user_save(p_id bigint, p_name text, p_role text, p_branch bigint,
   p_itrade text, p_email text, p_active boolean, p_password text default null)
