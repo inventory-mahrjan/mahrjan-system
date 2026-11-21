@@ -93,7 +93,8 @@
   function units(cat, it) {
     if (cat === 'RAW') return [['qty_big', 'Ctn'], ['qty_tray', 'Tray'], ['qty_small', 'Pcs']];
     if (cat === 'FG') return [['qty_big', 'Box'], ['qty_small', 'Pkts']];
-    var b = it && it.ppb; return b ? [['qty_big', cat === 'LABEL' ? 'Roll' : 'Box'], ['qty_small', 'Pcs']] : [['qty_small', 'Pcs']];
+    if (cat === 'TRAY' || cat === 'LTRAY') return [['qty_big', 'Box'], ['qty_small', 'Pcs']];   // trays come in boxes
+    var b = it && it.ppb; return b ? [['qty_big', 'Roll'], ['qty_small', 'Pcs']] : [['qty_small', 'Pcs']];
   }
   function totalOf(cat, it, v) { var b = num(v.qty_big), t = num(v.qty_tray), s = num(v.qty_small);
     if (cat === 'RAW') return b * (it.pcc || 0) + t * (it.ppt || 0) + s;
@@ -129,6 +130,7 @@
     var f = C.found; if (!f) return;
     var lead = f.items[0], v = C.v || {}, tot = totalOf(f.cat, lead, v);
     if (!(tot > 0)) { C.msg = 'Enter the quantity.'; render(); return; }
+    if ((f.cat === 'TRAY' || f.cat === 'LTRAY') && num(v.qty_big) > 0 && !(lead.ppb > 0)) { C.msg = 'Pcs per box is not set for ' + nm(lead) + '. Count in pcs, or ask the office to fill it in Items & BOM.'; render(); return; }
     if (!C.shelf) { C.msg = 'Enter or scan the shelf ID first.'; render(); return; }
     if (num(v.qty_big) >= 100 && !confirm(num(v.qty_big) + ' ' + (f.cat === 'RAW' ? 'cartons' : 'boxes') + ' of ' + nm(lead) + ' — are you sure?')) return;
     if ((f.cat === 'RAW' || f.cat === 'FG') && !C.exp && !confirm('No expiry date entered. Add without expiry?')) return;
