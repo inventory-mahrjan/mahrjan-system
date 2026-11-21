@@ -94,7 +94,7 @@
     if (cat === 'RAW') return [['qty_big', 'Ctn'], ['qty_tray', 'Tray'], ['qty_small', 'Pcs']];
     if (cat === 'FG') return [['qty_big', 'Box'], ['qty_small', 'Pkts']];
     if (cat === 'TRAY' || cat === 'LTRAY') return [['qty_big', 'Box'], ['qty_small', 'Pcs']];   // trays come in boxes
-    var b = it && it.ppb; return b ? [['qty_big', 'Roll'], ['qty_small', 'Pcs']] : [['qty_small', 'Pcs']];
+    return [['qty_small', 'Pcs']];   // label roll: counted in pcs
   }
   function totalOf(cat, it, v) { var b = num(v.qty_big), t = num(v.qty_tray), s = num(v.qty_small);
     if (cat === 'RAW') return b * (it.pcc || 0) + t * (it.ppt || 0) + s;
