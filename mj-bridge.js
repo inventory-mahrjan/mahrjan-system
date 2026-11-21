@@ -107,7 +107,10 @@
     D.cols = {}; D.col.forEach(function (x) { var sm = smOfDay[x.van_day_id]; if (!sm) return; var cu = custById[x.customer_id] || {};
       (D.cols[sm] = D.cols[sm] || []).push({ tran: /^NA-/.test(x.receipt_no) ? '' : x.receipt_no, invoice: x.invoice_no || '', head: cu.itrade_code || '', customer: cu.name || '', mode: x.mode, amount: num(x.amount) }); });
     // sales: keyed by the salesman (or the iTrade user for store sales), as RAW SALES "User"
-    D.lines = D.sales.map(function (l) { var s = m.staffById[l.salesman_id]; return { user: s ? s.name : up(l.itrade_user || l.sales_executive), inv: String(l.invoice_no || '').trim(), type: String(l.tran_type || '').toUpperCase() === 'CR' ? 'CR' : 'SR',
+    D.lines = D.sales.map(function (l) { var s = m.staffById[l.salesman_id], iu = up(l.itrade_user);
+      // a bill made in the office (iTrade user is not the salesman) is a store sale, not the salesman's
+      if (s && iu && iu !== up(s.name) && iu !== up(s.itrade_name) && iu !== up(s.erp_user)) s = null;
+      return { user: s ? s.name : up(l.itrade_user || l.sales_executive), inv: String(l.invoice_no || '').trim(), type: String(l.tran_type || '').toUpperCase() === 'CR' ? 'CR' : 'SR',
       tender: String(l.tender_type || '').toUpperCase(), head: l.customer_code || '', cust: String(l.customer_name || '').replace(/\s+/g, ' ').trim(), invTotal: null, line: num(l.net_incl_vat),
       deleted: !!l.cancelled && l.cancel_reason === 'DELETE LIST', cancelled: !!l.cancelled, code: l.item_id && m.itemById[l.item_id] ? C(m.itemById[l.item_id]) : String(l.item_code || ''), name: l.item_name || '', qty: num(l.qty) }; });
     D.salesMap = {}; D.grv = {};
