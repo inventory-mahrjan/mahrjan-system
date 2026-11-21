@@ -6,7 +6,7 @@ window.__mkOldViews = function () {
 const escH=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const session={token:'sb',get role(){return (window.PortalSession||{}).role||'';},get unit(){return (window.PortalSession||{}).unit||'';}};
 const call=(fn,...a)=>window.MJ_REPORTS.call((window.PortalSession||{}).unit||'AL QUOZ',fn,a);
-const oldHost=()=>document.getElementById('oldv');
+const oldHost=()=>document.getElementById('oldv')||document.createElement('div');   /* page left before the report finished: draw into a detached box */
 window.SimplePrint=(file,title,sub,sections,signs)=>{const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const logo=(document.querySelector('img[src*="data:image"]')||{}).src||'';
    const w=window.open('','_blank');if(!w)return false;
    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(file)+'</title><style>@page{size:A4 '+(sections.some(s=>s.cols.length>9)?'landscape':'portrait')+';margin:10mm}body{font:10pt Arial,sans-serif;color:#000;margin:0}.top{display:flex;align-items:center;gap:5mm;border-bottom:2px solid #0d4a28;padding-bottom:2mm;margin-bottom:3mm}.top img{height:13mm;border-radius:1.5mm}.t{font:700 14pt Arial,sans-serif;color:#0d4a28}h3{font-size:11pt;margin:5mm 0 2mm;color:#0d4a28}table{width:100%;border-collapse:collapse}th,td{padding:1.1mm 1.5mm;border-bottom:1px solid #c9cfcb;text-align:left}th{background:#e7efe9;border-top:1px solid #000;border-bottom:1px solid #000}.r{text-align:right}.b td{font-weight:700;border-top:1px solid #000}tr{break-inside:avoid}.bad{color:#b0432e;font-weight:700}</style></head><body>'
