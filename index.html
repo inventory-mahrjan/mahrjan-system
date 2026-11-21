@@ -1221,7 +1221,7 @@ async function vItems(){ const __t = S.nav;
   const TY = { FG:'Finished goods', RAW_EGG:'Raw egg', MATERIAL:'Packing material' };
   S.itab = S.itab || 'items'; S.ity = S.ity ?? ''; S.iq = S.iq || '';
   const nm = id => { const i = items.find(x => x.id === id); return i ? (i.short_name || i.name) : '#' + id; };
-  const tabs = `<div class="rtabs" style="margin-bottom:12px"><button data-it="items" class="${S.itab==='items'?'on':''}">Item master</button><button data-it="bom" class="${S.itab==='bom'?'on':''}">BOM (recipe)</button></div>`;
+  const tabs = `<div class="rtabs" style="margin-bottom:12px"><button data-it="items" class="${S.itab==='items'?'on':''}">Item master</button><button data-it="bom" class="${S.itab==='bom'?'on':''}">BOM (recipe)</button><button data-it="cty" class="${S.itab==='cty'?'on':''}">Countries</button></div>`;
   if (S.itab === 'items') {
     const shown = items.filter(i => (!S.ity || i.item_type === S.ity) && (!S.iq || [i.name, i.short_name, i.barcode, i.itrade_code].join(' ').toUpperCase().includes(S.iq.toUpperCase())));
     if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addi">Add item</button>
@@ -1236,6 +1236,16 @@ async function vItems(){ const __t = S.nav;
     $('#addi').onclick = () => itemDialog(null);
     $('#v').querySelectorAll('[data-ei]').forEach(b => b.onclick = () => itemDialog(items.find(i => i.id === +b.dataset.ei)));
     bindTools('Item master', [['Items', [{k:'display_order',l:'Order'},{k:'barcode',l:'Barcode'},{k:'itrade_code',l:'iTrade code'},{k:'name',l:'Name'},{k:'short_name',l:'Short name'},{l:'Type',f:i=>TY[i.item_type]},{k:'pcs_per_pack',l:'Pcs/pack'},{k:'packs_per_carton',l:'Packs/ctn'},{k:'pcs_per_carton',l:'Pcs/ctn'},{k:'pcs_per_tray',l:'Pcs/tray'},{k:'segment',l:'Segment'},{l:'Active',f:i=>i.active?'Yes':'No'}], shown]]);
+  } else if (S.itab === 'cty') {
+    // country of origin list for the stock count (the app offers only these)
+    const L = await q(sb.from('sc_countries').select('*').order('sort_order').order('name'));
+    $('#v').innerHTML = `<div class="card">${tabs}<p class="muted">Country of origin choices in the stock count app. Untick to hide a country; the app picks up changes next time a batch is opened online.</p>
+      <div class="row"><input id="cnew" placeholder="New country" style="width:200px"><button class="p" id="cadd">Add</button></div>
+      <div class="tw" style="max-width:520px"><table><tr><th class="l">Country</th><th>Order</th><th>Active</th></tr>${L.map(c => `<tr><td class="l">${esc(c.name)}</td><td><input type="number" data-o="${esc(c.name)}" value="${c.sort_order}" style="width:70px"></td><td><input type="checkbox" data-a="${esc(c.name)}" ${c.active?'checked':''}></td></tr>`).join('')}</table></div></div>`;
+    $('#cadd').onclick = async () => { const n = $('#cnew').value.trim().toUpperCase().replace(/\s+/g, ' '); if (!n) return;
+      try { await q(sb.from('sc_countries').insert({ name:n, sort_order:(L.reduce((a,c) => Math.max(a, c.sort_order), 0) || 0) + 1 })); toast('Added ' + n); vItems(); } catch (e) { toast(e.message, false); } };
+    $('#v').querySelectorAll('[data-a]').forEach(c => c.onchange = async () => { try { await q(sb.from('sc_countries').update({ active:c.checked }).eq('name', c.dataset.a)); toast('Saved'); } catch (e) { toast(e.message, false); } });
+    $('#v').querySelectorAll('[data-o]').forEach(c => c.onchange = async () => { try { await q(sb.from('sc_countries').update({ sort_order:+c.value||100 }).eq('name', c.dataset.o)); toast('Saved'); } catch (e) { toast(e.message, false); } });
   } else {
     const fgs = items.filter(i => i.item_type === 'FG'), parts = items.filter(i => i.item_type !== 'FG' && i.active);
     if (!fgs.some(f => f.id === S.ifg)) S.ifg = fgs[0]?.id;

@@ -140,7 +140,6 @@
         total_qty: t, unit: f.cat === 'FG' ? 'PACKS' : 'PCS', exp_date: (f.cat === 'RAW' || f.cat === 'FG') ? (C.exp || null) : null,
         country: f.cat === 'TRAY' ? null : (C.country || '').toUpperCase() || null, pair_key: pair, zero_confirmed: false, scanned_at: at });
     });
-    if (C.country && D.countries.indexOf(C.country.toUpperCase()) < 0) D.countries.push(C.country.toUpperCase());
     store(V.id, D); C.found = null; C.v = {}; C.msg = '✓ Added ' + f.items.map(nm).join(' + ') + ' · ' + tot; render(); setTimeout(focusScan, 30);
   }
   function undo(no) { var l = D.lines.find(function (x) { return x.entry_no === no; }); if (!l) return;
@@ -162,7 +161,7 @@
         + '<div class="q" style="margin-top:8px">' + u.map(function (x) { return '<label>' + x[1] + '<input type="number" inputmode="decimal" min="0" value="' + esc(v[x[0]] || '') + '" oninput="MJSC.q(\'' + x[0] + '\',this.value)"></label>'; }).join('') + '</div>'
         + '<div class="tot" id="mjscTot">= ' + totalOf(f.cat, lead, v) + ' ' + (f.cat === 'FG' ? 'packs' : 'pcs') + '</div>';
       if (f.cat === 'RAW' || f.cat === 'FG') h += '<div class="lbl">EXPIRY DATE</div><input type="date" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)">';
-      if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><input list="mjscCty" value="' + esc(C.country || '') + '" placeholder="Type — suggestions appear" oninput="MJSC.cty(this.value)"><datalist id="mjscCty">' + D.countries.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</datalist>';
+      if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
       h += '<button class="big" onclick="MJSC.add()">Add entry</button></div>';
     }
     var last = D.lines.slice().sort(function (x, y) { return y.entry_no - x.entry_no; }).slice(0, 5);
