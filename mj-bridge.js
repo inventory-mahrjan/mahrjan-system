@@ -149,7 +149,7 @@
     return o; }
   async function loadingSheet_(o, m, D, sm, reqs) {
     if (!sm) { o.add(['Choose a salesman in E2']); return; }
-    var info = man_(m, D, sm), items = readItems(m), board = D.boards[sm] || {}, rets = D.rets[sm] || {}, sale = {}, grv = {}, names = {};
+    var info = man_(m, D, sm), items = readItems(m), board = Object.assign({}, D.boards[sm] || {}), rets = D.rets[sm] || {}, sale = {}, grv = {}, names = {};
     D.lines.forEach(function (l) { if (l.cancelled || up(l.user) !== up(sm)) return; if (l.qty >= 0) sale[l.code] = (sale[l.code] || 0) + l.qty; else grv[l.code] = (grv[l.code] || 0) - l.qty; names[l.code] = l.name; });
     var req = {}; var R = reqs[sm] || {}; items.forEach(function (it) { if (it.shortName && R[it.shortName]) req[it.code] = R[it.shortName]; });
     var t = D.temps[sm] || {}, tt = { lt: t.load ? t.load.time : '', lp: t.load ? t.load.temp : '', ut: t.unload ? t.unload.time : '', up: t.unload ? t.unload.temp : '' };
@@ -162,6 +162,8 @@
     var rawSet = {}; items.forEach(function (i) { if (i.type === 'RAW') rawSet[i.code] = 1; });
     var codes = items.filter(function (i) { return !rawSet[i.code]; }).map(function (i) { return i.code; });
     [board, sale, grv, rets, req].forEach(function (mm) { Object.keys(mm).forEach(function (c) { if (!rawSet[c] && codes.indexOf(c) < 0) codes.push(c); }); });
+    /* raw egg sold by the salesman (billed from the store): listed at the end with LOAD = SALE, like the old sheet */
+    Object.keys(sale).forEach(function (c) { if (rawSet[c] && sale[c]) { codes.push(c); if (!board[c]) board[c] = sale[c]; } });
     var T = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], sl = 0;
     codes.forEach(function (c) { var it = items.filter(function (i) { return i.code === c; })[0], r = rets[c] || { good: 0, dmg: 0, exp: 0, wst: 0, foc: 0 };
       var v = [req[c] || 0, board[c] || 0, sale[c] || 0, grv[c] || 0, r.good, r.dmg, r.exp, r.wst || 0, r.foc], moved = v.some(function (x) { return x; }), active = it && String(it.status || '').toUpperCase() !== 'INACTIVE';
