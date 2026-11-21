@@ -213,7 +213,10 @@ function visitHtml_(D, units, per, dateIso) {
   var status = function (x) { if (x.days == null || x.days > 30) return '<td style="background:#fbe3e0;color:' + C_.red + '">Not visited 30+ days</td>'; if (x.days >= 15) return '<td style="color:' + C_.red + '">15-30 days</td>';
     if (x.days >= 7) return '<td style="color:' + C_.amber + '">8-14 days</td>'; return '<td style="color:' + C_.green + '">Visited this week</td>'; };
   var pages = men.slice().sort(function (a, b) { var sa = S.filter(function (s) { return s.name === a.name; })[0], sb = S.filter(function (s) { return s.name === b.name; })[0]; return sb.served - sa.served || a.name.localeCompare(b.name); })
-    .map(function (m) { return '<div class="pg">' + head_('SALESMAN VISIT STATUS - ' + m.name, '', 'Report Date: ' + per) + '<table class="t"><tr>'
+    .map(function (m, mi) {
+      // one salesman = one page: rows shrink to fit A4 (up to about 60 customers)
+      var n = m.customers.length, fs = n > 50 ? 9.5 : n > 40 ? 10.5 : n > 32 ? 11.5 : 12.5, pd = n > 50 ? 1 : n > 40 ? 1.8 : n > 32 ? 2.6 : 4.5, k = 'v' + mi;
+      return '<style>.' + k + ' td,.' + k + ' th{font-size:' + fs + 'px;padding-top:' + pd + 'px;padding-bottom:' + pd + 'px}</style><div class="pg" style="page-break-inside:avoid">' + head_('SALESMAN VISIT STATUS - ' + m.name, '', 'Report Date: ' + per) + '<table class="t ' + k + '"><tr>'
       + ['Sl<br>No','Head No','Customer Name','Last Visit<br>Date','Visit Since<br>(Days)','Visit Status','No. of Visits<br>(Last 30 Days)','Tender<br>Type'].map(function (h, i) { return '<th' + (i === 2 ? ' class="l"' : '') + '>' + h + '</th>'; }).join('') + '</tr>'
       + m.customers.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc_(x.head || '') + '</td><td class="l">' + esc_(x.name) + '</td><td>' + nd(x.last) + '</td><td>' + (x.days == null ? '—' : x.days) + '</td>' + status(x) + '<td>' + (x.visits || 0) + '</td><td>' + esc_(x.tender || '') + '</td></tr>'; }).join('')
       + '</table></div>'; }).join('');
