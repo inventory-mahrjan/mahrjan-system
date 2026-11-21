@@ -80,7 +80,8 @@
   .card>.muted:first-of-type{margin-top:-10px}
   footer{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding-top:8px}
   .notice{font-size:13px;color:#5f5233;background:#faf6ea;border:1px solid #efe5c8;border-radius:8px;padding:10px 14px;line-height:1.5}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px} @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .dbars{display:flex;align-items:flex-end;gap:4px;height:210px;padding-top:18px} .dbars>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0} .dbars i{display:block;width:70%;background:#0f5f57;border-radius:3px 3px 0 0} .dbars i.z{background:#d8dad5} .dbars em{font-style:normal;font-size:9px;color:#6b7370;white-space:nowrap} .dbars b{font-size:10px;color:#6b7370;font-weight:500;margin-top:4px}
   .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
   .kpi span{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.kpi b{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}.kpi small{color:var(--muted);font-size:12px}
   .sheet-head{display:flex;justify-content:space-between;border-bottom:2px solid var(--accent-ink);padding-bottom:6px;margin-bottom:8px;font-size:14px}
@@ -828,15 +829,19 @@ const ord = id => item(id).display_order || 0;
 const r2 = v => +num(v).toFixed(2);
 const nz = v => num(v) ? r2(v) : '';
 async function fetchAll(mk){ const out = []; for (let i = 0; ; i += 1000) { const d = await q(mk().range(i, i + 999)); out.push(...d); if (d.length < 1000) break; } return out; }
-async function byIds(table, cols, key, ids){ const out = []; for (let i = 0; i < ids.length; i += 150) { const part = ids.slice(i, i + 150); out.push(...await fetchAll(() => sb.from(table).select(cols).in(key, part))); } return out; }
+async function byIds(table, cols, key, ids){ const parts = []; for (let i = 0; i < ids.length; i += 150) parts.push(ids.slice(i, i + 150)); return (await Promise.all(parts.map(part => fetchAll(() => sb.from(table).select(cols).in(key, part))))).flat(); }
+// one query per day, 8 at a time (much faster than paging a long range one page after another)
+async function perDay(from, to, mk){ const ds = []; for (let d = from; d <= to; d = addDays(d, 1)) ds.push(d); const out = new Array(ds.length); let k = 0;
+  await Promise.all(Array.from({ length: Math.min(8, ds.length) }, async () => { while (k < ds.length) { const i = k++; out[i] = await fetchAll(() => mk(ds[i])); } })); return out.flat(); }
 const RC = {};   // small cache for one page visit
-async function cached(k, f){ if (!RC[k]) RC[k] = f().catch(e => { delete RC[k]; throw e; }); return RC[k]; }
-const clearCache = () => Object.keys(RC).forEach(k => delete RC[k]);
+async function cached(k, f){ if (!RC[k]) { RC[k] = f().catch(e => { delete RC[k]; throw e; }); RC[k].t = Date.now(); } return RC[k]; }
+// keep loaded data for 2 minutes so moving between pages is instant; changing dates or company loads fresh
+const clearCache = () => Object.keys(RC).forEach(k => { if (Date.now() - RC[k].t > 120000) delete RC[k]; });
 const rk = () => S.brs.join(',') + '|' + S.from + '|' + S.date;
 const getDays = () => cached('d' + rk(), () => fetchAll(() => sb.from('van_day').select('*').in('branch_id', S.brs).gte('business_date', S.from).lte('business_date', S.date).order('business_date')));
-const getSales = () => cached('s' + rk(), () => fetchAll(() => sb.from('sales_lines')
+const getSales = () => cached('s' + rk(), () => perDay(S.from, S.date, d => sb.from('sales_lines')
   .select('tran_date,invoice_no,line_no,tran_type,tender_type,sales_executive,itrade_user,salesman_id,customer_code,customer_name,customer_id,item_code,item_name,item_id,qty_base,gross,disc,net,vat,net_incl_vat,profit,van_day_id')
-  .in('branch_id', S.brs).eq('cancelled', false).gte('tran_date', S.from).lte('tran_date', S.date).order('id')));
+  .in('branch_id', S.brs).eq('cancelled', false).eq('tran_date', d).order('id')));
 const getItems = days => cached('i' + rk(), () => byIds('v_van_day_items', '*', 'van_day_id', days.map(d => d.id)));
 const getCash  = days => cached('c' + rk(), () => byIds('v_van_day_cash', '*', 'van_day_id', days.map(d => d.id)));
 const getColl  = days => cached('o' + rk(), () => byIds('collections', '*', 'van_day_id', days.map(d => d.id)));
@@ -878,8 +883,10 @@ async function vOverview(){
   const cr = sales.filter(r => r.tran_type === 'CR'), rt = sales.filter(r => r.tran_type !== 'CR');
   const sum = (a, k) => a.reduce((x, r) => x + num(r[k]), 0);
   const byDay = aggregate(sales, r => r.tran_date, r => ({ d:r.tran_date, net:0 }), (o,r) => o.net += num(r.net_incl_vat)).sort((a,b) => a.d < b.d ? -1 : 1);
-  const mx = Math.max(1, ...byDay.map(d => d.net)), W = Math.max(byDay.length * 34, 300);
-  const chart = byDay.length ? `<svg viewBox="0 0 ${W} 200" style="width:100%;max-width:${W}px;height:200px">${byDay.map((d,i) => { const h = Math.max(0, d.net) / mx * 150;
+  const all = []; for (let d = S.from; d <= S.date; d = addDays(d, 1)) all.push(byDay.find(x => x.d === d) || { d, net:0 });
+  const mx = Math.max(1, ...all.map(d => d.net)), kf = v => v >= 1000 ? Math.round(v / 1000) + 'k' : v ? Math.round(v) : '';
+  const chart = byDay.length ? `<div class="dbars">${all.map(d => { const h = Math.max(0, d.net) / mx * 100;
+      return `<div title="${d.d}: AED ${money(d.net)}"><em>${kf(d.net)}</em><i class="${d.net ? '' : 'z'}" style="height:${d.net ? Math.max(h, 1) : 1}%"></i><b>${d.d.slice(8)}</b></div>`; }).join('')}</div>` : '<p class="muted">No sales imported for this period.</p>';
       return `<g><rect x="${i*34+6}" y="${170-h}" width="22" height="${h}" fill="#0f5f57" rx="3"><title>${d.d}: AED ${money(d.net)}</title></rect><text x="${i*34+17}" y="188" font-size="10" text-anchor="middle" fill="#6b7370">${d.d.slice(8)}</text></g>`; }).join('')}</svg>` : '<p class="muted">No sales imported for this period.</p>';
   const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); o.inv.add(r.invoice_no); if (r.tran_type === 'CR') o.cust.add(r.customer_code); })
     .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size })).sort((a,b) => b.net - a.net);
