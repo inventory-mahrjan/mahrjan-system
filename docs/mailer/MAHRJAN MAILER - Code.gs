@@ -19,13 +19,15 @@
  *   Sunday 03:20     VARIANCE, FOC, EXPIRY (last Sunday–Saturday)
  *   1st/11th/21st    QTY_MTD    monthly sales qty
  *   07:45            ALERTS     a report that should have gone did not
+ *   09:00 / 21:00    STOCK_COUNT a WEEKLY stock count batch that was posted → its count report (once per batch)
+ *   02:30            BACKUP     every table saved as one .zip in Google Drive folder "Mahrjan Backup" (kept 30 days)
  * Each report is sent once per day/period (email_log). A failed send is retried on the next timer.
  * ===================================================================== */
 var SB_URL = 'https://xhndwjkqfqmmpfcglqzu.supabase.co';
 var SB_KEY = 'sb_publishable_emOqI1PWaSA7B5s56v-ERg_RrxZ9weu';   // public key; the data is protected by the login
 var TZ = 'Asia/Dubai';
 var TITLES = { VAN_LOAD: 'VAN LOAD & BOARDED QTY', SALES_QTY: 'DAILY SALES QTY', DAMAGE: 'SALESMAN WISE SALES & DAMAGE', GRV: 'GRV VS DAMAGE / WASTE / EXPIRY',
-  VISIT: 'CUSTOMER VISIT STATUS', HEALTH: 'MAHRJAN DAILY CHECK', VARIANCE: 'WEEKLY SHORT & EXCESS', FOC: 'WEEKLY FOC', EXPIRY: 'WEEKLY EXPIRY', QTY_MTD: 'MONTHLY SALES QTY (MTD)' };
+  VISIT: 'CUSTOMER VISIT STATUS', HEALTH: 'MAHRJAN DAILY CHECK', VARIANCE: 'WEEKLY SHORT & EXCESS', FOC: 'WEEKLY FOC', EXPIRY: 'WEEKLY EXPIRY', QTY_MTD: 'MONTHLY SALES QTY (MTD)', STOCK_COUNT: 'WEEKLY STOCK COUNT' };
 
 // ---------- Supabase ----------
 function token_() {
@@ -43,6 +45,13 @@ function rpc_(fn, args) {
   if (r.getResponseCode() >= 300) throw new Error(fn + ': ' + r.getContentText().slice(0, 300));
   var t = r.getContentText(); return t ? JSON.parse(t) : null;
 }
+// read a table (all rows, 1000 at a time); q = PostgREST filter, e.g. 'status=eq.POSTED'
+function rest_(table, q, cols) { var out = [], i = 0;
+  while (true) { var r = UrlFetchApp.fetch(SB_URL + '/rest/v1/' + table + '?select=' + encodeURIComponent(cols || '*') + (q ? '&' + q : '') + '&order=' + (table === 'sc_system' || table === 'role_access' ? 'batch_id' : 'id') + '&limit=1000&offset=' + i,
+      { muteHttpExceptions: true, headers: { apikey: SB_KEY, Authorization: 'Bearer ' + token_() } });
+    if (r.getResponseCode() >= 300) { var r2 = UrlFetchApp.fetch(SB_URL + '/rest/v1/' + table + '?select=' + encodeURIComponent(cols || '*') + (q ? '&' + q : '') + '&limit=1000&offset=' + i, { muteHttpExceptions: true, headers: { apikey: SB_KEY, Authorization: 'Bearer ' + token_() } });
+      if (r2.getResponseCode() >= 300) throw new Error(table + ': ' + r2.getContentText().slice(0, 200)); r = r2; }
+    var d = JSON.parse(r.getContentText()); out = out.concat(d); if (d.length < 1000) return out; i += 1000; } }
 function log_(rep, period, to, status, note) { try { rpc_('mail_log', { p_report: rep, p_period: period, p_recipient: to || null, p_status: status, p_note: note || null }); } catch (e) { Logger.log('log failed: ' + e.message); } }
 
 // ---------- dates ----------
@@ -143,11 +152,57 @@ function jobMorningCheck() {   // 07:45: anything that should have gone and did 
     MailApp.sendEmail({ to: x.email, name: 'Mahrjan Sales Portal', subject: 'Mahrjan: report not sent',
       htmlBody: '<div style="font-family:Arial,sans-serif;font-size:13px">Not sent (or no recipients ticked):<br>• ' + out.map(esc_).join('<br>• ') + '<br><br>To send now: Mahrjan Mailer → run sendNow.</div>' }); });
 }
+// ---------- weekly stock count: emailed once when a WEEKLY batch is posted ----------
+function jobStockCount() {
+  var since = new Date(Date.now() - 8 * 864e5).toISOString();
+  var B = rest_('sc_batches', 'status=eq.POSTED&count_type=eq.WEEKLY&posted_at=gte.' + since), done = 0;
+  if (!B.length) return;
+  var br = {}; rest_('branches', '', 'id,name').forEach(function (b) { br[b.id] = b.name; });
+  var it = {}; rest_('items', '', 'id,name,short_name,itrade_code,unit_cost,display_order').forEach(function (x) { it[x.id] = x; });
+  B.forEach(function (b) { try {
+    if (rpc_('mail_sent', { p_report: 'STOCK_COUNT', p_period: b.batch_no })) return;
+    var L = rest_('sc_lines', 'batch_id=eq.' + b.id), Sy = {}; try { rest_('sc_system', 'batch_id=eq.' + b.id).forEach(function (x) { Sy[x.item_id] = Number(x.qty); }); } catch (e) {}
+    var CAT = { RAW: 'Raw egg', FG: 'Finished goods', TRAY: 'Plain tray', LTRAY: 'Labelled tray', LABEL: 'Label roll' }, by = {};
+    L.forEach(function (l) { var k = l.item_id + '|' + l.category, o = by[k] = by[k] || { id: l.item_id, cat: l.category, fresh: 0, other: 0, dmg: 0, tot: 0 }, q = Number(l.total_qty) || 0;
+      if (l.stock_type === 'DAMAGE') o.dmg += q; else if (l.stock_type === 'GRV' || l.stock_type === 'CLEANED') o.other += q; else o.fresh += q; o.tot += q; });
+    var hasSys = Object.keys(Sy).length > 0, rows = [], val = 0, sh = 0, ex = 0;
+    Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, c) { return (a.cat < c.cat ? -1 : a.cat > c.cat ? 1 : 0) || ((it[a.id] || {}).display_order || 0) - ((it[c.id] || {}).display_order || 0); }).forEach(function (o) {
+      var x = it[o.id] || {}, sys = Sy[o.id], dif = hasSys && sys != null ? Math.round((o.tot - sys) * 100) / 100 : '', v = dif === '' ? '' : Math.round(dif * (Number(x.unit_cost) || 0) * 100) / 100;
+      if (v !== '') val += v; if (dif !== '' && dif < 0) sh += -dif; if (dif !== '' && dif > 0) ex += dif;
+      rows.push([CAT[o.cat] || o.cat, x.short_name || x.name || ('#' + o.id), o.fresh, o.other, o.dmg, o.tot].concat(hasSys ? [sys == null ? '' : sys, dif, v] : [])); });
+    var D = { summary: {}, units: [{ branch_id: b.branch_id, unit: br[b.branch_id] || '', note: hasSys ? '' : 'iTrade stock not uploaded for this batch yet — differences not shown.',
+      sections: [{ heading: 'Batch ' + b.batch_no + ' · counted ' + b.count_date + ' · ' + L.length + ' entries', num_from: 2,
+        columns: ['Category', 'Item', 'Fresh', 'GRV / Cleaned', 'Damage', 'Counted'].concat(hasSys ? ['iTrade', 'Difference', 'Difference AED'] : []), rows: rows,
+        total: hasSys ? ['Total', '', '', '', '', '', '', '', Math.round(val * 100) / 100] : null }] }] };
+    var rc = (rpc_('mail_recipients', { p_report: 'STOCK_COUNT' }) || []).filter(function (x) { return !x.branch_id || String(x.branch_id) === String(b.branch_id); });
+    if (!rc.length) { Logger.log('STOCK_COUNT ' + b.batch_no + ': nobody ticked'); return; }
+    var title = TITLES.STOCK_COUNT, per = nice_(b.count_date), html = html_(D, D.units, title, per), pdf = Utilities.newBlob(html, 'text/html', 'r.html').getAs('application/pdf').setName('STOCK COUNT_' + b.batch_no + '.pdf');
+    var sum = rows.length + ' items' + (hasSys ? ' · short ' + fmt_(sh) + ' · excess ' + fmt_(ex) + ' · AED ' + (Math.round(val * 100) / 100).toFixed(2) : '');
+    rc.forEach(function (x) { try { MailApp.sendEmail({ to: x.email, name: 'Mahrjan Sales Portal', subject: 'Mahrjan weekly stock count ' + per + ' · ' + (br[b.branch_id] || '') + ' · ' + sum,
+        htmlBody: '<div style="font-family:Arial,sans-serif;font-size:13px">Dear ' + esc_(x.name) + ',<br><br>Please find attached the weekly stock count <b>' + esc_(b.batch_no) + '</b> (' + esc_(br[b.branch_id] || '') + ', ' + esc_(per) + ').<br>' + esc_(sum) + '.<br><br>Mahrjan Sales Portal</div>', attachments: [pdf] });
+        log_('STOCK_COUNT', b.batch_no, x.email, 'SENT'); done++; } catch (e) { log_('STOCK_COUNT', b.batch_no, x.email, 'FAILED', e.message); } });
+  } catch (e) { Logger.log('stock count ' + b.batch_no + ': ' + e.message); log_('STOCK_COUNT', b.batch_no, null, 'FAILED', e.message); } });
+  Logger.log('stock count emails sent: ' + done);
+}
+
+// ---------- daily backup to Google Drive (the free database plan has no backups) ----------
+var BACKUP_TABLES = ['branches','routes','vans','staff','customers','customer_assignment','items','item_recipe','van_day','loading_lines','return_lines','expenses','collections',
+  'requirement_lines','sales_lines','sales_deletes','petty_cash','day_close_items','wh_batches','wh_lines','sc_batches','sc_lines','sc_system','office_log','email_recipients','role_access'];
+function jobBackup() {
+  var day = day_(0), blobs = [], miss = [];
+  BACKUP_TABLES.forEach(function (t) { try { blobs.push(Utilities.newBlob(JSON.stringify(rest_(t, '')), 'application/json', t + '.json')); } catch (e) { miss.push(t); Logger.log('backup ' + t + ': ' + e.message); } });
+  var it = DriveApp.getFoldersByName('Mahrjan Backup'), folder = it.hasNext() ? it.next() : DriveApp.createFolder('Mahrjan Backup');
+  folder.createFile(Utilities.zip(blobs, 'mahrjan-backup-' + day + '.zip'));
+  var old = Date.now() - 30 * 864e5, f = folder.getFiles(); while (f.hasNext()) { var x = f.next(); if (/^mahrjan-backup-/.test(x.getName()) && x.getDateCreated().getTime() < old) x.setTrashed(true); }
+  log_('BACKUP', day, null, miss.length ? 'FAILED' : 'SENT', blobs.length + ' tables saved' + (miss.length ? '; not readable by the mailer login: ' + miss.join(', ') : ''));
+  Logger.log('backup ' + day + ': ' + blobs.length + ' tables' + (miss.length ? ', missing ' + miss.join(', ') : ''));
+}
+
 function setup() {
-  var H = ['jobVanLoad', 'jobSameDay', 'jobNight', 'jobMorningCheck'];
+  var H = ['jobVanLoad', 'jobSameDay', 'jobNight', 'jobMorningCheck', 'jobStockCount', 'jobBackup'];
   ScriptApp.getProjectTriggers().forEach(function (t) { if (H.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t); });
   var at = function (fn, h, m) { ScriptApp.newTrigger(fn).timeBased().atHour(h).nearMinute(m).everyDays(1).inTimezone(TZ).create(); };
-  at('jobVanLoad', 11, 0); at('jobNight', 3, 5); at('jobMorningCheck', 7, 45);
+  at('jobVanLoad', 11, 0); at('jobNight', 3, 5); at('jobMorningCheck', 7, 45); at('jobStockCount', 9, 0); at('jobStockCount', 21, 0); at('jobBackup', 2, 30);
   [[20, 30], [21, 0], [21, 30], [22, 0], [23, 0], [0, 0], [1, 0]].forEach(function (x) { at('jobSameDay', x[0], x[1]); });
   Logger.log('Timers created. Run testAll to check.');
 }

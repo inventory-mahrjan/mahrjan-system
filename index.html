@@ -220,7 +220,7 @@ function tabsFor(){
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
   if (canV('wh')) t.push(['whr','Warehouse report','Reports']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
-  if (has('ADMIN')) t.push(['itm','Items & BOM','Admin'], ['stf','Users','Admin'], ['acc','Role access','Admin']);
+  if (has('ADMIN')) t.push(['itm','Items & BOM','Admin'], ['stf','Users','Admin'], ['em','Email reports','Admin'], ['acc','Role access','Admin']);
   G('Admin', ['dc','Data check']);
   if (!t.length) t.push(['none','No access','']);
   return t;
@@ -238,7 +238,7 @@ function render(){
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
-    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
+    co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', em:'Who gets which scheduled email, and what was sent.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
@@ -258,7 +258,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -1461,6 +1461,39 @@ async function vOffice(){
     }
   }
   await fill();
+}
+
+// ---------- EMAIL REPORTS (admin) ----------
+// Who gets which scheduled email (sent by the "Mahrjan Mailer" Apps Script) and what was sent.
+async function vEmail(){
+  loading();
+  const REP = [['VAN_LOAD','Van load 11:00'],['SALES_QTY','Daily sales qty'],['DAMAGE','Sales & damage'],['GRV','GRV vs damage'],['VISIT','Visit status'],['HEALTH','Daily check'],
+    ['VARIANCE','Weekly short & excess'],['FOC','Weekly FOC'],['EXPIRY','Weekly expiry'],['QTY_MTD','Monthly qty (MTD)'],['STOCK_COUNT','Weekly stock count'],['ALERTS','Report not sent'],['BACKUP','Backup']];
+  let [R, L] = await Promise.all([q(sb.from('email_recipients').select('*').order('name')), q(sb.from('email_log').select('*').order('id', { ascending:false }).limit(60)).catch(() => [])]);
+  const co = id => id == null ? 'Both' : (S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz');
+  const row = (r, i) => `<tr data-i="${i}"><td class="l"><input data-k="name" value="${esc(r.name||'')}" style="width:140px"></td><td class="l"><input data-k="email" type="email" value="${esc(r.email||'')}" style="width:200px"></td>
+    <td><select data-k="branch_id"><option value="">Both</option>${S.branches.map(b => `<option value="${b.id}" ${r.branch_id===b.id?'selected':''}>${co(b.id)}</option>`).join('')}</select></td>
+    ${REP.map(([k]) => `<td><input type="checkbox" data-r="${k}" ${(r.reports||[]).includes(k)?'checked':''}></td>`).join('')}
+    <td><input type="checkbox" data-k="active" ${r.active!==false?'checked':''}></td><td><button class="d" data-x="${i}">✕</button></td></tr>`;
+  const draw = () => {
+    $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Who gets which email</h3><div class="row" style="margin:0"><button id="ead">Add person</button><button class="p" id="esv">Save</button></div></div>
+      <p class="muted">Tick the reports each person gets. "Both" = Al Quoz and Ajman. The emails are sent by the Mahrjan Mailer script in Google (see the cheat sheet).</p>
+      <div class="tw"><table><tr><th class="l">Name</th><th class="l">Email</th><th>Company</th>${REP.map(([,l]) => `<th style="font-size:11px">${l}</th>`).join('')}<th>Active</th><th></th></tr>${R.map(row).join('') || ''}</table></div></div>
+      <div class="card"><h3>Last emails</h3>${table([{l:'Sent at',f:x=>new Date(x.sent_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})},{k:'report',l:'Report'},{k:'period',l:'Period'},{k:'recipient',l:'To',left:1},{k:'status',l:'Status',cls:x=>x.status==='FAILED'?'bad':''},{k:'note',l:'Note',left:1}], L, { empty:'Nothing sent yet. The mailer is not set up or has not run.' })}</div>`;
+    const read = () => { $('#v').querySelectorAll('tr[data-i]').forEach(tr => { const r = R[+tr.dataset.i];
+      r.name = $('[data-k=name]',tr).value.trim(); r.email = $('[data-k=email]',tr).value.trim(); r.branch_id = +$('[data-k=branch_id]',tr).value || null; r.active = $('[data-k=active]',tr).checked;
+      r.reports = [...tr.querySelectorAll('[data-r]')].filter(c => c.checked).map(c => c.dataset.r); }); };
+    $('#ead').onclick = () => { read(); R.push({ name:'', email:'', branch_id:null, reports:[], active:true }); draw(); };
+    $('#v').querySelectorAll('[data-x]').forEach(b => b.onclick = async () => { read(); const r = R[+b.dataset.x];
+      if (r.id) { if (!confirm('Remove ' + (r.name || r.email) + ' from all emails?')) return; try { await q(sb.from('email_recipients').delete().eq('id', r.id)); } catch (e) { return toast(e.message || String(e), false); } }
+      R.splice(+b.dataset.x, 1); draw(); });
+    $('#esv').onclick = async () => { read();
+      const bad = R.find(r => !r.name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email)); if (bad) return toast('Each person needs a name and a valid email', false);
+      try { for (const r of R) { const v = { name:r.name, email:r.email.toLowerCase(), branch_id:r.branch_id, reports:r.reports, active:r.active };
+          if (r.id) await q(sb.from('email_recipients').update(v).eq('id', r.id)); else { const [n] = await q(sb.from('email_recipients').insert(v).select('id')); r.id = n.id; } }
+        toast('Saved'); } catch (e) { toast(e.message || String(e), false); } };
+  };
+  draw();
 }
 
 // ---------- REQUIREMENT ----------
