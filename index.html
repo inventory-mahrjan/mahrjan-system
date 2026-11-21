@@ -814,13 +814,11 @@ async function vItrade(){ const __t = S.nav;
           ${cols.map(c => `<td>${num(m[id][c]) || ''}</td>`).join('')}${multi?`<td><b>${cols.reduce((a,c)=>a+num(m[id][c]),0)}</b></td>`:''}</tr>`; }).join('')}
         <tr class="tot"><td class="l">Total</td><td></td>${cols.map(c => `<td>${tot(c)}</td>`).join('')}${multi?`<td>${cols.reduce((a,c)=>a+tot(c),0)}</td>`:''}</tr></table></div>` : '<p class="muted">Nothing for this period.</p>'}</div>`; }).join('')}`;
   $('#to').onchange = e => { S.ito = e.target.value; vItrade(); };
-  // iTrade Damaged Goods import file: one line per item = company code, iTrade code, unit cost, qty (all columns of the section added up)
+  // iTrade Damaged Goods import file: one line per item = company code, iTrade code, (cost left blank), qty (all columns of the section added up)
   $('#v').querySelectorAll('[data-dg]').forEach(b => b.onclick = () => {
     const [t, , m, cols] = sec.find(x => x[0] === b.dataset.dg), code = S.branches.find(x => x.id === S.br)?.code || '';
     const ids = Object.keys(m).map(Number).sort((a,c) => (item(a).display_order||0) - (item(c).display_order||0)).filter(id => cols.reduce((a,c) => a + num(m[id][c]), 0));
-    const noCost = ids.filter(id => !(num(item(id).unit_cost) > 0)).map(id => item(id).short_name || item(id).name);
-    if (noCost.length && !confirm(`No cost in the item master for: ${noCost.join(', ')}.\nThey go in the file with cost 0.00. Import the latest stock report to fill costs. Download anyway?`)) return;
-    const txt = ids.map(id => { const it = item(id); return [code, it.itrade_code || it.barcode || '', num(it.unit_cost).toFixed(2), cols.reduce((a,c) => a + num(m[id][c]), 0).toFixed(3)].join(','); }).join('\r\n') + '\r\n';
+    const txt = ids.map(id => { const it = item(id); return [code, it.itrade_code || it.barcode || '', '', cols.reduce((a,c) => a + num(m[id][c]), 0).toFixed(3)].join(','); }).join('\r\n') + '\r\n';
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type:'text/plain' }));
     a.download = `DamagedGoods_${code}_${t.replace(/[^A-Z]+/g,'_').replace(/_+$/,'')}_${S.date}${S.ito !== S.date ? '_to_' + S.ito : ''}.txt`; a.click(); URL.revokeObjectURL(a.href);
   });
