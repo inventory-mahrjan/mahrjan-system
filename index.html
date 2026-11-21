@@ -90,7 +90,7 @@
   .cosel summary::-webkit-details-marker{display:none} .cosel summary::after{content:'▾';position:absolute;right:10px;color:var(--muted)}
   .cosel>div{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line2);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:6px;min-width:150px}
   .cosel>div label{display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer;flex-direction:row}
-  .udlg{border:1px solid var(--line2);border-radius:10px;padding:22px;width:min(440px,92vw)} .udlg form{display:flex;flex-direction:column;gap:10px} .udlg label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)} .udlg::backdrop{background:rgba(0,0,0,.3)}
+  table.ctr th:not(.l),table.ctr td:not(.l){text-align:center} .udlg{border:1px solid var(--line2);border-radius:10px;padding:22px;width:min(440px,92vw)} .udlg form{display:flex;flex-direction:column;gap:10px} .udlg label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)} .udlg::backdrop{background:rgba(0,0,0,.3)}
   tr.warn td{background:#fff4e5}
   .os{border-collapse:collapse;font-size:12.5px;width:100%} .os td{border:1px solid #d9dcd6;padding:4px 7px;white-space:nowrap} .os td.n{text-align:right;font-family:'IBM Plex Mono',monospace}
   .os tr.h td{background:var(--accent-ink);color:#fff;font-weight:600} .os tr.b td{font-weight:600} .os tr.t td{background:var(--soft);font-weight:600;color:var(--accent-ink)} .os tr.g td{border:0;height:10px} .os tr.s td{border:0;padding-top:34px}
@@ -684,7 +684,7 @@ async function vStockBatch(id){ const __t = S.nav;
     ex.forEach(r => { const p = split(r.it, r.qty), u = U(r.it); r.split = p.map((v, i) => v && u[i] ? v + ' ' + u[i] : '').filter(Boolean).join(', ') || '0';
       r.qty = +r.qty.toFixed(2); r.unit = r.it.item_type === 'FG' ? 'pkts' : 'pcs'; });
     body = `<div class="card"><div class="row"><label>Near expiry within (days)<input type="number" id="ned" value="${S.scexp}" style="width:80px"></label>${nearExp.length ? `<span class="bad">${nearExp.length} entr${nearExp.length>1?'ies':'y'} expire by ${soon}</span>` : '<span class="ok">Nothing near expiry.</span>'}</div>
-      <div class="tw"><table><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Qty</th><th>Total (pcs / pkts)</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${esc(r.split)}</td><td><b>${r.qty}</b> ${r.unit}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
+      <div class="tw"><table class="ctr"><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Qty</th><th>Total (pcs / pkts)</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${esc(r.split)}</td><td><b>${r.qty}</b> ${r.unit}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
     xl = [['Expiry & country', [{l:'Item',f:r=>r.it.name},{k:'exp',l:'Expiry'},{k:'country',l:'Country'},{k:'split',l:'Qty'},{k:'qty',l:'Total (pcs / pkts)'},{k:'unit',l:'Unit'}], ex]];
   } else {
     // tray & label usage: last count + received − used in production = expected; compare with this count
