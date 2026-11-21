@@ -214,12 +214,17 @@ function visitHtml_(D, units, per, dateIso) {
     if (x.days >= 7) return '<td style="color:' + C_.amber + '">8-14 days</td>'; return '<td style="color:' + C_.green + '">Visited this week</td>'; };
   var pages = men.slice().sort(function (a, b) { var sa = S.filter(function (s) { return s.name === a.name; })[0], sb = S.filter(function (s) { return s.name === b.name; })[0]; return sb.served - sa.served || a.name.localeCompare(b.name); })
     .map(function (m, mi) {
-      // one salesman = one page: rows shrink to fit A4 (up to about 60 customers)
-      var n = m.customers.length, fs = n > 50 ? 9.5 : n > 40 ? 10.5 : n > 32 ? 11.5 : 12.5, pd = n > 50 ? 1 : n > 40 ? 1.8 : n > 32 ? 2.6 : 4.5, k = 'v' + mi;
-      return '<style>.' + k + ' td,.' + k + ' th{font-size:' + fs + 'px;padding-top:' + pd + 'px;padding-bottom:' + pd + 'px}</style><div class="pg" style="page-break-inside:avoid">' + head_('SALESMAN VISIT STATUS - ' + m.name, '', 'Report Date: ' + per) + '<table class="t ' + k + '"><tr>'
-      + ['Sl<br>No','Head No','Customer Name','Last Visit<br>Date','Visit Since<br>(Days)','Visit Status','No. of Visits<br>(Last 30 Days)','Tender<br>Type'].map(function (h, i) { return '<th' + (i === 2 ? ' class="l"' : '') + '>' + h + '</th>'; }).join('') + '</tr>'
-      + m.customers.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc_(x.head || '') + '</td><td class="l">' + esc_(x.name) + '</td><td>' + nd(x.last) + '</td><td>' + (x.days == null ? '—' : x.days) + '</td>' + status(x) + '<td>' + (x.visits || 0) + '</td><td>' + esc_(x.tender || '') + '</td></tr>'; }).join('')
-      + '</table></div>'; }).join('');
+      // one salesman per page; long lists get slightly smaller rows (readable), more than 45 customers continue on a second page
+      var L = m.customers, n = L.length, fs = n > 36 ? 11.5 : 12.5, pd = n > 36 ? 3 : 4.5, k = 'v' + mi, out = '', per1 = 45;
+      var hd = '<tr>' + ['Sl<br>No','Head No','Customer Name','Last Visit<br>Date','Visit Since<br>(Days)','Visit Status','No. of Visits<br>(Last 30 Days)','Tender<br>Type'].map(function (h, i) { return '<th' + (i === 2 ? ' class="l"' : '') + '>' + h + '</th>'; }).join('') + '</tr>';
+      for (var a = 0; a < n || a === 0; a += per1) {
+        out += '<div class="pg" style="page-break-inside:avoid">' + head_('SALESMAN VISIT STATUS - ' + m.name + (a ? ' (continued)' : ''), '', 'Report Date: ' + per) + '<table class="t ' + k + '">' + hd
+          + L.slice(a, a + per1).map(function (x, i) { return '<tr><td>' + (a + i + 1) + '</td><td>' + esc_(x.head || '') + '</td><td class="l">' + esc_(x.name) + '</td><td>' + nd(x.last) + '</td><td>' + (x.days == null ? '—' : x.days) + '</td>' + status(x) + '<td>' + (x.visits || 0) + '</td><td>' + esc_(x.tender || '') + '</td></tr>'; }).join('')
+          + '</table></div>';
+        if (!n) break;
+      }
+      return '<style>.' + k + ' td,.' + k + ' th{font-size:' + fs + 'px;padding-top:' + pd + 'px;padding-bottom:' + pd + 'px}</style>' + out;
+    }).join('');
   return { html: doc_(p1 + pages, false), T: T };
 }
 
