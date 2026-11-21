@@ -72,7 +72,9 @@ begin
   first := not exists (select 1 from public.app_devices where staff_id = s.id);
   insert into public.app_devices (staff_id, device_id, label) values (s.id, dev, left(p_label, 120))
     on conflict (staff_id, device_id) do update set last_seen = now(), label = coalesce(excluded.label, public.app_devices.label);
-  if first and m = 1 and s.role in ('SALESMAN', 'RECEIVER') then
+  -- auto-approve only a user's very first device, and never a device already approved for someone else
+  if first and m = 1 and s.role in ('SALESMAN', 'RECEIVER')
+     and not exists (select 1 from public.app_devices x where x.device_id = dev and x.staff_id <> s.id and x.approved) then
     update public.app_devices set approved = true, approved_at = now(), approved_by = 'AUTO (first device)' where staff_id = s.id and device_id = dev;
   end if;
   ok := public.device_ok(s.id, s.role);
