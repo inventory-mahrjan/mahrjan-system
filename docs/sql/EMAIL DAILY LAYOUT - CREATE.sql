@@ -10,7 +10,8 @@ begin
   if public.my_role() not in ('ADMIN','VIEWER') then raise exception 'Not allowed'; end if;
   for b in select id, code, case when code = 'MGT' then 'AJMAN' else 'AL QUOZ' end unit from public.branches where active order by case when code = 'MGT' then 2 else 1 end loop
     if rep = 'DAMAGE' then
-      with sl as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,''))))) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled),
+      with sl as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and case when coalesce(trim(s.warehouse),'') <> '' and coalesce(trim(st.erp_warehouse),'') <> '' then upper(trim(s.warehouse)) = upper(trim(st.erp_warehouse))
+          else (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,'')))) end) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled),
       -- price of that day (net excl. VAT per pc/pack); if the item was not sold that day, the last 14 days' average (same as the old portal)
       rate as (select item_id, coalesce(sum(net) filter (where tran_date = d) / nullif(sum(qty_base) filter (where tran_date = d),0), sum(net) / nullif(sum(qty_base),0)) r from public.sales_lines
                 where branch_id = b.id and tran_type = 'CR' and not cancelled and qty_base > 0 and tran_date between d - 14 and d group by item_id),
@@ -34,7 +35,8 @@ begin
         'noRate', coalesce((select jsonb_agg(distinct i.name) from rl join public.items i on i.id = rl.item_id left join rate using (item_id) where rl.dq + rl.wq <> 0 and rate.r is null), '[]'))
         into u;
     elsif rep = 'GRV' then
-      with sl0 as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,''))))) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled and s.tran_type <> 'CR'),
+      with sl0 as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and case when coalesce(trim(s.warehouse),'') <> '' and coalesce(trim(st.erp_warehouse),'') <> '' then upper(trim(s.warehouse)) = upper(trim(st.erp_warehouse))
+          else (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,'')))) end) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled and s.tran_type <> 'CR'),
       sl as (select * from sl0 where own_sid is not null),
       g as (select salesman_id, item_id, sum(abs(qty_base)) grv, sum(abs(net_incl_vat)) gv from sl group by 1,2),
       r as (select vd.salesman_id, r.item_id, sum(r.damage) dmg, sum(r.waste) wst, sum(r.expiry) ex from public.return_lines r join public.van_day vd on vd.id = r.van_day_id
@@ -50,7 +52,8 @@ begin
         'items', coalesce((select jsonb_agg(jsonb_build_object('sm', nm, 'code', code, 'name', iname, 'grv', grv, 'dmg', dmg, 'wst', wst, 'exp', ex) order by nm, o nulls last, iname) from x2), '[]'))
         into u;
     elsif rep = 'SALES_QTY' then
-      with sl0 as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,''))))) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled),
+      with sl0 as (select s.*, (select st.id from public.staff st where st.id = s.salesman_id and case when coalesce(trim(s.warehouse),'') <> '' and coalesce(trim(st.erp_warehouse),'') <> '' then upper(trim(s.warehouse)) = upper(trim(st.erp_warehouse))
+          else (coalesce(trim(s.itrade_user),'') = '' or upper(trim(s.itrade_user)) in (upper(st.name), upper(coalesce(st.itrade_name,'')), upper(coalesce(st.erp_user,'')))) end) own_sid from public.sales_lines s where s.branch_id = b.id and s.tran_date = d and not s.cancelled),
       sl as (select * from sl0 where own_sid is not null),
       men as (select st.id, st.name nm,
                      (select to_char(vd.load_time, 'HH24:MI') from public.van_day vd where vd.salesman_id = st.id and vd.business_date = d limit 1) lt

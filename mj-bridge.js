@@ -109,7 +109,9 @@
     // sales: keyed by the salesman (or the iTrade user for store sales), as RAW SALES "User"
     D.lines = D.sales.map(function (l) { var s = m.staffById[l.salesman_id], iu = up(l.itrade_user);
       // a bill made in the office (iTrade user is not the salesman) is a store sale, not the salesman's
-      if (s && iu && iu !== up(s.name) && iu !== up(s.itrade_name) && iu !== up(s.erp_user)) s = null;
+      // warehouse first: his own van warehouse = his bill; any other warehouse (main store) = store sale. No warehouse on the line: check the iTrade user.
+      if (s && l.warehouse && s.erp_warehouse) { if (up(l.warehouse) !== up(s.erp_warehouse)) s = null; }
+      else if (s && iu && iu !== up(s.name) && iu !== up(s.itrade_name) && iu !== up(s.erp_user)) s = null;
       return { user: s ? s.name : up(l.itrade_user || l.sales_executive), inv: String(l.invoice_no || '').trim(), type: String(l.tran_type || '').toUpperCase() === 'CR' ? 'CR' : 'SR',
       tender: String(l.tender_type || '').toUpperCase(), head: l.customer_code || '', cust: String(l.customer_name || '').replace(/\s+/g, ' ').trim(), invTotal: null, line: num(l.net_incl_vat),
       deleted: !!l.cancelled && l.cancel_reason === 'DELETE LIST', cancelled: !!l.cancelled, code: l.item_id && m.itemById[l.item_id] ? C(m.itemById[l.item_id]) : String(l.item_code || ''), name: l.item_name || '', qty: num(l.qty) }; });
@@ -718,14 +720,14 @@
   async function oQtySales(m, sm, from, to) {
     if (from > to) { var x0 = from; from = to; to = x0; }
     var c = await sb(), R2 = function (v) { return Math.round(v * 100) / 100; };
-    var L = await perDay(from, to, function (d) { return c.from('sales_lines').select('item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
+    var L = await perDay(from, to, function (d) { return c.from('sales_lines').select('item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive,warehouse').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
     var list = [], seen = {}, noC = {};
     m.items.filter(function (it) { return it.item_type === 'FG' && m.code(it); }).sort(function (a, b) { return (a.display_order || 1e9) - (b.display_order || 1e9); }).forEach(function (it) {
       var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
     var U = up(sm || ''), men = {}, allQ = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
     L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
       var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
-      var usr = up(l.itrade_user), ex = up(l.sales_executive); if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
+      var usr = up(l.itrade_user), ex = up(l.sales_executive); if (l.warehouse && st.erp_warehouse) { if (up(l.warehouse) !== up(st.erp_warehouse)) return; } else if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
       var who = up(st.name); if (U && who !== U) return;
       var it = l.item_id && m.itemById[l.item_id]; if (it && it.item_type !== 'FG') return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
       var q2 = Math.abs(num(l.qty)) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;
