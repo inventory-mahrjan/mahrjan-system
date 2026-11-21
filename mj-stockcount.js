@@ -120,7 +120,7 @@
     var lead = f.items[0], v = C.v || {}, tot = totalOf(f.cat, lead, v);
     if (!(tot > 0)) { C.msg = 'Enter the quantity.'; render(); return; }
     if (!C.shelf) { C.msg = 'Enter or scan the shelf ID first.'; render(); return; }
-    if (num(v.qty_big) >= 10 && !confirm(num(v.qty_big) + ' ' + (f.cat === 'RAW' ? 'cartons' : 'boxes') + ' of ' + nm(lead) + ' — are you sure?')) return;
+    if (num(v.qty_big) >= 100 && !confirm(num(v.qty_big) + ' ' + (f.cat === 'RAW' ? 'cartons' : 'boxes') + ' of ' + nm(lead) + ' — are you sure?')) return;
     if ((f.cat === 'RAW' || f.cat === 'FG') && !C.exp && !confirm('No expiry date entered. Add without expiry?')) return;
     var no = D.lines.reduce(function (m, l) { return Math.max(m, l.entry_no || 0); }, 0) + 1, pair = f.cat === 'LTRAY' ? 'P' + Date.now() : null, at = new Date().toISOString();
     f.items.forEach(function (it, k) {

@@ -638,7 +638,7 @@ async function vStockBatch(id){
     ${office ? `<div class="row" style="margin-top:10px">${!posted && b.status !== 'CANCELLED' ? '<button id="eb">Change batch</button><button id="cb">Cancel batch</button>' : ''}${!posted && has('ADMIN') ? '<button id="db" class="danger" style="color:#b0432e">Delete batch</button>' : ''}
       ${b.status !== 'CANCELLED' ? '<label>iTrade stock for this count (.xlsx)<input type="file" id="sf" accept=".xlsx,.xls,.csv"></label>' : ''}
       ${posted && flagged.length ? `<button class="p" id="rc">Recount ${flagged.length} flagged item${flagged.length>1?'s':''}</button>` : ''}</div>` : ''}
-    <div class="rtabs" style="margin-top:12px">${tabs.map(([k,l]) => `<button data-t="${k}" class="${S.sctab===k?'on':''}">${l}${k==='shelf'&&missingShelves.length?' ⚠':''}${k==='exp'&&nearExp.length?' ⚠':''}</button>`).join('')}</div></div>`;
+    <div class="rtabs" style="margin-top:12px">${tabs.map(([k,l]) => `<button data-t="${k}" class="${S.sctab===k?'on':''}">${l}${k==='exp'&&nearExp.length?' ⚠':''}</button>`).join('')}</div></div>`;
   let body = '', xl = [];
   if (S.sctab === 'sum') {
     body = `<div class="card"><div class="row"><label>Flag when difference over (%)<input type="number" id="lim" value="${S.sclim}" style="width:80px"></label><label>and at least (cartons / boxes)<input type="number" id="min" value="${S.scmin}" style="width:80px"></label>
@@ -662,7 +662,7 @@ async function vStockBatch(id){
     xl = [['Entries', [{k:'entry_no',l:'#'},{k:'shelf',l:'Shelf'},{l:'Category',f:l=>SC_CAT[l.category]},{l:'Type',f:l=>SC_TYPE[l.stock_type]||''},{l:'Item',f:l=>item(l.item_id).name},{k:'qty_big',l:'Big'},{k:'qty_tray',l:'Tray'},{k:'qty_small',l:'Small'},{k:'total_qty',l:'Total'},{k:'unit',l:'Unit'},{k:'exp_date',l:'Expiry'},{k:'country',l:'Country'},{k:'scanned_barcode',l:'Scanned barcode'}], L]];
   } else if (S.sctab === 'shelf') {
     const sh = shelves.map(x => ({ shelf:x, n:L.filter(l => l.shelf === x).length, items:[...new Set(L.filter(l => l.shelf === x).map(l => item(l.item_id).short_name || item(l.item_id).name))].join(', ') }));
-    body = `<div class="card">${missingShelves.length ? `<div class="notice">Shelves counted last time (${esc(prev.batch_no)}) but not in this count: <b>${missingShelves.map(esc).join(', ')}</b></div>` : prev ? `<p class="ok">All ${prevShelves.length} shelves from the last count (${esc(prev.batch_no)}) are counted.</p>` : '<p class="muted">No earlier posted count to compare shelves with.</p>'}
+    body = `<div class="card">
       <div class="tw"><table><tr><th class="l">Shelf</th><th>Entries</th><th class="l">Items</th></tr>${sh.map(x => `<tr><td class="l">${esc(x.shelf)}</td><td>${x.n}</td><td class="l">${esc(x.items)}</td></tr>`).join('')}</table></div></div>`;
     xl = [['Shelves', [{k:'shelf',l:'Shelf'},{k:'n',l:'Entries'},{k:'items',l:'Items'}], sh]];
   } else if (S.sctab === 'exp') {
