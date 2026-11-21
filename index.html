@@ -221,7 +221,7 @@ function tabsFor(){
   const inOE = ['load','ret','req'], hasOE = S.me?.role !== 'SALESMAN' && (canV('oe') || inOE.some(k => canV(k)));
   const t = [], G = (g, ...x) => x.forEach(([k,l]) => { if (k === 'oe' ? hasOE : (canV(k) && !(hasOE && inOE.includes(k)))) t.push([k,l,g]); });
   G('Summary', ['ov','Overview'], ['dd','Daily dashboard']);
-  G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['oe','Office entry'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['req','Requirement']);
+  G('Daily flow', ['load','Loading'], ['ret','Return'], ['days','Van days'], ['oe','Office entry'], ['wh','Warehouse'], ['ite','I Trade entry'], ['sc','Stock count'], ['imp','Sales import'], ['sri','Stock report'], ['req','Requirement']);
   G('Reports', ['ds','Daily sheets'], ['pc','Petty cash'], ['se','Short & excess'], ['wo','FOC & write-offs'], ['qs','Qty by salesman']);
   if (canV('wh')) t.push(['whr','Warehouse report','Reports']);
   G('Analysis', ['sa','Sales analysis'], ['lr','Loading & return'], ['vl','Van log'], ['co','Collections'], ['ex','Expenses']);
@@ -236,7 +236,7 @@ function render(){
   const brN = id => { const b = S.branches.find(x => x.id === id); return b ? (b.code === 'MGT' ? 'Ajman' : 'Al Quoz') : ''; }, br = S.brs.length > 1 ? 'Al Quoz + Ajman' : (S.branches.find(b => b.id === S.br)?.name || '');
   const unitName = S.brs.length > 1 ? 'SALES PORTAL' : br.toUpperCase();
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
-    days:'Van day status, cash to hand over, settlement and closing.', oe:'Correct a salesman\'s loading, return, expense, collection, requirement or deleted bill for the date — like Office entry in the old portal.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
+    days:'Van day status, cash to hand over, settlement and closing.', oe:'Correct a salesman\'s loading, return, expense, collection, requirement or deleted bill for the date — like Office entry in the old portal.', imp:'Upload the iTrade Periodical Sales Detailed Report.', sri:'Upload the iTrade Stock Report. The latest report replaces the previous one and sets each item\'s cost.',
     req:'Next-day order by salesman, qty as the salesman gives it.', wh:'Production and cleaning batches: issue, return, differences and output.',
     ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Count batches: create here, the supervisor counts offline in the app and posts; compare with iTrade, recount, expiry, shelves, tray & label usage.',
     ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
@@ -263,7 +263,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ S.nav = (S.nav || 0) + 1; clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, set:vSettings, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ S.nav = (S.nav || 0) + 1; clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd','sri'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, sri:vStockReport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, set:vSettings, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -1538,6 +1538,62 @@ async function vEmail(){ const __t = S.nav;
 }
 
 // ---------- SETTINGS (admin) ----------
+// ---------- STOCK REPORT (iTrade "Stock Report as on <date>") ----------
+async function vStockReport(){ const __t = S.nav;
+  loading();
+  const R = (await q(sb.from('stock_reports').select('*').eq('branch_id', S.br)).catch(() => null)) ;
+  if (__t !== S.nav) return;
+  if (R === null) { $('#v').innerHTML = `<div class="card"><div class="notice">Stock report is not installed in the database yet. Run <b>docs/sql/STOCK REPORT - CREATE.sql</b> once.</div></div>`; return; }
+  const rep = R[0], L = rep ? await q(sb.from('stock_report_lines').select('*').eq('report_id', rep.id).order('id')) : [];
+  if (__t !== S.nav) return;
+  const brName = S.branches.find(b => b.id === S.br)?.code === 'MGT' ? 'Ajman' : 'Al Quoz', miss = L.filter(l => !l.item_id);
+  $('#v').innerHTML = `${canE('sri') ? `<div class="card"><h3>Import stock report — ${brName}</h3>
+    <p class="muted">iTrade → Stock Report (Excel). The new report replaces the previous one for ${brName}, and the Cost of every matched item becomes its cost (used for stock count values).</p>
+    <div class="row"><input type="file" id="f" accept=".xlsx,.xls"><button class="p" id="go" disabled>Import</button></div><div id="out"></div></div>` : ''}
+    <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${rep ? `Stock as on ${esc(rep.as_on)} · ${esc(rep.warehouse)}` : 'No stock report imported yet'}</h3>${tools()}</div>
+    ${rep ? `<p class="muted">${L.length} items · qty ${num(rep.total_qty).toLocaleString('en-US')} · value AED ${num(rep.total_value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} · imported ${esc(new Date(rep.imported_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}))} by ${esc(rep.imported_by||'')}${miss.length ? ` · <span class="bad">${miss.length} not in item master</span>` : ''}</p>
+    ${table([{l:'Item',left:1,f:r=>r.item_id?iNm(r.item_id):r.item_name,html:r=>r.item_id?esc(iNm(r.item_id)):`<span class="bad">${esc(r.item_name)} (not in item master)</span>`},{k:'item_code',l:'Item code'},{k:'item_no',l:'Item no'},{k:'qty',l:'Qty',sum:1},{l:'Cost',f:r=>r.cost,html:r=>r.cost==null?'':String(+r.cost)},{k:'selling',l:'Selling',money:1},{k:'stock_value',l:'Stock value',money:1,sum:1}], L)}` : ''}</div>`;
+  bindTools('Stock report ' + brName + (rep ? ' ' + rep.as_on : ''), [['Stock', [{k:'item_code',l:'Item code'},{k:'item_no',l:'Item no'},{l:'Item',f:r=>r.item_id?iNm(r.item_id):r.item_name},{k:'qty',l:'Qty'},{k:'cost',l:'Cost'},{k:'selling',l:'Selling'},{k:'stock_value',l:'Stock value'}], L]]);
+  if (!canE('sri')) return;
+  let P = null;
+  $('#f').onchange = async e => {
+    const file = e.target.files[0]; P = null; $('#go').disabled = true; if (!file) return;
+    try {
+      const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+      const grid = XLSX.utils.sheet_to_json((wb => wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer())), { header:1, defval:'', raw:true });
+      const T = v => String(v ?? '').replace(/\s+/g, ' ').trim(), all = grid.flat().map(T);
+      const MON = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+      const dm = all.map(v => v.match(/Stock Report as on (\d{1,2})-([A-Za-z]{3})-(\d{4})/i)).find(Boolean);
+      const asOn = dm ? `${dm[3]}-${String(MON[dm[2].toLowerCase()]).padStart(2,'0')}-${dm[1].padStart(2,'0')}` : null;
+      const wm = all.map(v => v.match(/Current Stock \(([^)]+)\)/i)).find(Boolean), wh = wm ? wm[1].trim() : '';
+      const tm = all.map(v => v.match(/^Total:\s*([\d,.\-]+)/)).find(Boolean), fileTotal = tm ? num(tm[1].replace(/,/g,'')) : null;
+      const hi = grid.findIndex(r => r.some(v => T(v) === 'Itemcode') && r.some(v => T(v) === 'Cost'));
+      if (hi < 0 || !asOn) throw new Error('This is not the iTrade Stock Report (no "Stock Report as on" date or no Itemcode / Cost header).');
+      const H = {}; grid[hi].forEach((v, i) => { const k = T(v); if (k && !(k in H)) H[k] = i; });
+      const g = (r, k) => H[k] == null ? '' : r[H[k]];
+      const nm = v => T(v).toUpperCase(), byCode = {}, byName = {};
+      S.items.forEach(i => { [i.barcode, i.itrade_code].forEach(c => { if (c) byCode[T(c)] = i.id; }); byName[nm(i.name)] = i.id; });
+      const lines = [];
+      for (let i = hi + 1; i < grid.length; i++) { const r = grid[i], code = T(g(r, 'Itemcode'));
+        if (!code || /^total/i.test(code) || !T(g(r, 'Item Name'))) continue;
+        lines.push({ item_id: byCode[code] || byName[nm(g(r, 'Item Name'))] || null, item_code: code, item_no: T(g(r, 'Item No')), item_name: T(g(r, 'Item Name')),
+          qty: num(g(r, 'QTY')), cost: num(g(r, 'Cost')), selling: num(String(g(r, 'Selling')).replace(/,/g,'')), stock_value: num(g(r, 'StockValue')) }); }
+      const tot = lines.reduce((a, l) => a + l.stock_value, 0), um = lines.filter(l => !l.item_id);
+      const fileBr = /ajman/i.test(wh) ? 'MGT' : /quoz/i.test(wh) ? 'MGAZ' : null, selBr = S.branches.find(b => b.id === S.br)?.code;
+      const wrongBr = fileBr && fileBr !== selBr;
+      $('#out').innerHTML = `<p>Stock as on <b>${asOn}</b> · ${esc(wh)} · ${lines.length} items · value AED ${tot.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${fileTotal != null && Math.abs(fileTotal - tot) > 1 ? ` <span class="bad">(file total ${fileTotal.toLocaleString('en-US')})</span>` : ''}</p>
+        ${um.length ? `<p class="bad">${um.length} not in item master (imported, but no cost update): ${um.map(l => esc(l.item_no + ' ' + l.item_name)).join(' · ')}</p>` : '<p>All items matched to the item master.</p>'}
+        ${wrongBr ? `<p class="bad">This report is for ${fileBr === 'MGT' ? 'Ajman' : 'Al Quoz'}, but the portal is on ${brName}. Switch company first.</p>` : ''}`;
+      if (lines.length && !wrongBr) { P = { wh, asOn, lines, file: file.name }; $('#go').disabled = false; }
+    } catch (err) { $('#out').innerHTML = `<p class="bad">${esc(err.message || err)}</p>`; }
+  };
+  $('#go').onclick = async () => { if (!P) return; $('#go').disabled = true;
+    try { const r = await rpc('stock_report_save', { p_branch:S.br, p_warehouse:P.wh, p_as_on:P.asOn, p_file:P.file, p_lines:P.lines });
+      S.items = await q(sb.from('items').select('*'));
+      toast(`Imported ${r.lines} items · ${r.costs_updated} item cost(s) updated`); vStockReport();
+    } catch (e) { toast(e.message || String(e), false); $('#go').disabled = false; } };
+}
+
 async function vSettings(){
   loading();
   const L = await q(sb.from('app_settings').select('*').order('key'));
