@@ -1337,7 +1337,8 @@ async function vOffice(){
   };
   const diffMap = (a, b, show) => { const out = []; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => { if (String(a[k] ?? '') !== String(b[k] ?? '')) out.push(iname(+k) + ':  ' + (a[k] == null ? '—' : show(a[k])) + '  →  ' + (b[k] == null ? 'removed' : show(b[k]))); }); return out; };
   let seq = 0;
-  async function fill(){
+  async function fill(){ try { await fill2(); } catch (e) { g().innerHTML = '<p class="bad">' + esc(e.message || String(e)) + '</p>'; } }
+  async function fill2(){
     const my = ++seq;
     if (!S.osm) { g().innerHTML = '<p class="muted">Choose a salesman.</p>'; return; }
     g().innerHTML = '<p class="muted">Loading… <b class="mjpct">0%</b></p>';
@@ -1420,8 +1421,8 @@ async function vOffice(){
         try { await rpc('save_requirement', { p_salesman:S.osm, p_date:S.date, p_lines:ln }); toast('Requirement saved'); fill(); } catch (e) { toast(e.message || String(e), false); } };
     } else {
       const sm = S.staff.find(s => s.id === S.osm), br = sm.branch_id;
-      const [L, D] = await Promise.all([all(() => sb.from('sales_lines').select('invoice_no,customer_name,net_incl_vat,tran_type,cancelled,cancel_reason').eq('salesman_id', S.osm).eq('tran_date', S.date).order('id')),
-        q(sb.from('sales_deletes').select('*').eq('branch_id', br).eq('del_date', S.date).order('invoice'))]);
+      const [L, D] = await Promise.all([q(sb.from('sales_lines').select('invoice_no,customer_name,net_incl_vat,tran_type,cancelled,cancel_reason').eq('salesman_id', S.osm).eq('tran_date', S.date).order('id').limit(5000)),
+        q(sb.from('sales_deletes').select('*').eq('branch_id', br).eq('del_date', S.date).order('invoice')).catch(() => [])]);
       if (my !== seq) return;
       const inv = {}; L.forEach(l => { const k = String(l.invoice_no||'').trim(); const o = inv[k] = inv[k] || { no:k, cust:l.customer_name, type:l.tran_type, net:0, del:false }; o.net += num(l.net_incl_vat); if (l.cancel_reason === 'DELETE LIST') o.del = true; });
       const list = Object.values(inv).sort((x,y) => x.no.localeCompare(y.no));
