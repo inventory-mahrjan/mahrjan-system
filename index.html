@@ -162,6 +162,8 @@ async function loadAccess(){ const { data, error } = await sb.from('role_access'
   S.acc = error || !data?.length ? null : Object.fromEntries(data.map(a => [a.module, a])); }
 const canE = m => S.me?.role === 'ADMIN' || (S.acc ? !!S.acc[m]?.can_edit : (ACC_DEF.E[S.me?.role] || '').split(' ').includes(m));
 var OLDT = ['se','wo','qs','whr','dd'];
+// role RECEIVER is shown as SUPERVISOR everywhere (the stored role keeps its code)
+const RN = r => r === 'RECEIVER' ? 'SUPERVISOR' : (r || '');
 const canV = m => S.me?.role === 'ADMIN' || canE(m) || (S.acc ? !!S.acc[m]?.can_view : (ACC_DEF.V[S.me?.role] || '').split(' ').includes(m));
 
 const item = id => S.items.find(i => i.id === id) || {};
@@ -233,7 +235,7 @@ function render(){
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
     days:'Van day status, cash to hand over, settlement and closing.', oe:'Correct a salesman\'s loading, return, expense, collection, requirement or deleted bill for the date — like Office entry in the old portal.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
     req:'Next-day order by salesman, qty as the salesman gives it.', wh:'Production and cleaning batches: issue, return, differences and output.',
-    ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Count batches: create here, the receiver counts offline in the app and posts; compare with iTrade, recount, expiry, shelves, tray & label usage.',
+    ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Count batches: create here, the supervisor counts offline in the app and posts; compare with iTrade, recount, expiry, shelves, tray & label usage.',
     ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
@@ -242,7 +244,7 @@ function render(){
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
-      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.role)} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
+      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(RN(S.me.role))} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
     <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${OLDT.includes(S.tab) ? '' : SUB[S.tab]||''}</p></div>
       <div class="header-actions">${S.me.branch_id ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
         ${RANGE.has(S.tab) && !OLDT.includes(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}${S.tab === 'ds' || OLDT.includes(S.tab) ? '' : `<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label>`}</div></header>
@@ -565,7 +567,7 @@ async function vStock(){ const __t = S.nav;
   const canMake = has('ADMIN','ACCOUNTANT');
   const st = b => ({ OPEN:'Open', DOWNLOADED:'Counting', POSTED:'Posted', CANCELLED:'Cancelled' })[b.status];
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0">${canMake ? '<button class="p" id="nb">New count batch</button>' : ''}
-      <span class="muted">Create the batch here; the receiver downloads it in the app (Warehouse → Stock count), counts offline and posts.</span></div>${tools()}</div>
+      <span class="muted">Create the batch here; the supervisor downloads it in the app (Warehouse → Stock count), counts offline and posts.</span></div>${tools()}</div>
     <div class="tw"><table><tr><th class="l">Batch</th><th>Company</th><th>Count date</th><th>Type</th><th class="l">Counted by</th><th class="l">Categories</th><th>Status</th><th>Entries</th><th>Posted</th><th></th></tr>
     ${bs.map(b => `<tr><td class="l">${esc(b.batch_no)}${b.parent_id ? ' <span class="muted">recount</span>' : ''}</td><td>${co(b.branch_id)}</td><td>${b.count_date}</td><td>${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'}</td>
       <td class="l">${esc(nm(b.counted_by))}</td><td class="l">${b.categories.map(c => SC_CAT[c]).join(', ')}</td><td class="${b.status==='POSTED'?'ok':b.status==='CANCELLED'?'muted':''}">${st(b)}</td><td>${nl(b.id)}</td>
@@ -1167,23 +1169,23 @@ async function vStaff(){ const __t = S.nav;
   const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
   const co = id => id == null ? 'Both' : (S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz');
   S.uq = S.uq || '';
-  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + (u.username||'') + ' ' + (u.itrade_name||'') + ' ' + (u.erp_user||'') + ' ' + (u.erp_warehouse||'')).toUpperCase().includes(S.uq.toUpperCase()));
+  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + RN(u.role) + ' ' + (u.username||'') + ' ' + (u.itrade_name||'') + ' ' + (u.erp_user||'') + ' ' + (u.erp_warehouse||'')).toUpperCase().includes(S.uq.toUpperCase()));
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addu">Add user</button><label>Search<input id="uq" value="${esc(S.uq)}" placeholder="Name, role…"></label></div>${tools()}</div>
     <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th>Company</th><th class="l">ERP user</th><th class="l">Sales Executive (ERP)</th><th class="l">Warehouse (ERP)</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
-    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(u.role)}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.erp_user||'')}</td><td class="l">${esc(u.itrade_name||'')}</td><td class="l">${esc(u.erp_warehouse||'')}</td>
+    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(RN(u.role))}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.erp_user||'')}</td><td class="l">${esc(u.itrade_name||'')}</td><td class="l">${esc(u.erp_warehouse||'')}</td>
       <td>${u.role === 'PACKER' ? '—' : u.has_login ? 'Yes' : '<span class="bad">No</span>'}</td><td>${u.last_sign_in ? esc(new Date(u.last_sign_in).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : ''}</td>
       <td>${u.active ? 'Yes' : '<span class="bad">Disabled</span>'}</td><td><button data-ed="${u.id}">Edit</button></td></tr>`).join('')}</table></div>
     <p class="muted" style="margin-top:8px">Username = name in small letters without spaces. The same username and password work in the app and the portal. Disabled users cannot sign in.</p></div>`;
   $('#uq').oninput = e => { S.uq = e.target.value; const c = e.target.selectionStart; vStaff().then(() => { const i = $('#uq'); if (i) { i.focus(); i.setSelectionRange(c, c); } }); };
   $('#addu').onclick = () => userDialog(null);
   $('#v').querySelectorAll('[data-ed]').forEach(b => b.onclick = () => userDialog(list.find(u => u.id === +b.dataset.ed)));
-  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{k:'role',l:'Role'},{l:'Company',f:u=>co(u.branch_id)},{k:'erp_user',l:'ERP user'},{k:'itrade_name',l:'Sales Executive (ERP)'},{k:'erp_warehouse',l:'Warehouse (ERP)'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
+  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{l:'Role',f:u=>RN(u.role)},{l:'Company',f:u=>co(u.branch_id)},{k:'erp_user',l:'ERP user'},{k:'itrade_name',l:'Sales Executive (ERP)'},{k:'erp_warehouse',l:'Warehouse (ERP)'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
 
   function userDialog(u){
     const d = document.createElement('dialog'); d.className = 'udlg';
     d.innerHTML = `<form method="dialog"><h3 style="margin-top:0">${u ? 'Edit user · ' + esc(u.name) : 'Add user'}</h3>
       <label>Name<input name="name" required value="${esc(u?.name||'')}" autocomplete="off"></label>
-      <label>Role<select name="role">${roles.map(r => `<option ${r===(u?.role||'SALESMAN')?'selected':''}>${r}</option>`).join('')}</select></label>
+      <label>Role<select name="role">${roles.map(r => `<option value="${r}" ${r===(u?.role||'SALESMAN')?'selected':''}>${RN(r)}</option>`).join('')}</select></label>
       <label>Company<select name="br"><option value="">Both</option>${S.branches.slice().sort((x,y)=>x.code==='MGAZ'?-1:1).map(b => `<option value="${b.id}" ${(u ? u.branch_id===b.id : b.id===S.br)?'selected':''}>${co(b.id)}</option>`).join('')}</select></label>
       <label class="itr">Salesman name (ERP user)<input name="erpu" value="${esc(u?.erp_user||'')}" autocomplete="off"></label>
       <label class="itr">Sales Executive (ERP)<input name="itrade" value="${esc(u?.itrade_name||'')}" autocomplete="off"></label>
@@ -1313,7 +1315,7 @@ async function vAccess(){ const __t = S.nav;
   const get = (r, m) => A.data.find(a => a.role === r && a.module === m) || { can_view:false, can_edit:false };
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Role access</h3><div class="row" style="margin:0"><button id="rs">Undo changes</button><button class="p" id="sv">Save access</button></div></div>
     <p class="muted" style="margin-bottom:12px">View = the page shows. Edit = can post or change (Edit includes View). ADMIN always has full access. Branch rules and "salesman sees only his own day" always apply. Every change is kept in the audit log.</p>
-    <div class="tw"><table><tr><th class="l" rowspan="2">Page / action</th><th rowspan="2">ADMIN</th>${roles.map(r => `<th colspan="2">${r}</th>`).join('')}</tr>
+    <div class="tw"><table><tr><th class="l" rowspan="2">Page / action</th><th rowspan="2">ADMIN</th>${roles.map(r => `<th colspan="2">${RN(r)}</th>`).join('')}</tr>
       <tr>${roles.map(() => '<th>View</th><th>Edit</th>').join('')}</tr>
       ${M.data.map((m,i) => (i === 0 || M.data[i-1].grp !== m.grp ? `<tr class="tot"><td class="l" colspan="${2 + roles.length*2}">${esc(m.grp)}</td></tr>` : '') + `<tr><td class="l">${esc(m.label)}</td><td>Full</td>
         ${roles.map(r => { const a = get(r, m.module); return `<td><input type="checkbox" data-r="${r}" data-m="${m.module}" data-k="can_view" ${a.can_view?'checked':''}></td>
