@@ -140,7 +140,8 @@ const LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 const SB_URL = 'https://xhndwjkqfqmmpfcglqzu.supabase.co';
 const SB_KEY = 'sb_publishable_emOqI1PWaSA7B5s56v-ERg_RrxZ9weu';   // public key; data is protected by access rules
 const EMAIL_DOMAIN = '@mahrjan.app';
-const sb = createClient(SB_URL, SB_KEY);
+const devId = () => { let v = ''; try { v = localStorage.getItem('mj-device') || ''; if (!v) { v = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(16) + Math.random().toString(16).slice(2)).replace(/-/g, ''); localStorage.setItem('mj-device', v); } } catch (e) {} return v; };
+const sb = createClient(SB_URL, SB_KEY, { global: { headers: { 'x-mj-device': devId() } } });   // device id: salesmen & supervisors only work from approved devices
 
 const S = { me:null, items:[], staff:[], vans:[], customers:[], branches:[], date:today(), tab:null, dayId:null, br:null };
 const $ = (s, el=document) => el.querySelector(s);
@@ -197,6 +198,8 @@ function renderLogin(){
 }
 
 async function boot(){
+  const dv = await rpc('device_register', { p_label: ((navigator.userAgent.match(/\(([^)]+)\)/) || [])[1] || 'Browser').slice(0, 120) }).catch(() => null);
+  if (dv && !dv.ok) { toast(dv.error, false); await sb.auth.signOut(); return renderLogin(); }
   S.me = await rpc('me');
   if (!S.me || !S.me.role) { toast('This login is not linked to an active staff member', false); await sb.auth.signOut(); return; }
   const [items, staff, vans, branches] = await Promise.all([
@@ -1182,10 +1185,29 @@ async function vStaff(){ const __t = S.nav;
       <td>${u.role === 'PACKER' ? '—' : u.has_login ? 'Yes' : '<span class="bad">No</span>'}</td><td>${u.last_sign_in ? esc(new Date(u.last_sign_in).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : ''}</td>
       <td>${u.active ? 'Yes' : '<span class="bad">Disabled</span>'}</td><td><button data-ed="${u.id}">Edit</button></td></tr>`).join('')}</table></div>
     <p class="muted" style="margin-top:8px">Username = name in small letters without spaces. The same username and password work in the app and the portal. Disabled users cannot sign in.</p></div>`;
+  vDevices(list, __t);
   $('#uq').oninput = e => { S.uq = e.target.value; const c = e.target.selectionStart; vStaff().then(() => { const i = $('#uq'); if (i) { i.focus(); i.setSelectionRange(c, c); } }); };
   $('#addu').onclick = () => userDialog(null);
   $('#v').querySelectorAll('[data-ed]').forEach(b => b.onclick = () => userDialog(list.find(u => u.id === +b.dataset.ed)));
   bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{l:'Role',f:u=>RN(u.role)},{l:'Company',f:u=>co(u.branch_id)},{k:'erp_user',l:'ERP user'},{k:'itrade_name',l:'Sales Executive (ERP)'},{k:'erp_warehouse',l:'Warehouse (ERP)'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
+
+  async function vDevices(list, __t){
+    const D = await q(sb.from('app_devices').select('*').order('last_seen', { ascending:false })).catch(() => null); if (!D || __t !== S.nav) return;
+    const mode = (await q(sb.from('app_settings').select('value').eq('key','DEVICE_LOCK')).catch(() => []))[0]?.value;
+    const who = id => list.find(u => u.id === id) || {}, st = d => d.approved ? 'Approved' : d.approved_at ? 'Blocked' : 'Waiting';
+    D.sort((a, b) => (st(a) === 'Waiting' ? 0 : 1) - (st(b) === 'Waiting' ? 0 : 1));
+    const dt = x => x ? new Date(x).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    const el = document.createElement('div'); el.className = 'card'; el.id = 'devs';
+    el.innerHTML = `<h3>Devices</h3><p class="muted">Salesmen and supervisors can only work from approved devices (app and portal). Device lock is <b>${mode == 0 ? 'OFF' : mode == 2 ? 'ON — you approve every device' : 'ON — first device of each user is approved automatically'}</b>; change it in Admin → Settings. The code shown on the blocked phone matches the Code column.</p>
+      <div class="tw"><table><tr><th class="l">User</th><th>Role</th><th class="l">Device</th><th>Code</th><th>First seen</th><th>Last seen</th><th>Status</th><th class="l">By</th><th></th></tr>
+      ${D.map(d => `<tr><td class="l">${esc(who(d.staff_id).name || d.staff_id)}</td><td>${esc(RN(who(d.staff_id).role || ''))}</td><td class="l">${esc(d.label || '')}</td><td class="mono">${esc((d.device_id.slice(0,4) + '-' + d.device_id.slice(4,8)).toUpperCase())}</td>
+        <td>${dt(d.created_at)}</td><td>${dt(d.last_seen)}</td><td>${st(d) === 'Approved' ? 'Approved' : `<span class="bad">${st(d)}</span>`}</td><td class="l">${esc(d.approved_by || '')}</td>
+        <td style="white-space:nowrap">${d.approved ? `<button data-dv="BLOCK" data-id="${d.id}">Block</button>` : `<button class="p" data-dv="APPROVE" data-id="${d.id}">Approve</button>`} <button data-dv="DELETE" data-id="${d.id}">Remove</button></td></tr>`).join('') || '<tr><td colspan="9" class="muted">No devices yet. They appear when users open the app or portal.</td></tr>'}</table></div>`;
+    $('#devs')?.remove(); $('#v').append(el);
+    el.querySelectorAll('[data-dv]').forEach(b => b.onclick = async () => {
+      if (b.dataset.dv === 'DELETE' && !confirm('Remove this device? The user will need approval again on it.')) return;
+      try { await rpc('device_admin', { p_id:+b.dataset.id, p_action:b.dataset.dv }); toast('Saved'); vDevices(list, S.nav); } catch (e) { toast(e.message || String(e), false); } });
+  }
 
   function userDialog(u){
     const d = document.createElement('dialog'); d.className = 'udlg';
@@ -1519,10 +1541,10 @@ async function vEmail(){ const __t = S.nav;
 async function vSettings(){
   loading();
   const L = await q(sb.from('app_settings').select('*').order('key'));
-  $('#v').innerHTML = `<div class="card"><h3>Rates</h3><p class="muted">Carton rate = AED charged per empty carton returned (small / big). A new rate is used for returns saved from now on; days already saved keep their amount.</p>
+  $('#v').innerHTML = `<div class="card"><h3>Rates & device lock</h3><p class="muted">Carton rate = AED charged per empty carton returned (small / big). A new rate is used for returns saved from now on; days already saved keep their amount.</p>
     <div class="tw" style="max-width:560px"><table><tr><th class="l">Setting</th><th>Value</th><th>Last changed</th></tr>${L.map(x => `<tr><td class="l">${esc(x.label || x.key)}</td><td><input type="number" step="0.01" min="0" data-k="${esc(x.key)}" value="${x.value}" style="width:100px"></td><td class="muted">${new Date(x.updated_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})}</td></tr>`).join('')}</table></div>
     <div class="row" style="margin-top:8px"><button class="p" id="ssv">Save</button></div></div>`;
-  $('#ssv').onclick = async () => { try { for (const i of $('#v').querySelectorAll('[data-k]')) { const v = Number(i.value); if (!(v >= 0)) return toast('Enter a valid rate', false);
+  $('#ssv').onclick = async () => { try { for (const i of $('#v').querySelectorAll('[data-k]')) { const v = Number(i.value); if (!(v >= 0)) return toast('Enter a valid rate', false); if (i.dataset.k === 'DEVICE_LOCK' && ![0,1,2].includes(v)) return toast('Device lock must be 0, 1 or 2', false);
       const x = L.find(y => y.key === i.dataset.k); if (Number(x.value) !== v) await q(sb.from('app_settings').update({ value:v, updated_at:new Date().toISOString() }).eq('key', i.dataset.k)); }
     toast('Saved'); vSettings(); } catch (e) { toast(e.message || String(e), false); } };
 }

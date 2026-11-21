@@ -28,7 +28,10 @@
 
   // ---------- Supabase ----------
   var sbP = null;
-  function sb() { if (!sbP) sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.MJ_AUTH_KEY || 'mj-app-auth' } }); }); return sbP; }
+  /* each install has its own device id; the database only lets salesmen and supervisors work from approved devices */
+  function devId() { var v = ''; try { v = localStorage.getItem('mj-device') || ''; if (!v) { v = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(16) + Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2)).replace(/-/g, ''); localStorage.setItem('mj-device', v); } } catch (e) {} return v; }
+  function devLabel() { var u = navigator.userAgent || '', m = u.match(/Android[^;]*;\s*([^;)]+)/); return (m ? m[1] : (u.match(/\(([^;)]+)/) || [])[1] || 'Device').trim().slice(0, 120); }
+  function sb() { if (!sbP) sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.MJ_AUTH_KEY || 'mj-app-auth' }, global: { headers: { 'x-mj-device': devId() } } }); }); return sbP; }
   async function q(p) { var r = await p; if (r.error) throw new Error(r.error.message); return r.data; }
   async function rpc(fn, args) { var c = await sb(); return q(c.rpc(fn, args)); }
   window.MJ_SB = sb;   // the app's Stock count screen uses the same signed-in client
@@ -285,7 +288,10 @@
   // ---------- login / session ----------
   function emailOf(name) { return String(name).toLowerCase().replace(/[^a-z0-9]/g, '') + '@mahrjan.app'; }
   var ME = null;
-  async function me() { if (ME && ME.at > Date.now() - 600000) return ME; var c = await sb(), s = (await c.auth.getSession()).data.session; if (!s) return null; var x = await rpc('me'); if (!x || !x.role) return null; ME = { at: Date.now(), s: x }; return ME; }
+  var REG = 0, DEVMSG = '';
+  async function me() { if (ME && ME.at > Date.now() - 600000) return ME; var c = await sb(), s = (await c.auth.getSession()).data.session; if (!s) return null;
+    if (!REG) { try { var dv = await rpc('device_register', { p_label: devLabel() }); DEVMSG = dv && !dv.ok ? dv.error : ''; if (!DEVMSG) REG = 1; } catch (e) { REG = 1; } }
+    var x = await rpc('me'); if (!x || !x.role) return null; ME = { at: Date.now(), s: x }; return ME; }
   function unitOf(s) { return s.branch_id == null ? 'BOTH' : ((M['AJMAN'] && M['AJMAN'].br.id === s.branch_id) ? 'AJMAN' : 'AL QUOZ'); }
   async function userPublic(s, unit) { var u = s.branch_id == null ? 'BOTH' : null; if (!u) { var c = await sb(), b = (await q(c.from('branches').select('*'))).filter(function (x) { return x.id === s.branch_id; })[0]; u = b && b.code === 'MGT' ? 'AJMAN' : 'AL QUOZ'; }
     return { name: s.name, role: s.role, salesman: s.role === 'SALESMAN' ? s.name : '', unit: u === 'BOTH' ? unit : u, access: 'BOTH' }; }
@@ -344,7 +350,7 @@
       if (!lastPw) return { ok: false, error: 'Incorrect username or password.' };
       var c = await sb(), r = await c.auth.signInWithPassword({ email: emailOf(p.username), password: lastPw }); lastPw = null;
       if (r.error) return { ok: false, error: 'Incorrect username or password.' };
-      ME = null; var w = await me(); if (!w) { await c.auth.signOut(); return { ok: false, error: 'This login is not linked to an active staff member. Ask the admin.' }; }
+      ME = null; REG = 0; var w = await me(); if (!w) { await c.auth.signOut(); return { ok: false, error: DEVMSG || 'This login is not linked to an active staff member. Ask the admin.' }; }
       if (w.s.role === 'PACKER') return { ok: false, error: 'User type not set. Ask the admin.' };
       return { ok: true, token: 'sb', user: await userPublic(w.s, unit) };
     }
@@ -606,7 +612,7 @@
       if (!lastPw) throw new Error('Incorrect username or password.');
       var c = await sb(), r = await c.auth.signInWithPassword({ email: emailOf(a[0]), password: lastPw }); lastPw = null;
       if (r.error) throw new Error('Incorrect username or password.');
-      ME = null; var w = await me(); if (!w || w.s.role === 'PACKER') { await c.auth.signOut(); throw new Error('Incorrect username or password.'); }
+      ME = null; REG = 0; var w = await me(); if (!w || w.s.role === 'PACKER') { await c.auth.signOut(); throw new Error(DEVMSG || 'Incorrect username or password.'); }
       try { var ss = await pSession(w.s, un); } catch (e) { await c.auth.signOut(); throw e; }
       try { ss.roster = await pRoster(); } catch (e) {} ss.device = hexR(32); return ss; }
     if (fn === 'portalResume') { ME = null; var w2 = await me(); if (!w2 || w2.s.role === 'PACKER') throw new Error('DEVICE_EXPIRED'); return pSession(w2.s, PU); }
