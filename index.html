@@ -842,7 +842,7 @@ const clearCache = () => Object.keys(RC).forEach(k => { if (Date.now() - RC[k].t
 const rk = () => S.brs.join(',') + '|' + S.from + '|' + S.date;
 const getDays = () => cached('d' + rk(), () => fetchAll(() => sb.from('van_day').select('*').in('branch_id', S.brs).gte('business_date', S.from).lte('business_date', S.date).order('business_date')));
 const getSales = () => cached('s' + rk(), () => perDay(S.from, S.date, d => sb.from('sales_lines')
-  .select('tran_date,invoice_no,line_no,tran_type,tender_type,sales_executive,itrade_user,salesman_id,customer_code,customer_name,customer_id,item_code,item_name,item_id,qty_base,gross,disc,net,vat,net_incl_vat,profit,van_day_id')
+  .select('tran_date,invoice_no,line_no,tran_type,tender_type,sales_executive,itrade_user,salesman_id,customer_code,customer_name,customer_id,item_code,item_name,item_id,unit,qty_base,gross,disc,net,vat,net_incl_vat,profit,van_day_id')
   .in('branch_id', S.brs).eq('cancelled', false).eq('tran_date', d).order('id')));
 const getItems = days => cached('i' + rk(), () => byIds('v_van_day_items', '*', 'van_day_id', days.map(d => d.id)));
 const getCash  = days => cached('c' + rk(), () => byIds('v_van_day_cash', '*', 'van_day_id', days.map(d => d.id)));
@@ -1052,8 +1052,14 @@ async function vAnalysis(){ const __t = S.nav;
   $('#f_clr').onclick = () => { S.saf = null; vAnalysis(); };
   bindRows($('#v'), G, g => {
     if (F.by === 'iv') { const L = rows.filter(r => r.invoice_no === g.key);
-      $('#drill').innerHTML = `<div class="card"><h3>${esc(g.key)} — ${esc(g.sub)} · ${esc(L[0]?.tran_date||'')} · ${esc(L[0]?.tender_type||'')} · ${esc(saleName(L[0]||{}))}</h3>
-        ${table([{l:'Item',left:1,f:r=>r.item_id?iNm(r.item_id):r.item_name},{k:'item_code',l:'Code'},{k:'qty_base',l:'Qty',sum:1},{k:'gross',l:'Gross',money:1,sum:1},{k:'disc',l:'Discount',money:1,sum:1},{k:'net',l:'Net',money:1,sum:1},{k:'vat',l:'VAT',money:1,sum:1},{k:'net_incl_vat',l:'Net incl. VAT',money:1,sum:1}], L)}</div>`;
+      // invoice opens in a popup (like the old portal): who entered it, the executive, each product line
+      const dlg = document.createElement('dialog'); dlg.className = 'udlg'; dlg.style.cssText = 'max-width:1100px;width:94vw';
+      dlg.innerHTML = `<div class="row" style="justify-content:space-between;margin:0 0 4px"><h3 style="margin:0">${esc(g.key)}</h3><button id="dclose">Close</button></div>
+        <p class="muted" style="margin:0 0 10px">${esc(L[0]?.tran_date||'')} · ${esc(saleName(L[0]||{}))} · ${esc(L[0]?.customer_name||g.sub||'')}${L[0]?.customer_code?' ('+esc(L[0].customer_code)+')':''} · ${esc(L[0]?.tender_type||'')} · ${L.length} line${L.length===1?'':'s'}</p>
+        ${table([{k:'itrade_user',l:'Entered by',left:1},{k:'sales_executive',l:'Executive',left:1},{l:'Product',left:1,f:r=>r.item_name||(r.item_id?iNm(r.item_id):'')},{k:'item_code',l:'Code'},{k:'qty_base',l:'Qty',sum:1},{k:'unit',l:'Unit'},{k:'gross',l:'Gross',money:1,sum:1},{k:'disc',l:'Discount',money:1,sum:1},{k:'net',l:'Net',money:1,sum:1},{k:'vat',l:'VAT',money:1,sum:1},{k:'net_incl_vat',l:'Net incl. VAT',money:1,sum:1},{k:'profit',l:'Profit',money:1,sum:1}], L)}
+        <p class="muted" style="margin:8px 0 0">Amounts reflect the current filters. Source: imported iTrade sales.</p>`;
+      document.body.append(dlg); dlg.querySelector('#dclose').onclick = () => dlg.close(); dlg.addEventListener('close', () => dlg.remove());
+      dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); }); dlg.showModal(); return;
     } else { const nf = { ...F, by:'iv' }; const fk = { sm:'sm', it:'item', cu:'cust', td:'tender' }[F.by]; if (fk) nf[fk] = String(g.key);
       if (F.by === 'dt') { S.from = S.date = g.key; } S.saf = nf; render(); return; }
     $('#drill').scrollIntoView({ behavior:'smooth' });
