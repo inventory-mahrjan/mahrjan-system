@@ -90,6 +90,7 @@
   .cosel>div{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line2);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:6px;min-width:150px}
   .cosel>div label{display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer;flex-direction:row}
   .udlg{border:1px solid var(--line2);border-radius:10px;padding:22px;width:min(440px,92vw)} .udlg form{display:flex;flex-direction:column;gap:10px} .udlg label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)} .udlg::backdrop{background:rgba(0,0,0,.3)}
+  tr.warn td{background:#fff4e5}
   .os{border-collapse:collapse;font-size:12.5px;width:100%} .os td{border:1px solid #d9dcd6;padding:4px 7px;white-space:nowrap} .os td.n{text-align:right;font-family:'IBM Plex Mono',monospace}
   .os tr.h td{background:var(--accent-ink);color:#fff;font-weight:600} .os tr.b td{font-weight:600} .os tr.t td{background:var(--soft);font-weight:600;color:var(--accent-ink)} .os tr.g td{border:0;height:10px} .os tr.s td{border:0;padding-top:34px}
   .rtabs{display:flex;gap:6px;flex-wrap:wrap} .rtabs button.on{background:var(--accent-ink);color:#fff;border-color:var(--accent-ink)}
@@ -127,7 +128,7 @@
 </head>
 <body>
 <div id="app"></div>
-<script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=4"></script><script src="old-sheets.js?v=1"></script>
+<script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=5"></script><script src="old-sheets.js?v=1"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -223,7 +224,7 @@ function render(){
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
     days:'Van day status, cash to hand over, settlement and closing.', imp:'Upload the iTrade Periodical Sales Detailed Report.',
     req:'Next-day order by salesman, qty as the salesman gives it.', wh:'Production and cleaning batches: issue, return, differences and output.',
-    ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Daily and weekly store count (good and damage), compared with the iTrade stock.',
+    ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Count batches: create here, the receiver counts offline in the app and posts; compare with iTrade, recount, expiry, shelves, tray & label usage.',
     ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
     ds:'Loading sheet, salesman summary and daily cash sheet, ready to print on A4.', pc:'Office cash book: receipts, payments, deposits and suspense, with opening and closing balance.',
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
@@ -248,7 +249,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','sc','pc'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+function view(){ clearCache(); if (S.brs.length > 1 && ['wh','ite','pc'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, imp:vImport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:vDash, ds:vSheets, pc:vPetty, se:vShort, wo:vWriteoff, qs:vQty, sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -541,32 +542,169 @@ async function vWarehouse(){
 }
 
 // ---------- STOCK COUNT ----------
+// ---------- STOCK COUNT (batches: created here, counted offline in the app, posted, compared) ----------
+const SC_CAT = { RAW:'Raw egg', FG:'Finished goods', TRAY:'Plain tray', LTRAY:'Labelled tray', LABEL:'Label roll' };
+const SC_TYPE = { FRESH:'Fresh', GRV:'GRV', CLEANED:'Cleaned', DAMAGE:'Damage' };
 async function vStock(){
-  S.sct = S.sct || 'WEEKLY';
-  const hist = await q(sb.from('stock_counts').select('*').eq('branch_id', S.br).gte('count_date', addDays(S.date, -35)).lte('count_date', S.date).order('count_date', { ascending:false }));
-  const c = hist.find(h => h.count_date === S.date && h.count_type === S.sct);
-  const L = c ? await q(sb.from('stock_count_lines').select('*').eq('count_id', c.id)) : [];
-  const nm = id => S.staff.find(s => s.id === id)?.name || '';
-  const hasSys = c && c.system_loaded_at, canUp = canE('itstock') && c;
-  const rows = L.map(l => ({ ...l, it:item(l.item_id) })).filter(l => num(l.good) || num(l.damage) || l.system_qty != null)
-    .sort((a,b) => (a.it.display_order||0) - (b.it.display_order||0));
-  const grp = [['FG','Finished goods (packs)'],['RAW_EGG','Raw egg (pieces)'],['MATERIAL','Packing material (pieces)']];
-  $('#v').innerHTML = `<div class="card"><h3>Count</h3><div class="row">
-      <label>Type<select id="ty">${['DAILY','WEEKLY'].map(t => `<option ${t===S.sct?'selected':''}>${t}</option>`).join('')}</select></label>
-      ${canUp ? `<label>iTrade stock (.xlsx)<input type="file" id="sf" accept=".xlsx,.xls,.csv"></label>` : ''}
-      ${c ? `<span class="muted">Counted by <b>${esc(nm(c.counted_by))}</b> · ${new Date(c.posted_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})}${hasSys?' · iTrade stock loaded '+new Date(c.system_loaded_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):''}</span>` : `<span class="muted">No ${S.sct.toLowerCase()} count for ${S.date}.</span>`}
-    </div>${rows.length ? grp.map(([t,l]) => { const g = rows.filter(r => r.it.item_type === t); if (!g.length) return '';
-      const tot = k => g.reduce((a,r) => a + num(r[k]), 0), tsys = g.reduce((a,r) => a + num(r.system_qty), 0);
-      return `<h3 style="margin-top:14px">${l}</h3><div class="tw"><table><tr><th class="l">Item</th><th>Good</th><th>Damage</th><th>Total</th>${hasSys?'<th>iTrade</th><th>Difference</th>':''}</tr>
-        ${g.map(r => { const t = num(r.good) + num(r.damage), df = t - num(r.system_qty); return `<tr><td class="l">${esc(r.it.short_name||r.it.name)}</td>
-          <td>${showQty(r.it, r.good) || 0}</td><td>${num(r.damage) || ''}</td><td>${showQty(r.it, t) || 0}</td>
-          ${hasSys ? `<td>${r.system_qty!=null?showQty(r.it, r.system_qty)||0:'—'}</td><td class="${r.system_qty!=null&&df?'bad':''}">${r.system_qty==null?'—':(df>0?'+':'')+(+df.toFixed(2))}</td>` : ''}</tr>`; }).join('')}
-        <tr class="tot"><td class="l">Total</td><td>${tot('good')}</td><td>${tot('damage')}</td><td>${tot('good')+tot('damage')}</td>${hasSys?`<td>${tsys}</td><td>${+(tot('good')+tot('damage')-tsys).toFixed(2)}</td>`:''}</tr></table></div>`; }).join('') : ''}</div>
-    <div class="card"><h3>Counts — last 5 weeks</h3>${hist.length ? `<div class="tw"><table><tr><th>Date</th><th>Type</th><th class="l">Counted by</th><th>Posted</th><th>iTrade compare</th><th></th></tr>
-      ${hist.map(h => `<tr><td>${h.count_date}</td><td>${h.count_type}</td><td class="l">${esc(nm(h.counted_by))}</td><td>${new Date(h.posted_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'})}</td>
-        <td>${h.system_loaded_at?'Yes':''}</td><td><button data-h="${h.count_date}|${h.count_type}">Open</button></td></tr>`).join('')}</table></div>` : '<p class="muted">No counts yet. The receiver posts counts from the PDT app (Stock count).</p>'}</div>`;
-  $('#ty').onchange = e => { S.sct = e.target.value; vStock(); };
-  $('#v').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { const [d,t] = b.dataset.h.split('|'); S.date = d; S.sct = t; $('#dt').value = d; vStock(); });
+  if (S.scb) return vStockBatch(S.scb);
+  loading();
+  const from = addDays(S.date, -60);
+  const bs = await q(sb.from('sc_batches').select('*').in('branch_id', S.brs).gte('count_date', from).order('count_date', { ascending:false }).order('id', { ascending:false }));
+  const cnt = bs.length ? await q(sb.from('sc_lines').select('batch_id').in('batch_id', bs.map(b => b.id))) : [];
+  const nl = id => cnt.filter(x => x.batch_id === id).length, nm = id => S.staff.find(s => s.id === id)?.name || '';
+  const co = id => S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz';
+  const canMake = has('ADMIN','ACCOUNTANT');
+  const st = b => ({ OPEN:'Open', DOWNLOADED:'Counting', POSTED:'Posted', CANCELLED:'Cancelled' })[b.status];
+  $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0">${canMake ? '<button class="p" id="nb">New count batch</button>' : ''}
+      <span class="muted">Create the batch here; the receiver downloads it in the app (Warehouse → Stock count), counts offline and posts.</span></div>${tools()}</div>
+    <div class="tw"><table><tr><th class="l">Batch</th><th>Company</th><th>Count date</th><th>Type</th><th class="l">Counted by</th><th class="l">Categories</th><th>Status</th><th>Entries</th><th>Posted</th><th></th></tr>
+    ${bs.map(b => `<tr><td class="l">${esc(b.batch_no)}${b.parent_id ? ' <span class="muted">recount</span>' : ''}</td><td>${co(b.branch_id)}</td><td>${b.count_date}</td><td>${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'}</td>
+      <td class="l">${esc(nm(b.counted_by))}</td><td class="l">${b.categories.map(c => SC_CAT[c]).join(', ')}</td><td class="${b.status==='POSTED'?'ok':b.status==='CANCELLED'?'muted':''}">${st(b)}</td><td>${nl(b.id)}</td>
+      <td>${b.posted_at ? new Date(b.posted_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td><td><button data-b="${b.id}">Open</button></td></tr>`).join('') || '<tr><td colspan="10" class="muted">No count batches in the last 60 days.</td></tr>'}</table></div></div>`;
+  $('#nb') && ($('#nb').onclick = () => scBatchDialog(null));
+  $('#v').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { S.scb = +b.dataset.b; S.sctab = 'sum'; vStock(); });
+  bindTools('Stock count batches', [['Batches', [{k:'batch_no',l:'Batch'},{l:'Company',f:b=>co(b.branch_id)},{k:'count_date',l:'Date'},{k:'count_type',l:'Type'},{l:'Counted by',f:b=>nm(b.counted_by)},{l:'Categories',f:b=>b.categories.map(c=>SC_CAT[c]).join(', ')},{k:'status',l:'Status'},{l:'Entries',f:b=>nl(b.id)}], bs]]);
+}
+
+function scBatchDialog(b, recount){
+  const d = document.createElement('dialog'); d.className = 'udlg';
+  const brs = S.branches.filter(x => S.brs.includes(x.id) || x.id === b?.branch_id);
+  const recv = br => S.staff.filter(s => s.active && ['RECEIVER','ADMIN','ACCOUNTANT'].includes(s.role) && (s.branch_id === br || s.branch_id == null));
+  const brId = b?.branch_id || recount?.branch_id || brs[0]?.id, cats = b?.categories || recount?.categories || ['RAW','FG'];
+  d.innerHTML = `<form method="dialog"><h3 style="margin-top:0">${recount ? 'Recount batch' : b ? 'Change batch ' + esc(b.batch_no) : 'New count batch'}</h3>
+    ${recount ? `<p class="muted">Recount of ${esc(recount.batch_no)} · only the ${recount.items.length} flagged items.</p>` : ''}
+    <label>Company<select name="br">${brs.map(x => `<option value="${x.id}" ${x.id===brId?'selected':''}>${x.code==='MGT'?'Ajman':'Al Quoz'}</option>`).join('')}</select></label>
+    <label>Count date<input type="date" name="dt" value="${b?.count_date || addDays(S.date, recount ? 0 : 1)}"></label>
+    <label>Type<select name="ty"><option value="DAILY" ${b?.count_type!=='WEEKLY'?'selected':''}>Daily</option><option value="WEEKLY" ${b?.count_type==='WEEKLY'?'selected':''}>Weekly</option></select></label>
+    <label>Counted by<select name="cb"></select></label>
+    <div class="cobox">Categories to count<div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px">${Object.entries(SC_CAT).map(([k,l]) => `<label style="flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:14px"><input type="checkbox" name="cat" value="${k}" ${cats.includes(k)?'checked':''}> ${l}</label>`).join('')}</div></div>
+    <label>Note (optional)<input name="nt" value="${esc(b?.note||'')}"></label>
+    <p class="bad st"></p><div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="bsv">${b ? 'Save' : 'Create batch'}</button></div></form>`;
+  document.body.append(d); const f = d.querySelector('form');
+  const fill = () => { const br = +f.br.value; f.cb.innerHTML = recv(br).map(s => `<option value="${s.id}" ${s.id===b?.counted_by?'selected':''}>${esc(s.name)} · ${s.role.toLowerCase()}</option>`).join(''); };
+  f.br.onchange = fill; fill();
+  d.querySelector('#bsv').onclick = async ev => { ev.preventDefault(); const st = d.querySelector('.st'); st.textContent = '';
+    const cs = [...f.querySelectorAll('[name=cat]:checked')].map(x => x.value);
+    if (!cs.length) { st.textContent = 'Tick at least one category.'; return; }
+    ev.target.disabled = true;
+    try { const r = await rpc('sc_save_batch', { p_id: b ? b.id : null, p_branch: +f.br.value, p_date: f.dt.value, p_type: f.ty.value, p_counted_by: f.cb.value ? +f.cb.value : null,
+        p_categories: cs, p_note: f.nt.value, p_parent: recount ? recount.id : null, p_items: recount ? recount.items : null });
+      d.close(); toast((b ? 'Saved ' : 'Created ') + r.batch_no); S.scb = r.id; vStock(); }
+    catch (e) { st.textContent = e.message || String(e); ev.target.disabled = false; } };
+  d.addEventListener('close', () => d.remove()); d.showModal();
+}
+
+async function vStockBatch(id){
+  loading();
+  const b = (await q(sb.from('sc_batches').select('*').eq('id', id)))[0];
+  if (!b) { S.scb = null; return vStock(); }
+  const [L, SY, prevA] = await Promise.all([q(sb.from('sc_lines').select('*').eq('batch_id', id).order('entry_no')),
+    has('ADMIN','ACCOUNTANT','VIEWER') ? q(sb.from('sc_system').select('*').eq('batch_id', id)) : [],
+    q(sb.from('sc_batches').select('*').eq('branch_id', b.branch_id).eq('status','POSTED').lt('count_date', b.count_date).order('count_date', { ascending:false }).limit(10))]);
+  const prev = prevA.find(p => !p.parent_id && p.categories.some(c => b.categories.includes(c)));
+  const PL = prev ? await q(sb.from('sc_lines').select('*').eq('batch_id', prev.id)) : [];
+  const nm = sid => S.staff.find(s => s.id === sid)?.name || '';
+  const co = S.branches.find(x => x.id === b.branch_id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz';
+  const office = has('ADMIN','ACCOUNTANT'), posted = b.status === 'POSTED';
+  S.sclim = S.sclim ?? 5; S.scmin = S.scmin ?? 2; S.scexp = S.scexp ?? 7; S.sctab = S.sctab || 'sum';
+  const sys = {}; SY.forEach(x => sys[x.item_id] = num(x.qty)); const hasSys = SY.length > 0;
+  const unitOf = it => it.item_type === 'FG' ? 'packs' : 'pcs';
+  const big = it => it.item_type === 'FG' ? (it.packs_per_carton || 0) : it.item_type === 'RAW_EGG' ? (it.pcs_per_carton || 0) : (it.pcs_per_box || 0);
+  const show = (it, v) => { v = num(v); const k = big(it); if (!k || !v) return v ? String(+v.toFixed(2)) : '0'; const c = Math.floor(v / k), r = +(v - c * k).toFixed(2);
+    return `${+v.toFixed(2)} <span class="muted">(${c} ${it.item_type==='FG'?'ctn':it.item_type==='RAW_EGG'?'ctn':'box'}${r ? ' + ' + r : ''})</span>`; };
+  // per item
+  const by = {}; L.forEach(l => { const r = by[l.item_id] ||= { it: item(l.item_id), FRESH:0, GRV:0, CLEANED:0, DAMAGE:0, PLAIN:0, LAB:0, tot:0, cats:new Set() };
+    r.cats.add(l.category); const q2 = num(l.total_qty); r.tot += q2;
+    if (l.category === 'TRAY') r.PLAIN += q2; else if (l.category === 'LTRAY' || l.category === 'LABEL') r.LAB += q2; else r[l.stock_type || 'FRESH'] += q2; });
+  Object.keys(sys).forEach(k => { if (!by[k]) by[k] = { it:item(+k), FRESH:0, GRV:0, CLEANED:0, DAMAGE:0, PLAIN:0, LAB:0, tot:0, cats:new Set() }; });
+  const rows = Object.entries(by).map(([k, r]) => { const s2 = sys[k], df = s2 == null ? null : r.tot - s2, pct = s2 ? Math.abs(df) / s2 * 100 : (df ? 100 : 0);
+    const flag = s2 != null && df !== 0 && pct > S.sclim && Math.abs(df) >= S.scmin * (big(r.it) || 1);
+    return { id:+k, ...r, sys:s2, df, pct, flag, val: df == null ? null : df * num(r.it.unit_cost) }; })
+    .sort((x, y) => (x.it.item_type||'').localeCompare(y.it.item_type||'') || (x.it.display_order||0) - (y.it.display_order||0));
+  const flagged = rows.filter(r => r.flag);
+  const soon = addDays(S.date, S.scexp), nearExp = L.filter(l => l.exp_date && l.exp_date <= soon).sort((x,y) => x.exp_date.localeCompare(y.exp_date));
+  const shelves = [...new Set(L.map(l => l.shelf).filter(Boolean))].sort(), prevShelves = [...new Set(PL.map(l => l.shelf).filter(Boolean))].sort();
+  const missingShelves = prevShelves.filter(x => !shelves.includes(x));
+  const tabs = [['sum','Summary'],['ent','Entries'],['shelf','Shelves'],['exp','Expiry & country'],['use','Tray & label usage']];
+  const head = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button id="bk">← All batches</button>
+      <b style="font-size:16px">${esc(b.batch_no)}</b><span>${co} · ${b.count_date} · ${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'} · counted by ${esc(nm(b.counted_by))}</span>
+      <span class="${posted?'ok':''}">${({OPEN:'Open — not downloaded yet',DOWNLOADED:'Counting in the app',POSTED:'Posted',CANCELLED:'Cancelled'})[b.status]}</span></div>${tools()}</div>
+    <p class="muted" style="margin:6px 0 0">Categories: ${b.categories.map(c => SC_CAT[c]).join(', ')}${b.cutoff_at ? ' · cut-off ' + new Date(b.cutoff_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}${b.posted_at ? ' · posted ' + new Date(b.posted_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}${b.edited_at && posted ? ' · edited ' + new Date(b.edited_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}${b.note ? ' · ' + esc(b.note) : ''}</p>
+    ${office ? `<div class="row" style="margin-top:10px">${!posted && b.status !== 'CANCELLED' ? '<button id="eb">Change batch</button><button id="cb">Cancel batch</button>' : ''}
+      ${b.status !== 'CANCELLED' ? '<label>iTrade stock for this count (.xlsx)<input type="file" id="sf" accept=".xlsx,.xls,.csv"></label>' : ''}
+      ${posted && flagged.length ? `<button class="p" id="rc">Recount ${flagged.length} flagged item${flagged.length>1?'s':''}</button>` : ''}</div>` : ''}
+    <div class="rtabs" style="margin-top:12px">${tabs.map(([k,l]) => `<button data-t="${k}" class="${S.sctab===k?'on':''}">${l}${k==='shelf'&&missingShelves.length?' ⚠':''}${k==='exp'&&nearExp.length?' ⚠':''}</button>`).join('')}</div></div>`;
+  let body = '', xl = [];
+  if (S.sctab === 'sum') {
+    body = `<div class="card"><div class="row"><label>Flag when difference over (%)<input type="number" id="lim" value="${S.sclim}" style="width:80px"></label><label>and at least (cartons / boxes)<input type="number" id="min" value="${S.scmin}" style="width:80px"></label>
+      ${hasSys ? `<span class="muted">${flagged.length} item${flagged.length===1?'':'s'} flagged</span>` : '<span class="muted">Upload the iTrade stock to compare.</span>'}</div>
+      <div class="tw"><table><tr><th class="l">Item</th><th>Category</th><th>Fresh</th><th>GRV / Cleaned</th><th>Damage</th><th>Plain</th><th>Labelled / roll</th><th>Total counted</th>${hasSys?'<th>iTrade</th><th>Difference</th><th>%</th><th>AED</th>':''}</tr>
+      ${rows.map(r => `<tr class="${r.flag?'warn':''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${[...r.cats].map(c=>SC_CAT[c]).join(', ') || (r.it.item_type==='FG'?'Finished goods':r.it.item_type==='RAW_EGG'?'Raw egg':'Material')}</td>
+        <td>${r.FRESH?+r.FRESH.toFixed(2):''}</td><td>${(r.GRV+r.CLEANED)?+(r.GRV+r.CLEANED).toFixed(2):''}</td><td>${r.DAMAGE?+r.DAMAGE.toFixed(2):''}</td><td>${r.PLAIN?+r.PLAIN.toFixed(2):''}</td><td>${r.LAB?+r.LAB.toFixed(2):''}</td>
+        <td><b>${show(r.it, r.tot)}</b> ${unitOf(r.it)}</td>${hasSys ? `<td>${r.sys==null?'—':show(r.it, r.sys)}</td><td class="${r.df?'bad':''}">${r.df==null?'—':(r.df>0?'+':'')+(+r.df.toFixed(2))}</td><td>${r.sys==null?'':r.pct.toFixed(1)}</td><td>${r.val==null||!r.it.unit_cost?'':(r.val>0?'+':'')+r.val.toFixed(2)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="12" class="muted">Nothing counted yet.</td></tr>'}
+      ${hasSys ? `<tr class="tot"><td class="l" colspan="11">Value of differences (items with a cost in Items & BOM)</td><td>${rows.reduce((a,r)=>a+(r.val||0),0).toFixed(2)}</td></tr>` : ''}</table></div></div>`;
+    xl = [['Summary', [{l:'Item',f:r=>r.it.name},{l:'Fresh',f:r=>r.FRESH},{l:'GRV/Cleaned',f:r=>r.GRV+r.CLEANED},{l:'Damage',f:r=>r.DAMAGE},{l:'Plain',f:r=>r.PLAIN},{l:'Labelled/roll',f:r=>r.LAB},{l:'Total',f:r=>r.tot},{l:'Unit',f:r=>unitOf(r.it)},{l:'iTrade',f:r=>r.sys??''},{l:'Difference',f:r=>r.df??''},{l:'AED',f:r=>r.val??''},{l:'Flag',f:r=>r.flag?'RECOUNT':''}], rows]];
+  } else if (S.sctab === 'ent') {
+    const edit = office;
+    body = `<div class="card"><p class="muted">${edit ? (posted ? 'Posted count — you can still correct a line or add one; every change is recorded.' : 'Lines saved from the app so far. You can correct them here.') : ''}</p>
+      <div class="tw"><table id="ent"><tr><th>#</th><th>Shelf</th><th>Category</th><th>Type</th><th class="l">Item</th><th>Big</th><th>Tray</th><th>Small</th><th>Total</th><th>Expiry</th><th>Country</th><th>Scanned</th>${edit?'<th></th>':''}</tr>
+      ${L.map(l => { const it = item(l.item_id); return `<tr data-l="${l.id}"><td>${l.entry_no}</td><td>${edit?`<input data-k="shelf" value="${esc(l.shelf||'')}" style="width:70px">`:esc(l.shelf||'')}</td><td>${SC_CAT[l.category]}</td><td>${SC_TYPE[l.stock_type]||''}</td>
+        <td class="l">${esc(it.short_name||it.name)}${l.zero_confirmed?' <span class="muted">(confirmed zero)</span>':''}</td>
+        ${['qty_big','qty_tray','qty_small'].map(k => `<td>${edit?`<input type="number" min="0" data-k="${k}" value="${+l[k]||''}" style="width:64px">`:(+l[k]||'')}</td>`).join('')}
+        <td data-tot>${+num(l.total_qty).toFixed(2)}</td><td>${edit?`<input type="date" data-k="exp_date" value="${l.exp_date||''}">`:(l.exp_date||'')}</td><td>${edit?`<input data-k="country" value="${esc(l.country||'')}" style="width:90px">`:esc(l.country||'')}</td>
+        <td>${l.scanned_at?new Date(l.scanned_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'}):''}</td>${edit?`<td><button data-del="${l.id}">✕</button></td>`:''}</tr>`; }).join('') || '<tr><td colspan="13" class="muted">No entries yet.</td></tr>'}</table></div>
+      ${edit && L.length ? '<div class="row" style="justify-content:flex-end"><button class="p" id="sl">Save changes</button></div>' : ''}</div>`;
+    xl = [['Entries', [{k:'entry_no',l:'#'},{k:'shelf',l:'Shelf'},{l:'Category',f:l=>SC_CAT[l.category]},{l:'Type',f:l=>SC_TYPE[l.stock_type]||''},{l:'Item',f:l=>item(l.item_id).name},{k:'qty_big',l:'Big'},{k:'qty_tray',l:'Tray'},{k:'qty_small',l:'Small'},{k:'total_qty',l:'Total'},{k:'unit',l:'Unit'},{k:'exp_date',l:'Expiry'},{k:'country',l:'Country'},{k:'scanned_barcode',l:'Scanned barcode'}], L]];
+  } else if (S.sctab === 'shelf') {
+    const sh = shelves.map(x => ({ shelf:x, n:L.filter(l => l.shelf === x).length, items:[...new Set(L.filter(l => l.shelf === x).map(l => item(l.item_id).short_name || item(l.item_id).name))].join(', ') }));
+    body = `<div class="card">${missingShelves.length ? `<div class="notice">Shelves counted last time (${esc(prev.batch_no)}) but not in this count: <b>${missingShelves.map(esc).join(', ')}</b></div>` : prev ? `<p class="ok">All ${prevShelves.length} shelves from the last count (${esc(prev.batch_no)}) are counted.</p>` : '<p class="muted">No earlier posted count to compare shelves with.</p>'}
+      <div class="tw"><table><tr><th class="l">Shelf</th><th>Entries</th><th class="l">Items</th></tr>${sh.map(x => `<tr><td class="l">${esc(x.shelf)}</td><td>${x.n}</td><td class="l">${esc(x.items)}</td></tr>`).join('')}</table></div></div>`;
+    xl = [['Shelves', [{k:'shelf',l:'Shelf'},{k:'n',l:'Entries'},{k:'items',l:'Items'}], sh]];
+  } else if (S.sctab === 'exp') {
+    const g = {}; L.filter(l => l.exp_date || l.country).forEach(l => { const k = l.item_id + '|' + (l.exp_date||'') + '|' + (l.country||''); (g[k] ||= { it:item(l.item_id), exp:l.exp_date, country:l.country, qty:0 }).qty += num(l.total_qty); });
+    const ex = Object.values(g).sort((x,y) => (x.exp||'9').localeCompare(y.exp||'9'));
+    body = `<div class="card"><div class="row"><label>Near expiry within (days)<input type="number" id="ned" value="${S.scexp}" style="width:80px"></label>${nearExp.length ? `<span class="bad">${nearExp.length} entr${nearExp.length>1?'ies':'y'} expire by ${soon}</span>` : '<span class="ok">Nothing near expiry.</span>'}</div>
+      <div class="tw"><table><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Qty</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${+r.qty.toFixed(2)} ${unitOf(r.it)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
+    xl = [['Expiry & country', [{l:'Item',f:r=>r.it.name},{k:'exp',l:'Expiry'},{k:'country',l:'Country'},{k:'qty',l:'Qty'}], ex]];
+  } else {
+    // tray & label usage: last count + received − used in production = expected; compare with this count
+    let use = [];
+    if (prev && prev.cutoff_at && b.cutoff_at) {
+      const wb = await q(sb.from('wh_batches').select('id').eq('branch_id', b.branch_id).neq('status','CANCELLED').gte('issued_at', prev.cutoff_at).lt('issued_at', b.cutoff_at));
+      const wl = wb.length ? await q(sb.from('wh_lines').select('item_id,line_type,qty').in('batch_id', wb.map(x => x.id)).in('line_type', ['ISSUE MATERIAL','MATERIAL REUSABLE'])) : [];
+      const used = {}; wl.forEach(x => used[x.item_id] = (used[x.item_id] || 0) + (x.line_type === 'ISSUE MATERIAL' ? 1 : -1) * num(x.qty));
+      const last = {}, now2 = {}; PL.forEach(l => { if (['TRAY','LTRAY','LABEL'].includes(l.category)) last[l.item_id] = (last[l.item_id]||0) + num(l.total_qty); });
+      L.forEach(l => { if (['TRAY','LTRAY','LABEL'].includes(l.category)) now2[l.item_id] = (now2[l.item_id]||0) + num(l.total_qty); });
+      S.scrcv ||= {}; const rcv = S.scrcv[id] ||= {};
+      use = [...new Set([...Object.keys(last), ...Object.keys(now2)])].map(k => { const it = item(+k), exp2 = (last[k]||0) + num(rcv[k]) - (used[k]||0);
+        return { id:+k, it, last:last[k]||0, rcv:num(rcv[k]), used:used[k]||0, exp:exp2, now:now2[k]||0, waste: exp2 - (now2[k]||0) }; })
+        .sort((x,y) => (x.it.material_kind||'').localeCompare(y.it.material_kind||'') || (x.it.name||'').localeCompare(y.it.name||''));
+    }
+    body = `<div class="card">${!prev ? '<p class="muted">Needs an earlier posted count with trays or labels to compare with.</p>' : !b.cutoff_at ? '<p class="muted">Available once counting has started.</p>' : `
+      <p class="muted">Last count ${esc(prev.batch_no)} → this count. Used = issued to production (less reusable returned) between the two counts. Type the trays / labels received in between.</p>
+      <div class="tw"><table><tr><th class="l">Tray / label</th><th>Last count</th><th>Received</th><th>Used in production</th><th>Expected</th><th>Counted now</th><th>Wastage / missing</th></tr>
+      ${use.map(r => `<tr class="${r.waste>0?'warn':''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${+r.last.toFixed(0)}</td><td><input type="number" min="0" data-rcv="${r.id}" value="${r.rcv||''}" style="width:80px"></td><td>${+r.used.toFixed(0)}</td><td>${+r.exp.toFixed(0)}</td><td>${+r.now.toFixed(0)}</td><td class="${r.waste>0?'bad':''}">${+r.waste.toFixed(0)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No trays or labels counted.</td></tr>'}</table></div>`}</div>`;
+    xl = [['Tray & label usage', [{l:'Item',f:r=>r.it.name},{k:'last',l:'Last count'},{k:'rcv',l:'Received'},{k:'used',l:'Used'},{k:'exp',l:'Expected'},{k:'now',l:'Counted'},{k:'waste',l:'Wastage'}], use]];
+  }
+  $('#v').innerHTML = head + body;
+  bindTools(b.batch_no, xl);
+  $('#bk').onclick = () => { S.scb = null; vStock(); };
+  $('#v').querySelectorAll('[data-t]').forEach(x => x.onclick = () => { S.sctab = x.dataset.t; vStockBatch(id); });
+  $('#lim') && ($('#lim').onchange = e => { S.sclim = num(e.target.value); vStockBatch(id); });
+  $('#min') && ($('#min').onchange = e => { S.scmin = num(e.target.value); vStockBatch(id); });
+  $('#ned') && ($('#ned').onchange = e => { S.scexp = num(e.target.value); vStockBatch(id); });
+  $('#v').querySelectorAll('[data-rcv]').forEach(x => x.onchange = () => { S.scrcv[id][x.dataset.rcv] = num(x.value); vStockBatch(id); });
+  $('#eb') && ($('#eb').onclick = () => scBatchDialog(b));
+  $('#cb') && ($('#cb').onclick = async () => { if (!confirm('Cancel batch ' + b.batch_no + '? The app will not show it any more.')) return; await rpc('sc_cancel_batch', { p_id:id }); toast('Batch cancelled'); vStockBatch(id); });
+  $('#rc') && ($('#rc').onclick = () => scBatchDialog(null, { id, batch_no:b.batch_no, branch_id:b.branch_id, categories:b.categories, items:flagged.map(r => r.id) }));
+  $('#v').querySelectorAll('[data-del]').forEach(x => x.onclick = () => { x.closest('tr').remove(); });
+  $('#sl') && ($('#sl').onclick = async () => {
+    const keep = [...$('#ent').querySelectorAll('tr[data-l]')].map(tr => { const l = L.find(z => z.id === +tr.dataset.l), it = item(l.item_id), v = k => tr.querySelector(`[data-k="${k}"]`).value;
+      const qb = num(v('qty_big')), qt = num(v('qty_tray')), qs = num(v('qty_small')), k = big(it);
+      const total = l.category === 'RAW' ? qb * (it.pcs_per_carton||0) + qt * (it.pcs_per_tray||0) + qs : qb * (k||0) + qs;
+      return { ...l, shelf:v('shelf'), qty_big:qb, qty_tray:qt, qty_small:qs, total_qty: k || l.category === 'RAW' ? total : (qb || qs), exp_date:v('exp_date'), country:v('country') }; });
+    if (!confirm(`Save ${keep.length} line${keep.length===1?'':'s'}${keep.length < L.length ? ' (' + (L.length - keep.length) + ' removed)' : ''}?`)) return;
+    try { await rpc('sc_upload', { p_id:id, p_lines:keep, p_post:false }); toast('Count saved'); vStockBatch(id); } catch (e) { toast(e.message, false); } });
   $('#sf') && ($('#sf').onchange = async e => {
     const file = e.target.files[0]; if (!file) return;
     const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
@@ -576,13 +714,12 @@ async function vStock(){
     const H = grid[hi].map(x => String(x).trim()), ci = H.findIndex(x => /code/i.test(x)),
           qi = H.findIndex(x => /closing|balance/i.test(x)) >= 0 ? H.findIndex(x => /closing|balance/i.test(x)) : H.findIndex(x => /qty|quantity|stock/i.test(x)),
           ui = H.findIndex(x => /^(unit|uom)/i.test(x));
-    const rows = grid.slice(hi + 1).filter(r => String(r[ci]).trim() && r[qi] !== '').map(r => {
-      const it = S.items.find(i => i.itrade_code === String(r[ci]).trim()) || {}, u = ui >= 0 ? String(r[ui]).toUpperCase() : '';
-      const m = /TRAY/.test(u) ? (it.pcs_per_tray || 30) : /CTN|CARTON|BOX/.test(u) ? per(it) : 1;
-      return { item_code:String(r[ci]).trim(), qty: num(r[qi]) * m }; });
-    const res = await rpc('set_system_stock', { p_count:c.id, p_rows:rows });
-    toast(`iTrade stock loaded · ${rows.length} rows` + (res?.unknown_items ? ' · not in item master: ' + res.unknown_items : ''), !res?.unknown_items);
-    vStock();
+    const unknown = [], rows2 = grid.slice(hi + 1).filter(r => String(r[ci]).trim() && r[qi] !== '').map(r => {
+      const code = String(r[ci]).trim(), it = S.items.find(i => i.itrade_code === code || i.barcode === code); if (!it) { unknown.push(code); return null; }
+      const u = ui >= 0 ? String(r[ui]).toUpperCase() : '', m = /TRAY/.test(u) ? (it.pcs_per_tray || 30) : /CTN|CARTON|BOX/.test(u) ? (big(it) || 1) : 1;
+      return { item_id: it.id, qty: num(r[qi]) * m }; }).filter(Boolean);
+    try { const n = await rpc('sc_set_system', { p_id:id, p_rows:rows2 }); toast(`iTrade stock loaded · ${n} items` + (unknown.length ? ' · not in item master: ' + unknown.slice(0,8).join(', ') : ''), !unknown.length); vStockBatch(id); }
+    catch (er) { toast(er.message, false); }
   });
 }
 
@@ -1054,9 +1191,9 @@ async function vItems(){
     $('#v').innerHTML = `<div class="card">${tabs}<div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addi">Add item</button>
       <label>Type<select id="ity"><option value="">All</option>${Object.entries(TY).map(([k,l]) => `<option value="${k}" ${k===S.ity?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Search<input id="iq" value="${esc(S.iq)}" placeholder="Name, code…"></label></div>${tools()}</div>
-      <div class="tw"><table><tr><th>Order</th><th class="l">Barcode</th><th class="l">iTrade code</th><th class="l">Name</th><th class="l">Short name</th><th>Type</th><th>Pcs / pack</th><th>Packs / ctn</th><th>Pcs / ctn</th><th>Pcs / tray</th><th>Segment</th><th>Active</th><th></th></tr>
+      <div class="tw"><table><tr><th>Order</th><th class="l">Barcode</th><th class="l">iTrade code</th><th class="l">Name</th><th class="l">Short name</th><th>Type</th><th>Pcs / pack</th><th>Packs / ctn</th><th>Pcs / ctn</th><th>Pcs / tray</th><th>Kind</th><th>Pcs / box</th><th>Cost</th><th>Segment</th><th>Active</th><th></th></tr>
       ${shown.map(i => `<tr><td>${i.display_order ?? ''}</td><td class="l">${esc(i.barcode||'')}</td><td class="l">${esc(i.itrade_code||'')}</td><td class="l">${esc(i.name)}</td><td class="l">${esc(i.short_name||'')}</td>
-        <td>${TY[i.item_type]||i.item_type}</td><td>${i.pcs_per_pack ?? ''}</td><td>${i.packs_per_carton ?? ''}</td><td>${i.pcs_per_carton ?? ''}</td><td>${i.pcs_per_tray ?? ''}</td><td>${esc(i.segment||'')}</td>
+        <td>${TY[i.item_type]||i.item_type}</td><td>${i.pcs_per_pack ?? ''}</td><td>${i.packs_per_carton ?? ''}</td><td>${i.pcs_per_carton ?? ''}</td><td>${i.pcs_per_tray ?? ''}</td><td>${esc(i.material_kind||'')}</td><td>${i.pcs_per_box ?? ''}</td><td>${i.unit_cost ?? ''}</td><td>${esc(i.segment||'')}</td>
         <td>${i.active ? 'Yes' : '<span class="bad">No</span>'}</td><td><button data-ei="${i.id}">Edit</button></td></tr>`).join('')}</table></div></div>`;
     $('#ity').onchange = e => { S.ity = e.target.value; vItems(); };
     $('#iq').onchange = e => { S.iq = e.target.value; vItems(); };
@@ -1101,6 +1238,8 @@ async function vItems(){
       <div class="row" style="margin:0">${n('pcs_per_pack','Pcs per pack',i?.pcs_per_pack)}${n('packs_per_carton','Packs per carton',i?.packs_per_carton)}</div>
       <div class="row" style="margin:0">${n('pcs_per_carton','Pcs per carton (raw)',i?.pcs_per_carton)}${n('pcs_per_tray','Pcs per tray (raw)',i?.pcs_per_tray)}</div>
       <div class="row" style="margin:0"><label>Segment<select name="segment"><option ${i?.segment!=='OFFER'?'selected':''}>NORMAL</option><option ${i?.segment==='OFFER'?'selected':''}>OFFER</option></select></label>${n('display_order','Display order',i?.display_order ?? (items.reduce((m,x)=>Math.max(m,x.display_order||0),0)+1))}</div>
+      <div class="row" style="margin:0"><label>Material kind<select name="material_kind"><option value="">—</option>${['TRAY','LABEL','CARTON','OTHER'].map(k => `<option ${i?.material_kind===k?'selected':''}>${k}</option>`).join('')}</select></label>${n('pcs_per_box','Pcs per box / roll',i?.pcs_per_box)}</div>
+      <label>Cost per unit, AED (pcs for egg & material, pack for FG)<input name="unit_cost" type="number" min="0" step="0.0001" value="${i?.unit_cost ?? ''}"></label>
       <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="active" ${!i || i.active ? 'checked' : ''}> Active</label>
       <p class="bad st"></p><div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="isv">Save</button></div></form>`;
     document.body.append(d); const f = d.querySelector('form');
@@ -1108,7 +1247,7 @@ async function vItems(){
       const t = v => String(v || '').trim() || null, nn = v => v === '' ? null : Math.round(num(v));
       const row = { name: String(f.name.value).trim().toUpperCase(), short_name: t(f.short_name.value)?.toUpperCase() || null, barcode: t(f.barcode.value), itrade_code: t(f.itrade_code.value),
         item_type: f.item_type.value, pcs_per_pack: nn(f.pcs_per_pack.value), packs_per_carton: nn(f.packs_per_carton.value), pcs_per_carton: nn(f.pcs_per_carton.value),
-        pcs_per_tray: nn(f.pcs_per_tray.value), segment: f.segment.value, display_order: nn(f.display_order.value), active: f.active.checked };
+        pcs_per_tray: nn(f.pcs_per_tray.value), pcs_per_box: nn(f.pcs_per_box.value), material_kind: f.material_kind.value || null, unit_cost: f.unit_cost.value === '' ? null : num(f.unit_cost.value), segment: f.segment.value, display_order: nn(f.display_order.value), active: f.active.checked };
       if (!row.name) { st.textContent = 'Enter the item name.'; return; }
       if (row.item_type === 'FG' && !row.packs_per_carton) { st.textContent = 'Enter packs per carton for a finished good.'; return; }
       ev.target.disabled = true;

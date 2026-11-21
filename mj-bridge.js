@@ -31,6 +31,7 @@
   function sb() { if (!sbP) sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.MJ_AUTH_KEY || 'mj-app-auth' } }); }); return sbP; }
   async function q(p) { var r = await p; if (r.error) throw new Error(r.error.message); return r.data; }
   async function rpc(fn, args) { var c = await sb(); return q(c.rpc(fn, args)); }
+  window.MJ_SB = sb;   // the app's Stock count screen uses the same signed-in client
   async function all(mk) { var out = []; for (var i = 0; ; i += 1000) { var d = await q(mk().range(i, i + 999)); out = out.concat(d); if (d.length < 1000) break; } return out; }
   async function byIds(table, cols, key, ids) { var c = await sb(), out = []; for (var i = 0; i < ids.length; i += 150) { var part = ids.slice(i, i + 150); out = out.concat(await all(function () { return c.from(table).select(cols).in(key, part); })); } return out; }
 
