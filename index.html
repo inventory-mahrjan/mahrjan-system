@@ -160,6 +160,7 @@ const ACC_DEF = { V:{ ACCOUNTANT:'ov dd load ret days settle close wh ite sc its
 async function loadAccess(){ const { data, error } = await sb.from('role_access').select('module,can_view,can_edit').eq('role', S.me.role);
   S.acc = error || !data?.length ? null : Object.fromEntries(data.map(a => [a.module, a])); }
 const canE = m => S.me?.role === 'ADMIN' || (S.acc ? !!S.acc[m]?.can_edit : (ACC_DEF.E[S.me?.role] || '').split(' ').includes(m));
+var OLDT = ['se','wo','qs','whr','dd'];
 const canV = m => S.me?.role === 'ADMIN' || canE(m) || (S.acc ? !!S.acc[m]?.can_view : (ACC_DEF.V[S.me?.role] || '').split(' ').includes(m));
 
 const item = id => S.items.find(i => i.id === id) || {};
@@ -926,7 +927,6 @@ async function vDash(){
 
 // ---------- DAILY SHEETS (A4) ----------
 // Old SALES_PORTAL report screens (old-views.js): same layout, print and Excel/CSV — data live from the database, one company at a time.
-var OLDT = ['se','wo','qs','whr','dd'];
 function vOld(name){
   const code = S.branches.find(b => b.id === S.br)?.code || 'MGAZ';
   window.PortalSession = { username: S.me.name, role: S.me.role, unit: code === 'MGT' ? 'AJMAN' : 'AL QUOZ', unitName: code === 'MGT' ? 'MAHRJAN GENERAL TRADING LLC-AJMAN' : 'MAHRJAN GENERAL TRADING LLC-ALQUOZ' };
