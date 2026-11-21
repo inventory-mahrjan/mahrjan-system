@@ -440,7 +440,7 @@ async function vDay(id){
 async function vImport(){
   $('#v').innerHTML = `<div class="card"><h3>Sales import (iTrade Periodical Sales Detailed Report)</h3>
     <p class="muted">Export the report from iTrade for the dates you want (Excel or CSV) and choose the file. The company of each invoice comes from its Company Name (or the MGAZ / MGT invoice prefix). Company and Warehouse are saved with every line.
-    Invoices already imported are skipped. Invoices missing from the file for its dates are marked cancelled.</p>
+    Invoices already imported are skipped; an invoice changed in iTrade since the last import is replaced with the new lines. Invoices missing from the file for its dates are marked cancelled.</p>
     <div class="row"><input type="file" id="f" accept=".xlsx,.xls,.csv"><button class="p" id="go" disabled>Import</button></div><div id="out"></div></div>`;
   let rows = [];
   $('#f').onchange = async e => {
@@ -495,12 +495,12 @@ async function vImport(){
         // sent in parts of whole days (about 400 lines each) so a long period does not time out
         const days = [...new Set(rs.map(x => x['Tran Date']))].sort(), parts = []; let cur = [];
         days.forEach(d => { const dl = rs.filter(x => x['Tran Date'] === d); if (cur.length && cur.length + dl.length > 400) { parts.push(cur); cur = []; } cur = cur.concat(dl); }); if (cur.length) parts.push(cur);
-        const r = { rows:0, new:0, already_there:0, cancelled:0, new_customers:0, customers_moved:0, from:days[0], to:days[days.length-1], unknown_items:'', not_salesman_sales_executives:'' };
+        const r = { rows:0, new:0, already_there:0, replaced_invoices:0, cancelled:0, new_customers:0, customers_moved:0, from:days[0], to:days[days.length-1], unknown_items:'', not_salesman_sales_executives:'' };
         for (const [k, part] of parts.entries()) { $('#out').innerHTML = `<p>${esc(br.name)}: part ${k+1} of ${parts.length}…</p>` + out.join('');
           const x = await rpc('import_sales', { p_branch:br.id, p_rows:part, p_full_export:true });
-          ['rows','new','already_there','cancelled','new_customers','customers_moved'].forEach(f => r[f] += num(x[f]));
+          ['rows','new','already_there','replaced_invoices','cancelled','new_customers','customers_moved'].forEach(f => r[f] += num(x[f]));
           ['unknown_items','not_salesman_sales_executives'].forEach(f => { if (x[f]) r[f] = [...new Set((r[f] ? r[f] + ', ' : '').concat(x[f]).split(', ').filter(Boolean))].join(', '); }); }
-        out.push(`<div class="card"><b>${esc(br.name)}</b> ${r.from} to ${r.to}<br>Lines ${r.rows} · new ${r.new} · already there ${r.already_there} · cancelled ${r.cancelled}
+        out.push(`<div class="card"><b>${esc(br.name)}</b> ${r.from} to ${r.to}<br>Lines ${r.rows} · new ${r.new} · already there ${r.already_there} · invoices changed in iTrade and replaced ${r.replaced_invoices} · cancelled ${r.cancelled}
           · new customers ${r.new_customers} · customers moved ${r.customers_moved}
           ${r.unknown_items?`<br><span class="bad">Unknown items: ${esc(r.unknown_items)}</span>`:''}
           ${r.not_salesman_sales_executives?`<br><span class="muted">Not a salesman (store/office sales): ${esc(r.not_salesman_sales_executives)}</span>`:''}</div>`);
