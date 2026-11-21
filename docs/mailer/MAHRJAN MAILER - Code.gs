@@ -207,7 +207,12 @@ function setup() {
   Logger.log('Timers created. Run testAll to check.');
 }
 // ---------- manual ----------
-function testAll() { var y = day_(864e5 + 6 * 3600000), w = lastWeek_(); ['VAN_LOAD','SALES_QTY','DAMAGE','GRV','VISIT','HEALTH'].forEach(function (r) { Logger.log(r + ': ' + sendReport(r, y, y, true)); });
-  ['VARIANCE','FOC','EXPIRY'].forEach(function (r) { Logger.log(r + ': ' + sendReport(r, w.from, w.to, true)); }); Logger.log('QTY_MTD: ' + sendReport('QTY_MTD', y.slice(0, 8) + '01', y, true)); }
+function testAll() { var y = day_(864e5 + 6 * 3600000), w = lastWeek_(), t = function (r, f, to) { try { Logger.log(r + ': ' + sendReport(r, f, to, true)); } catch (e) { Logger.log(r + ' FAILED: ' + e.message); } };
+  ['VAN_LOAD','SALES_QTY','DAMAGE','GRV','VISIT','HEALTH'].forEach(function (r) { t(r, y, y); });
+  ['VARIANCE','FOC','EXPIRY'].forEach(function (r) { t(r, w.from, w.to); }); t('QTY_MTD', y.slice(0, 8) + '01', y); }
+/** Send only the reports that are not sent yet (after a failed testAll). */
+function testRest() { var y = day_(864e5 + 6 * 3600000), w = lastWeek_(), t = function (r, f, to) { try { Logger.log(r + ': ' + sendReport(r, f, to)); } catch (e) { Logger.log(r + ' FAILED: ' + e.message); } };
+  ['VAN_LOAD','SALES_QTY','DAMAGE','GRV','VISIT','HEALTH'].forEach(function (r) { t(r, y, y); });
+  ['VARIANCE','FOC','EXPIRY'].forEach(function (r) { t(r, w.from, w.to); }); t('QTY_MTD', y.slice(0, 8) + '01', y); }
 /** Re-send one report: change the values below, then Run. */
 function sendNow() { sendReport('DAMAGE', '2026-11-20', '2026-11-20', 'CORRECTED'); }
