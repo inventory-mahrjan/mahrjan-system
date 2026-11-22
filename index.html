@@ -164,6 +164,11 @@
   nav button::before{background:linear-gradient(180deg,#F2994A,#F2C94C)}
   .rtabs button.on{background:var(--accent-ink);border-color:var(--accent-ink)}
   th{background:#EAF2EC}
+  .ovd{display:block;margin-top:3px;font-size:11.5px;font-weight:500;color:var(--muted)} .ovd.up{color:#1B7A3E} .ovd.dn{color:var(--neg)}
+  .ovsplit{display:block;height:6px;border-radius:3px;background:#F2C94C;overflow:hidden;margin:4px 0 5px} .ovsplit i{display:block;height:100%;background:#1B4332}
+  .ovshare{display:inline-block;vertical-align:middle;width:70px;height:6px;border-radius:3px;background:#EEF4F0;margin-right:7px;overflow:hidden} .ovshare i{display:block;height:100%;background:#1B4332}
+  .ovleg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:2px 0 0} .ovleg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .ovz{font-size:9px;color:#9aa19c;font-style:normal}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   @media print{#v>*,.kpi{animation:none!important}}
 </style>
@@ -981,26 +986,54 @@ async function vOverview(){ const __t = S.nav;
   const [cash, coll, exp] = await Promise.all([getCash(days), getColl(days), getExp(days)]);
   const cr = sales.filter(r => r.tran_type === 'CR'), rt = sales.filter(r => r.tran_type !== 'CR');
   const sum = (a, k) => a.reduce((x, r) => x + num(r[k]), 0);
+  const tNet = sum(sales,'net_incl_vat'), tCr = sum(cr,'net_incl_vat'), tRt = -sum(rt,'net_incl_vat'), tPr = sum(sales,'profit'), tColl = sum(coll,'amount'), tExp = sum(exp,'amount');
+  const tCash = sum(cr.filter(r=>r.tender_type==='Cash'),'net_incl_vat'), tCred = sum(cr.filter(r=>r.tender_type==='Credit'),'net_incl_vat'), credPct = tCash + tCred ? tCred / (tCash + tCred) * 100 : 0;
   const byDay = aggregate(sales, r => r.tran_date, r => ({ d:r.tran_date, net:0 }), (o,r) => o.net += num(r.net_incl_vat)).sort((a,b) => a.d < b.d ? -1 : 1);
   const all = []; for (let d = S.from; d <= S.date; d = addDays(d, 1)) all.push(byDay.find(x => x.d === d) || { d, net:0 });
-  const mx = Math.max(1, ...all.map(d => d.net)), kf = v => v >= 1000 ? Math.round(v / 1000) + 'k' : v ? Math.round(v) : '';
-  const chart = byDay.length ? `<div class="dbars">${all.map(d => { const h = Math.max(0, d.net) / mx * 100;
-      return `<div title="${d.d}: AED ${money(d.net)}"><em>${kf(d.net)}</em><i class="${d.net ? '' : 'z'}" style="height:${d.net ? Math.max(h, 1) : 1}%"></i><b>${d.d.slice(8)}</b></div>`; }).join('')}</div>` : '<p class="muted">No sales imported for this period.</p>';
-  const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); o.inv.add(r.invoice_no); if (r.tran_type === 'CR') o.cust.add(r.customer_code); })
-    .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size })).sort((a,b) => b.net - a.net);
+  const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], wd = d => WD[new Date(d + 'T00:00:00Z').getUTCDay()];
+  const sold = all.filter(d => d.net > 0), avg = sold.length ? sold.reduce((a,d) => a + d.net, 0) / sold.length : 0, best = sold.reduce((m,d) => d.net > (m?.net || 0) ? d : m, null);
+  const mx = Math.max(1, ...all.map(d => d.net)), kf = v => v >= 1000 ? Math.round(v / 1000) + 'k' : v ? Math.round(v) : '', tdy = today();
+  const chart = byDay.length ? `<div class="ovleg"><span><i style="background:#F2C94C"></i>Best day</span><span><i style="background:#1B4332"></i>Above average</span><span><i style="background:#8FB59C"></i>Below average</span><span><i style="background:#d8dad5"></i>No sales</span></div>
+    <div class="dbars">${all.map(d => { const h = Math.max(0, d.net) / mx * 100, col = !d.net ? '' : d === best ? '#F2C94C' : d.net >= avg ? '#1B4332' : '#8FB59C';
+      const lab = !d.net ? (d.d === tdy ? 'pending' : wd(d.d)) : '';
+      return `<div title="${wd(d.d)} ${d.d}: AED ${money(d.net)}"><em>${d.net ? kf(d.net) : `<span class="ovz">${lab}</span>`}</em><i class="${d.net ? '' : 'z'}" style="height:${d.net ? Math.max(h, 1) : 1}%${col ? ';background:' + col : ''}"></i><b>${d.d.slice(8)}</b></div>`; }).join('')}</div>` : '<p class="muted">No sales imported for this period.</p>';
+  const rtBy = {}; rt.forEach(r => { const n = saleName(r); rtBy[n] = (rtBy[n] || 0) - num(r.net_incl_vat); });
+  const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, gross:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); if (r.tran_type === 'CR') { o.gross += num(r.net_incl_vat); o.inv.add(r.invoice_no); o.cust.add(r.customer_code); } })
+    .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size, share:tNet ? o.net / tNet * 100 : 0, retPct:o.gross ? (rtBy[o.name] || 0) / o.gross * 100 : 0, avgInv:o.inv.size ? o.gross / o.inv.size : 0 })).sort((a,b) => b.net - a.net);
   const it = aggregate(sales, r => r.item_id || r.item_code, r => ({ name:r.item_id ? iNm(r.item_id) : r.item_name, qty:0, net:0 }), (o,r) => { o.qty += num(r.qty_base); o.net += num(r.net_incl_vat); }).sort((a,b) => b.net - a.net).slice(0, 15);
+  const dl = k => `<span class="ovd" data-k="${k}"></span>`;
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">
-      ${kpi('Net sales', 'AED ' + money(sum(sales,'net_incl_vat')), 'incl. VAT, after returns')}
-      ${kpi('Sales', 'AED ' + money(sum(cr,'net_incl_vat')), new Set(cr.map(r => r.invoice_no)).size + ' invoices')}
-      ${kpi('Returns', 'AED ' + money(-sum(rt,'net_incl_vat')), new Set(rt.map(r => r.invoice_no)).size + ' returns')}
-      ${kpi('Cash / credit', money(sum(cr.filter(r=>r.tender_type==='Cash'),'net_incl_vat')) + ' / ' + money(sum(cr.filter(r=>r.tender_type==='Credit'),'net_incl_vat')), 'sales, AED')}
-      ${kpi('Collections', 'AED ' + money(sum(coll,'amount')), coll.length + ' receipts')}
-      ${kpi('Expenses', 'AED ' + money(sum(exp,'amount')), exp.length + ' lines')}
+      ${kpi('Net sales', 'AED ' + money(tNet), 'incl. VAT, after returns' + dl('net'))}
+      ${kpi('Sales', 'AED ' + money(tCr), new Set(cr.map(r => r.invoice_no)).size + ' invoices' + dl('cr'))}
+      ${kpi('Returns', 'AED ' + money(tRt), new Set(rt.map(r => r.invoice_no)).size + ' returns · ' + (tCr ? (tRt / tCr * 100).toFixed(1) : '0.0') + '% of sales' + dl('rt'))}
+      ${kpi('Credit share', credPct.toFixed(0) + '% credit', `<span class="ovsplit"><i style="width:${(100 - credPct).toFixed(1)}%"></i></span>Cash ${money(tCash)} · Credit ${money(tCred)}`)}
+      ${kpi('Collections', 'AED ' + money(tColl), coll.length + ' receipts' + dl('coll'))}
+      ${kpi('Expenses', 'AED ' + money(tExp), exp.length + ' lines' + dl('exp'))}
       ${kpi('Cash to hand over', 'AED ' + money(sum(cash,'cash_to_hand_over')), days.length + ' van days')}
-      ${kpi('Profit', 'AED ' + money(sum(sales,'profit')), 'as per iTrade')}</div>
-    <div class="card"><h3>Daily net sales (AED)</h3>${chart}</div>
-    <div class="card"><h3>Salesman performance</h3>${table([{k:'name',l:'Salesman',left:1},{k:'customers',l:'Customers',sum:1},{k:'invoices',l:'Invoices',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], sm)}</div>
+      ${kpi('Profit', 'AED ' + money(tPr), 'margin ' + (tNet ? (tPr / tNet * 100).toFixed(1) : '0.0') + '% of net sales' + dl('pr'))}</div>
+    <div class="card"><div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:4px"><h3 style="margin:0">Daily net sales (AED)</h3><span class="muted">Average per selling day AED ${money(avg)}${best ? ` · best ${wd(best.d)} ${best.d} AED ${money(best.net)}` : ''}</span></div>${chart}</div>
+    <div class="card"><h3>Salesman performance</h3>${table([{k:'name',l:'Salesman',left:1},{k:'customers',l:'Customers',sum:1},{k:'invoices',l:'Invoices',sum:1},
+      {k:'avgInv',l:'Avg invoice',money:1},{k:'retPct',l:'Returns %',html:r => `<span class="${r.retPct > 5 ? 'bad' : ''}">${r.retPct.toFixed(1)}%</span>`},
+      {k:'share',l:'Share',left:1,html:r => `<span class="ovshare"><i style="width:${Math.max(0, Math.min(100, r.share)).toFixed(1)}%"></i></span>${r.share.toFixed(1)}%`},
+      {k:'net',l:'Net sales AED',money:1,sum:1}], sm)}</div>
     <div class="card"><h3>Top items</h3>${table([{k:'name',l:'Item',left:1},{k:'qty',l:'Qty (pk / pcs)',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], it)}</div>`;
+  // comparison with the previous period of the same length — loaded after the page shows, so the page stays fast
+  const n = all.length, pTo = addDays(S.from, -1), pFrom = addDays(S.from, -n), key = 'pv' + S.brs.join(',') + '|' + pFrom + '|' + pTo;
+  try {
+    const pv = await cached(key, async () => {
+      const [ps, pd] = await Promise.all([
+        perDay(pFrom, pTo, d => sb.from('sales_lines').select('tran_type,net_incl_vat,profit').in('branch_id', S.brs).eq('cancelled', false).eq('tran_date', d)),
+        fetchAll(() => sb.from('van_day').select('id').in('branch_id', S.brs).gte('business_date', pFrom).lte('business_date', pTo))]);
+      const ids = pd.map(d => d.id), [pc, pe] = ids.length ? await Promise.all([byIds('collections', 'amount', 'van_day_id', ids), byIds('expenses', 'amount', 'van_day_id', ids)]) : [[], []];
+      const pcr = ps.filter(r => r.tran_type === 'CR');
+      return { net:sum(ps,'net_incl_vat'), cr:sum(pcr,'net_incl_vat'), rt:-sum(ps.filter(r => r.tran_type !== 'CR'),'net_incl_vat'), pr:sum(ps,'profit'), coll:sum(pc,'amount'), exp:sum(pe,'amount') };
+    });
+    if (__t !== S.nav) return;
+    const cur = { net:tNet, cr:tCr, rt:tRt, pr:tPr, coll:tColl, exp:tExp }, lowGood = { rt:1, exp:1 };
+    document.querySelectorAll('.ovd').forEach(el => { const k = el.dataset.k, a = cur[k], b = pv[k]; if (!b) { el.textContent = ''; return; }
+      const ch = (a - b) / Math.abs(b) * 100, up = ch >= 0, good = lowGood[k] ? !up : up;
+      el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + pFrom + ' – ' + pTo; });
+  } catch (e) { document.querySelectorAll('.ovd').forEach(el => el.textContent = ''); }
 }
 
 // ---------- DAILY DASHBOARD ----------
