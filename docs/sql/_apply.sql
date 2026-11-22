@@ -1,12 +1,14 @@
--- CHECK ONLY: nothing is kept. Runs as the admin login with Supabase's guard on bare DELETE / UPDATE switched on,
--- creates a daily stock count batch, deletes it, then cancels everything by ending with an error that shows the result.
-load 'safeupdate';
-do $$ declare r jsonb; d text; begin
-  perform set_config('request.jwt.claims', json_build_object('sub', s.auth_user_id::text, 'role', 'authenticated')::text, true)
-    from public.staff s where upper(s.name) = 'MUSTHAFFIR' and s.auth_user_id is not null limit 1;
-  set local role authenticated;
-  r := public.sc_save_batch(null, (select id from public.branches where code = 'MGAZ'), current_date + 1, 'DAILY',
-       (select id from public.staff where upper(name) = 'SHAMEEM' limit 1), array['RAW','FG'], 'system check');
-  d := coalesce(public.sc_delete_batch((r->>'id')::bigint)::text, 'done');
-  raise exception 'CHECK RESULT (rolled back): created % then deleted (%)', r->>'batch_no', d;
-end $$;
+-- GRANTS CLEANUP 2 - CREATE.sql
+-- Signed-out visitors could still call a few functions through the default PUBLIC grant (they were blocked
+-- inside by the role check, but should not be reachable at all). Triggers keep working (they need no grant).
+-- login_unit stays open: the app calls it at sign-in.
+-- Undo with: GRANTS CLEANUP 2 - REVERT.sql
+revoke execute on function public.office_save(bigint, date, text, jsonb, jsonb) from public, anon;
+revoke execute on function public.sc_delete_batch(bigint) from public, anon;
+revoke execute on function public.sales_lines_deleted() from public, anon;
+revoke execute on function public.van_day_cartons() from public, anon;
+revoke execute on function public.sales_deletes_apply() from public, anon;
+revoke execute on function public.sc_purge_daily_trg() from public, anon;
+grant execute on function public.office_save(bigint, date, text, jsonb, jsonb), public.sc_delete_batch(bigint) to authenticated;
+select string_agg(p.proname, ',') as still_open_to_signed_out from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prosecdef and has_function_privilege('anon', p.oid, 'execute');
