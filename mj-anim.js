@@ -34,10 +34,10 @@
     c.fillStyle = FOREST; rr(c, x + 30, y - 4, 70, 9, 4); c.fill(); c.font = 'bold 20px sans-serif'; c.fillText('CASH', x + 36, y + 50); c.fillStyle = '#C89628'; rr(c, x + 55, y + 60, 20, 15, 3); c.fill(); }
 
   var SCENES = {
-    BOARD: function (c, p, d) { van(c, 120, 70, 1 - ease(d * 2)); for (var i = 0; i < 3; i++) { var q = ease(seg(p, .1 + i * .25, .35 + i * .25)); if (q >= 1) continue;
-        carton(c, lerp(14, 124, q), lerp(150 - i * 38, 100, q) - Math.sin(q * Math.PI) * 45, lerp(1, .55, q)); } },
-    RETURN: function (c, p, d) { van(c, 120, 70, 1 - ease(d * 2)); for (var i = 0; i < 3; i++) { var q = ease(seg(p, .1 + i * .25, .35 + i * .25)); if (q <= 0) continue;
-        carton(c, lerp(124, 14, q), lerp(100, 150 - i * 38, q) - Math.sin(q * Math.PI) * 45, lerp(.55, 1, q)); } },
+    BOARD: function (c, p, d) { van(c, 100, 70, 1 - ease(d * 2)); for (var i = 0; i < 3; i++) { var q = ease(seg(p, .1 + i * .25, .35 + i * .25)); if (q >= 1) continue;
+        carton(c, lerp(10, 104, q), lerp(150 - i * 38, 100, q) - Math.sin(q * Math.PI) * 45, lerp(1, .55, q)); } },
+    RETURN: function (c, p, d) { van(c, 100, 70, 1 - ease(d * 2)); for (var i = 0; i < 3; i++) { var q = ease(seg(p, .1 + i * .25, .35 + i * .25)); if (q <= 0) continue;
+        carton(c, lerp(104, 10, q), lerp(100, 150 - i * 38, q) - Math.sin(q * Math.PI) * 45, lerp(.55, 1, q)); } },
     COLLECTION: function (c, p) { cashbox(c, 95, 120); for (var i = 0; i < 3; i++) { var q = ease(seg(p, .1 + i * .25, .4 + i * .25)); if (q <= 0 || q >= 1) continue;
         note(c, lerp(50 + i * 110, 160, q), lerp(30, 110, q) - Math.sin(q * Math.PI) * 25, lerp(1, .5, q), lerp(-15 + i * 15, 0, q)); } },
     EXPENSE: function (c, p, d) { cashbox(c, 20, 130); c.fillStyle = '#fff'; c.strokeStyle = '#D7DCD7'; c.lineWidth = 1.5; rr(c, 200, 50, 105, 150, 6); c.fill(); c.stroke();
@@ -53,8 +53,8 @@
         if (d > 0) { var s = lerp(1.6, 1, ease(d * 2)); c.save(); c.globalAlpha = clamp(d * 3); c.translate(160, 118); c.rotate(-.24); c.scale(s, s); c.strokeStyle = RED; c.lineWidth = 4; rr(c, -70, -22, 140, 44, 8); c.stroke();
           c.fillStyle = RED; c.font = 'bold 26px sans-serif'; c.textAlign = 'center'; c.fillText('DELETED', 0, 10); c.restore(); } }
   };
-  var LABEL = { BOARD: ['Loading the van…', 'Board posted'], RETURN: ['Unloading…', 'Return posted'], COLLECTION: ['Receiving money…', 'Collection posted'],
-    EXPENSE: ['Paying out…', 'Expense posted'], DELETE: ['Deleting invoice…', 'Invoice deleted'] };
+  var LABEL = { BOARD: ['Loading the van\u2026', 'Board posted'], RETURN: ['Unloading\u2026', 'Return posted'], COLLECTION: ['Receiving money\u2026', 'Collection posted'],
+    EXPENSE: ['Paying out\u2026', 'Expense posted'], DELETE: ['Deleting invoice\u2026', 'Invoice deleted'] };
 
   function start(kind) {
     if (!SCENES[kind] || reduce || document.visibilityState !== 'visible' || Date.now() - lastTap > 4000) return null;
