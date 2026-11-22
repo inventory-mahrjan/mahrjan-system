@@ -3,7 +3,7 @@
    Only runs for a post the user just tapped (not for background re-sends). Tap the card to close it once done. */
 (function () {
   var FOREST = '#0D2818', FOREST2 = '#1B4332', AMBER = '#F2994A', AMBER2 = '#F2C94C', RED = '#B3261E', CART = '#C4925C', CART2 = '#A87644';
-  var lastTap = 0; ['pointerdown', 'touchstart', 'keydown'].forEach(function (e) { document.addEventListener(e, function () { lastTap = Date.now(); }, true); });
+  var lastTap = 0; ['pointerdown', 'touchstart', 'mousedown', 'click', 'keydown'].forEach(function (e) { document.addEventListener(e, function () { lastTap = Date.now(); }, true); });
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var clamp = function (t) { return t < 0 ? 0 : t > 1 ? 1 : t; }, ease = function (t) { t = clamp(t); return t * t * (3 - 2 * t); };
   var seg = function (t, a, b) { return clamp((t - a) / (b - a)); }, lerp = function (a, b, t) { return a + (b - a) * t; };
@@ -57,7 +57,7 @@
     EXPENSE: ['Paying out\u2026', 'Expense posted'], DELETE: ['Deleting invoice\u2026', 'Invoice deleted'] };
 
   function start(kind) {
-    if (!SCENES[kind] || reduce || document.visibilityState !== 'visible' || Date.now() - lastTap > 4000) return null;
+    if (!SCENES[kind] || document.visibilityState === 'hidden' || Date.now() - lastTap > 20000) return null;   // shown even when the phone has animations turned off (PDTs often do)
     var ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(13,40,24,.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s';
     ov.innerHTML = '<div style="background:#fff;border-radius:22px;padding:18px 18px 16px;width:300px;max-width:88vw;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.25);font-family:inherit">' +
