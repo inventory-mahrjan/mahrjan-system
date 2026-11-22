@@ -424,7 +424,7 @@
     m.items.filter(function (i) { return i.item_type === 'RAW_EGG' && i.active; }).forEach(function (i) { raws[m.code(i)] = { n: i.name, t: i.pcs_per_tray || 30, c: i.pcs_per_carton || 360, noCtn: /QUAIL/i.test(i.name) }; });
     m.items.filter(function (i) { return i.item_type === 'FG' && i.active; }).forEach(function (i) {
       var B = m.bom.filter(function (b) { return b.fg_item_id === i.id; }); var egg = B.filter(function (b) { return b.item_type === 'RAW_EGG'; })[0]; if (!egg) return;
-      var mats = B.filter(function (b) { return b.item_type !== 'RAW_EGG'; }).map(function (b) { var it = m.itemById[b.item_id] || {}; return [m.code(it), it.name || '', num(b.per_pack) || 1]; });
+      var mats = B.filter(function (b) { return b.item_type !== 'RAW_EGG'; }).map(function (b) { var it = m.itemById[b.item_id] || {}; return [m.code(it), it.name || '', num(b.per_pack) || 1, num(it.pcs_per_box) || 0]; });   /* 4th = pcs per box (trays issued in boxes) */
       var tray = mats.filter(function (x) { return !/STICKER|LABEL/i.test(x[1]); })[0] || null, label = mats.filter(function (x) { return x !== tray; })[0] || null;
       fg[m.code(i)] = { n: i.name, epp: num(egg.per_pack), raw: m.code(m.itemById[egg.item_id] || {}), tray: tray, label: label }; });
     return { fg: fg, raws: raws };
