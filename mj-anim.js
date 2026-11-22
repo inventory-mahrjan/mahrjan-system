@@ -80,7 +80,8 @@
       if (closeAt && now >= closeAt) return close();
       raf = requestAnimationFrame(tick);
     }
-    function close() { cancelAnimationFrame(raf); ov.style.opacity = '0'; setTimeout(function () { ov.remove(); hide.remove(); }, 220); }
+    function close() { cancelAnimationFrame(raf); ov.style.opacity = '0';
+      setTimeout(function () { ov.remove(); var po = document.getElementById('postOv'); if (state === 'ok' && po) po.className = ''; hide.remove(); }, 220); }   // saved: the old "posted" card is not shown again; not saved: its error card stays with the reason
     ov.addEventListener('click', function () { if (state !== 'run') close(); });
     raf = requestAnimationFrame(tick);
     return {
