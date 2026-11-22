@@ -128,6 +128,37 @@
   .printonly{display:none}
   #v #oldv .mobile-report{font-size:11.5px} #v #oldv .mobile-report td{padding:5px 7px}   /* daily sheets preview fits the screen (vehicle and item names visible) */
   .link-btn{border:0;background:none;color:var(--muted);padding:0;text-decoration:underline;text-underline-offset:2px;font-size:13px}
+  /* ---- motion & polish (CSS only; no effect on data or speed) ---- */
+  @keyframes mjUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes mjFade{from{opacity:0}to{opacity:1}}
+  @keyframes mjPop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+  @keyframes mjToast{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes mjSpin{to{transform:rotate(360deg)}}
+  @keyframes skel{0%{background-position:100% 50%}100%{background-position:0 50%}}
+  #v.an>*{animation:mjUp .28s cubic-bezier(.2,.7,.2,1) both} #v.an>*:nth-child(2){animation-delay:.04s} #v.an>*:nth-child(3){animation-delay:.08s} #v.an>*:nth-child(n+4){animation-delay:.12s}
+  #v.an .kpis>.kpi{animation:mjUp .3s cubic-bezier(.2,.7,.2,1) both} #v.an .kpis>.kpi:nth-child(2){animation-delay:.04s} #v.an .kpis>.kpi:nth-child(3){animation-delay:.08s} #v.an .kpis>.kpi:nth-child(n+4){animation-delay:.12s}
+  main>header h1{animation:mjFade .25s ease both}
+  .login-card{animation:mjUp .4s cubic-bezier(.2,.7,.2,1) both}
+  button,nav button,input,select,.kpi,.card,.cosel summary{transition:background-color .15s,border-color .15s,color .15s,box-shadow .2s,transform .12s}
+  button:not(:disabled):active{transform:scale(.97)}
+  button.p:not(:disabled):hover,#osh button.primary:not(:disabled):hover{box-shadow:0 3px 10px rgba(12,54,59,.22)}
+  input:hover:not(:focus),select:hover:not(:focus){border-color:#b9bdb6}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,95,87,.12);outline:none}
+  nav button{position:relative} nav button::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--accent);transform:scaleY(0);transition:transform .2s}
+  nav button.on::before{transform:scaleY(1)} nav button:hover{padding-left:13px} nav button{transition:background-color .15s,color .15s,padding .15s}
+  .kpi:hover{box-shadow:0 6px 18px rgba(16,40,36,.07);transform:translateY(-1px)}
+  td{transition:background-color .12s}
+  .msg{animation:mjToast .25s cubic-bezier(.2,.7,.2,1) both}
+  dialog[open]{animation:mjPop .2s cubic-bezier(.2,.7,.2,1) both} dialog::backdrop{animation:mjFade .2s ease both;backdrop-filter:blur(2px)}
+  .cosel[open]>div{animation:mjPop .15s ease both}
+  .st{transition:none}
+  .mjload{display:flex;flex-direction:column;gap:12px} .mjload p{display:flex;align-items:center;gap:10px;margin:0}
+  .mjload p::before{content:'';width:16px;height:16px;border-radius:50%;border:2px solid #d5e4df;border-top-color:var(--accent);animation:mjSpin .7s linear infinite;flex:none}
+  .mjload i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,#eceeea 25%,#f6f7f4 37%,#eceeea 63%);background-size:400% 100%;animation:skel 1.3s ease infinite}
+  .mjload i:nth-child(3){width:85%} .mjload i:nth-child(4){width:65%}
+  .sidebar::-webkit-scrollbar,.tw::-webkit-scrollbar{width:8px;height:8px} .sidebar::-webkit-scrollbar-thumb,.tw::-webkit-scrollbar-thumb{background:#d8dad5;border-radius:8px} .sidebar::-webkit-scrollbar-thumb:hover,.tw::-webkit-scrollbar-thumb:hover{background:#c2c6be}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+  @media print{#v>*,.kpi{animation:none!important}}
 </style>
 </head>
 <body>
@@ -247,15 +278,18 @@ function render(){
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
     co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', em:'Who gets which scheduled email, and what was sent.', set:'Rates used by the system, such as the carton rates.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
+  const navTop = document.querySelector('.sidebar')?.scrollTop || 0;
+  const NODATE = ['stf','acc','set','itm','em','sri','dc'], NOCO = ['acc','set','itm','dc'];   // pages that do not use the date / company
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
       <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(RN(S.me.role))} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
     <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${OLDT.includes(S.tab) ? '' : SUB[S.tab]||''}</p></div>
-      <div class="header-actions">${S.me.branch_id ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
-        ${RANGE.has(S.tab) && !OLDT.includes(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}${S.tab === 'ds' || OLDT.includes(S.tab) ? '' : `<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label>`}</div></header>
+      <div class="header-actions">${S.me.branch_id || NOCO.includes(S.tab) ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
+        ${RANGE.has(S.tab) && !OLDT.includes(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}${S.tab === 'ds' || OLDT.includes(S.tab) || NODATE.includes(S.tab) ? '' : `<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label>`}</div></header>
       <div id="v"></div>
       <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
+  $('.sidebar').scrollTop = navTop;
   $('#out').onclick = () => sb.auth.signOut();
   document.querySelectorAll('[data-br]').forEach(c => c.onchange = () => { const v = [...document.querySelectorAll('[data-br]:checked')].map(x => +x.dataset.br); if (!v.length) { c.checked = true; return; }
     S.brs = v; S.br = v[0]; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
@@ -266,7 +300,9 @@ function render(){
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
-function view(){ S.nav = (S.nav || 0) + 1; clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd','sri'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, sri:vStockReport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, set:vSettings, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
+// page entry animation: only when a page opens or its date / company changes, not while the user types or clicks in it
+['input','change','click'].forEach(ev => document.addEventListener(ev, e => { if (e.target.closest && e.target.closest('#v')) $('#v')?.classList.remove('an'); }, true));
+function view(){ S.nav = (S.nav || 0) + 1; $('#v')?.classList.add('an'); clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd','sri'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, sri:vStockReport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, set:vSettings, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
 
 const salesmen = () => S.staff.filter(s => s.role === 'SALESMAN' && s.active && S.brs.includes(s.branch_id));
 const smOptions = sel => salesmen().map(s => `<option value="${s.id}" ${s.id==sel?'selected':''}>${esc(s.name)}</option>`).join('');
@@ -922,7 +958,7 @@ async function toExcel(name, sheets){   // sheets: [[sheetName, cols, rows]]
 }
 const tools = (extra = '') => `<div class="row noprint" style="margin:0">${extra}<button id="xl">Download Excel</button><button id="pr">Print</button></div>`;
 function bindTools(name, sheets){ $('#xl') && ($('#xl').onclick = () => toExcel(name, typeof sheets === 'function' ? sheets() : sheets)); $('#pr') && ($('#pr').onclick = () => window.print()); }
-const loading = () => $('#v').innerHTML = '<div class="card"><p class="muted">Loading… <b class="mjpct">0%</b></p></div>';
+const loading = () => $('#v').innerHTML = '<div class="card mjload"><p class="muted">Loading… <b class="mjpct">0%</b></p><i></i><i></i><i></i></div>';
 const kpi = (l, v, sub = '') => `<div class="kpi"><span>${esc(l)}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
 function aggregate(rows, keyF, init, add){ const m = new Map(); rows.forEach(r => { const k = keyF(r); if (k == null) return; if (!m.has(k)) m.set(k, init(r)); add(m.get(k), r); }); return [...m.values()]; }
 
