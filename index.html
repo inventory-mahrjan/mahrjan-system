@@ -1016,7 +1016,7 @@ async function vOverview(){ const __t = S.nav;
         <div><b>${credPct.toFixed(0)}% credit</b><div class="lg"><i style="background:#1B4332"></i>Cash ${money(tCash)}<br><i style="background:#F2C94C"></i>Credit ${money(tCred)}</div></div></div></div>
       ${kpi('Collections', 'AED ' + money(tColl), coll.length + ' receipts' + dl('coll'))}
       ${kpi('Expenses', 'AED ' + money(tExp), exp.length + ' lines' + dl('exp'))}
-      ${kpi('Cash to hand over', 'AED ' + money(sum(cash,'cash_to_hand_over')), days.length + ' van days')}
+      ${kpi('Cash due from salesmen', 'AED ' + money(sum(cash,'cash_to_hand_over')), 'cash sales + collections − cash returns − expenses · ' + days.length + ' van days')}
       ${kpi('Profit', 'AED ' + money(tPr), 'margin ' + (tNet ? (tPr / tNet * 100).toFixed(1) : '0.0') + '% of net sales' + dl('pr'))}</div>
     <div class="card"><div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:4px"><h3 style="margin:0">Daily net sales (AED)</h3><span class="muted">Average per selling day AED ${money(avg)}${best ? ` · best ${wd(best.d)} ${best.d} AED ${money(best.net)}` : ''}</span></div>${chart}</div>
     <div class="card"><h3>Salesman performance</h3>${table([{k:'name',l:'Salesman',left:1},{k:'customers',l:'Customers',sum:1},{k:'invoices',l:'Invoices',sum:1},
