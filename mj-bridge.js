@@ -46,7 +46,7 @@
   function num(v) { if (v === null || v === undefined || v === '') return 0; var n = Number(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
   function up(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toUpperCase(); }
   function blank_(n) { return n ? n : ''; }
-  function today() { return new Date(Date.now() + (new Date().getTimezoneOffset() + TZ_OFF) * 60000).toISOString().slice(0, 10); }
+  function today() { return new Date(Date.now() + TZ_OFF * 60000).toISOString().slice(0, 10); }   /* Dubai date (UTC+4) */
   function invTail_(v) { var m = String(v == null ? '' : v).replace(/\s+/g, '').match(/(\d+)$/); return m ? String(Number(m[1])) : ''; }
   var CARTON_RATE = { 'CARTON SMALL': 0.5, 'CARTON BIG': 0.25 };
   function cartonQty_(e) { var m = String(e.note || '').match(/^\s*(\d+)\s*@/); if (m) return Number(m[1]); var ty = String(e.type || '').trim().toUpperCase(); var rate = /^CARTON\s*S/.test(ty) ? 0.5 : /^CARTON\s*B/.test(ty) ? 0.25 : 0; return rate ? Math.round(e.amount / rate) : 0; }
@@ -431,7 +431,7 @@
   }
   function batchOut(m, b, L) {
     var nm = function (id) { return (m.staffById[id] || {}).name || ''; }, cd = function (id) { return id ? m.code(m.itemById[id] || {}) : ''; };
-    var fmt = function (ts) { return ts ? new Date(new Date(ts).getTime() + (new Date().getTimezoneOffset() + TZ_OFF) * 60000).toISOString().slice(0, 16).replace('T', ' ') : ''; };
+    var fmt = function (ts) { return ts ? new Date(new Date(ts).getTime() + TZ_OFF * 60000).toISOString().slice(0, 16).replace('T', ' ') : ''; };   /* Dubai time */
     return { no: b.batch_no, type: b.process === 'CLEANING' ? 'C' : 'P', work: b.work_date, shift: b.shift, status: b.status, issuedAt: fmt(b.issued_at), by: nm(b.issued_by), staff: (b.staff_ids || []).map(nm),
       returnedAt: fmt(b.returned_at), recvBy: nm(b.received_by), hours: b.hours == null ? '' : num(b.hours), beyond: b.beyond_shift == null ? '' : num(b.beyond_shift), output: b.output_per_staff_hour == null ? '' : num(b.output_per_staff_hour),
       lines: L.filter(function (l) { return l.batch_id === b.id; }).map(function (l) { var it = m.itemById[l.item_id] || {}, egg = it.item_type === 'RAW_EGG';
