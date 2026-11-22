@@ -347,7 +347,14 @@
       if (p.salesman !== undefined && up(p.salesman) !== up(s.name)) return 'You can only post for ' + s.name; }
     return '';
   }
-  async function doPost(unit, p) {
+  async function doPost(unit, p) {   // posting animation (mj-anim.js) runs while the save is in progress; tick only after the database confirms
+    var st = up(p && p.stage), k = ['BOARD', 'RETURN', 'COLLECTION', 'EXPENSE', 'DELETE'].indexOf(st) > -1 ? st : '', a = null;
+    try { a = k && window.MJAnim ? window.MJAnim.start(k) : null; } catch (e) { a = null; }
+    var r; try { r = await doPost_(unit, p); } catch (e) { if (a) a.fail(); throw e; }
+    if (a) { if (r && r.ok) a.done(); else a.fail(); }
+    return r;
+  }
+  async function doPost_(unit, p) {
     var stage = up(p.stage);
     if (stage === 'LOGIN_CHALLENGE') { var u = 'AL QUOZ'; try { u = await rpc('login_unit', { p_username: p.username }); } catch (e) {}
       var salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), function (v) { return v.toString(16).padStart(2, '0'); }).join('');
