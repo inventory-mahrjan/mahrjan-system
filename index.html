@@ -169,6 +169,11 @@
   .ovshare{display:inline-block;vertical-align:middle;width:70px;height:6px;border-radius:3px;background:#EEF4F0;margin-right:7px;overflow:hidden} .ovshare i{display:block;height:100%;background:#1B4332}
   .ovleg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:2px 0 0} .ovleg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
   .ovz{font-size:9px;color:#9aa19c;font-style:normal}
+  .dbars .bw{flex:1;width:100%;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:0}
+  .dbars .avl{position:absolute;left:-2px;right:-2px;height:0;border-top:1.5px dashed #F2994A;pointer-events:none;z-index:1}
+  .ovleg i.dash{height:0;border-top:2px dashed #F2994A;border-radius:0;width:14px;vertical-align:3px}
+  .ovdonut{display:flex;align-items:center;gap:12px} .ovdonut svg{flex:none;transform:rotate(-90deg)} .ovdonut b{font-size:19px}
+  .ovdonut .lg{font-size:11.5px;color:var(--muted);line-height:1.5} .ovdonut .lg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   @media print{#v>*,.kpi{animation:none!important}}
 </style>
@@ -993,10 +998,10 @@ async function vOverview(){ const __t = S.nav;
   const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], wd = d => WD[new Date(d + 'T00:00:00Z').getUTCDay()];
   const sold = all.filter(d => d.net > 0), avg = sold.length ? sold.reduce((a,d) => a + d.net, 0) / sold.length : 0, best = sold.reduce((m,d) => d.net > (m?.net || 0) ? d : m, null);
   const mx = Math.max(1, ...all.map(d => d.net)), kf = v => v >= 1000 ? Math.round(v / 1000) + 'k' : v ? Math.round(v) : '', tdy = today();
-  const chart = byDay.length ? `<div class="ovleg"><span><i style="background:#F2C94C"></i>Best day</span><span><i style="background:#1B4332"></i>Above average</span><span><i style="background:#8FB59C"></i>Below average</span><span><i style="background:#d8dad5"></i>No sales</span></div>
+  const chart = byDay.length ? `<div class="ovleg"><span><i style="background:#F2C94C"></i>Best day</span><span><i style="background:#1B4332"></i>Above average</span><span><i style="background:#8FB59C"></i>Below average</span><span><i style="background:#d8dad5"></i>No sales</span><span><i class="dash"></i>Daily average</span></div>
     <div class="dbars">${all.map(d => { const h = Math.max(0, d.net) / mx * 100, col = !d.net ? '' : d === best ? '#F2C94C' : d.net >= avg ? '#1B4332' : '#8FB59C';
       const lab = !d.net ? (d.d === tdy ? 'pending' : wd(d.d)) : '';
-      return `<div title="${wd(d.d)} ${d.d}: AED ${money(d.net)}"><em>${d.net ? kf(d.net) : `<span class="ovz">${lab}</span>`}</em><i class="${d.net ? '' : 'z'}" style="height:${d.net ? Math.max(h, 1) : 1}%${col ? ';background:' + col : ''}"></i><b>${d.d.slice(8)}</b></div>`; }).join('')}</div>` : '<p class="muted">No sales imported for this period.</p>';
+      return `<div title="${wd(d.d)} ${d.d}: AED ${money(d.net)}"><span class="bw">${avg ? `<s class="avl" style="bottom:${(avg / mx * 88).toFixed(2)}%"></s>` : ''}<em>${d.net ? kf(d.net) : `<span class="ovz">${lab}</span>`}</em><i class="${d.net ? '' : 'z'}" style="height:${d.net ? Math.max(h * 0.88, 1) : 1}%${col ? ';background:' + col : ''}"></i></span><b>${d.d.slice(8)}</b></div>`; }).join('')}</div>` : '<p class="muted">No sales imported for this period.</p>';
   const rtBy = {}; rt.forEach(r => { const n = saleName(r); rtBy[n] = (rtBy[n] || 0) - num(r.net_incl_vat); });
   const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, gross:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); if (r.tran_type === 'CR') { o.gross += num(r.net_incl_vat); o.inv.add(r.invoice_no); o.cust.add(r.customer_code); } })
     .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size, share:tNet ? o.net / tNet * 100 : 0, retPct:o.gross ? (rtBy[o.name] || 0) / o.gross * 100 : 0, avgInv:o.inv.size ? o.gross / o.inv.size : 0 })).sort((a,b) => b.net - a.net);
@@ -1006,7 +1011,8 @@ async function vOverview(){ const __t = S.nav;
       ${kpi('Net sales', 'AED ' + money(tNet), 'incl. VAT, after returns' + dl('net'))}
       ${kpi('Sales', 'AED ' + money(tCr), new Set(cr.map(r => r.invoice_no)).size + ' invoices' + dl('cr'))}
       ${kpi('Returns', 'AED ' + money(tRt), new Set(rt.map(r => r.invoice_no)).size + ' returns · ' + (tCr ? (tRt / tCr * 100).toFixed(1) : '0.0') + '% of sales' + dl('rt'))}
-      ${kpi('Credit share', credPct.toFixed(0) + '% credit', `<span class="ovsplit"><i style="width:${(100 - credPct).toFixed(1)}%"></i></span>Cash ${money(tCash)} · Credit ${money(tCred)}`)}
+      <div class="kpi"><span>Cash / credit</span><div class="ovdonut"><svg width="58" height="58" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="15.915" fill="none" stroke="#1B4332" stroke-width="7"></circle><circle cx="21" cy="21" r="15.915" fill="none" stroke="#F2C94C" stroke-width="7" stroke-dasharray="${credPct.toFixed(2)} ${(100 - credPct).toFixed(2)}"></circle></svg>
+        <div><b>${credPct.toFixed(0)}% credit</b><div class="lg"><i style="background:#1B4332"></i>Cash ${money(tCash)}<br><i style="background:#F2C94C"></i>Credit ${money(tCred)}</div></div></div></div>
       ${kpi('Collections', 'AED ' + money(tColl), coll.length + ' receipts' + dl('coll'))}
       ${kpi('Expenses', 'AED ' + money(tExp), exp.length + ' lines' + dl('exp'))}
       ${kpi('Cash to hand over', 'AED ' + money(sum(cash,'cash_to_hand_over')), days.length + ' van days')}
@@ -1018,7 +1024,12 @@ async function vOverview(){ const __t = S.nav;
       {k:'net',l:'Net sales AED',money:1,sum:1}], sm)}</div>
     <div class="card"><h3>Top items</h3>${table([{k:'name',l:'Item',left:1},{k:'qty',l:'Qty (pk / pcs)',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], it)}</div>`;
   // comparison with the previous period of the same length — loaded after the page shows, so the page stays fast
-  const n = all.length, pTo = addDays(S.from, -1), pFrom = addDays(S.from, -n), key = 'pv' + S.brs.join(',') + '|' + pFrom + '|' + pTo;
+  const n = all.length, M3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let pTo = addDays(S.from, -1), pFrom = addDays(S.from, -n), pLab = '';
+  if (S.from.slice(8) === '01' && S.from.slice(0, 7) === S.date.slice(0, 7)) {   // month to date: same days of last month
+    const y = +S.from.slice(0, 4), mo = +S.from.slice(5, 7), py = mo === 1 ? y - 1 : y, pm = mo === 1 ? 12 : mo - 1, last = new Date(Date.UTC(py, pm, 0)).getUTCDate(), dd = Math.min(+S.date.slice(8), last);
+    pFrom = `${py}-${String(pm).padStart(2, '0')}-01`; pTo = `${py}-${String(pm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; pLab = `same days last month (${M3[pm - 1]} 1–${dd})`; }
+  const key = 'pv' + S.brs.join(',') + '|' + pFrom + '|' + pTo;
   try {
     const pv = await cached(key, async () => {
       const [ps, pd] = await Promise.all([
@@ -1032,7 +1043,7 @@ async function vOverview(){ const __t = S.nav;
     const cur = { net:tNet, cr:tCr, rt:tRt, pr:tPr, coll:tColl, exp:tExp }, lowGood = { rt:1, exp:1 };
     document.querySelectorAll('.ovd').forEach(el => { const k = el.dataset.k, a = cur[k], b = pv[k]; if (!b) { el.textContent = k === 'net' ? 'No earlier figures to compare yet' : ''; return; }
       const ch = (a - b) / Math.abs(b) * 100, up = ch >= 0, good = lowGood[k] ? !up : up;
-      el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + pFrom + ' – ' + pTo; });
+      el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + (pLab || pFrom + ' – ' + pTo); });
   } catch (e) { document.querySelectorAll('.ovd').forEach(el => el.textContent = ''); }
 }
 
