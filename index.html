@@ -1030,7 +1030,7 @@ async function vOverview(){ const __t = S.nav;
     });
     if (__t !== S.nav) return;
     const cur = { net:tNet, cr:tCr, rt:tRt, pr:tPr, coll:tColl, exp:tExp }, lowGood = { rt:1, exp:1 };
-    document.querySelectorAll('.ovd').forEach(el => { const k = el.dataset.k, a = cur[k], b = pv[k]; if (!b) { el.textContent = ''; return; }
+    document.querySelectorAll('.ovd').forEach(el => { const k = el.dataset.k, a = cur[k], b = pv[k]; if (!b) { el.textContent = k === 'net' ? 'No earlier figures to compare yet' : ''; return; }
       const ch = (a - b) / Math.abs(b) * 100, up = ch >= 0, good = lowGood[k] ? !up : up;
       el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + pFrom + ' – ' + pTo; });
   } catch (e) { document.querySelectorAll('.ovd').forEach(el => el.textContent = ''); }
