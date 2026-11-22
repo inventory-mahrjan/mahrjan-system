@@ -28,4 +28,4 @@ end $$;
 
 revoke all on function public.backup_allowed(), public.backup_tables(), public.backup_table(text, int, int) from public, anon;
 grant execute on function public.backup_allowed(), public.backup_tables(), public.backup_table(text, int, int) to authenticated;
-select array_length(public.backup_tables(), 1) as tables_in_backup;
+select proname from pg_proc where proname like 'backup_%' order by 1;
