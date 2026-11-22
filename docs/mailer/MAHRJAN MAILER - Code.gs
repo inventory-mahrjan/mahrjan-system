@@ -345,6 +345,7 @@ function jobBackup() {
       for (var off = 0; ; off += 5000) { var p = rpc_('backup_table', { p_table: t, p_offset: off, p_limit: 5000 }) || []; rows = rows.concat(p); if (p.length < 5000) break; }
       blobs.push(Utilities.newBlob(JSON.stringify(rows), 'application/json', t + '.json')); }
     catch (e) { try { blobs.push(Utilities.newBlob(JSON.stringify(rest_(t, '')), 'application/json', t + '.json')); } catch (e2) { miss.push(t); Logger.log('backup ' + t + ': ' + e2.message); } } });
+  try { blobs.push(Utilities.newBlob(rpc_('backup_schema', {}), 'text/plain', '_schema.sql')); } catch (e) { Logger.log('backup_schema: ' + e.message); }
   var it = DriveApp.getFoldersByName('Mahrjan Backup'), folder = it.hasNext() ? it.next() : DriveApp.createFolder('Mahrjan Backup');
   folder.createFile(Utilities.zip(blobs, 'mahrjan-backup-' + day + '.zip'));
   var old = Date.now() - 30 * 864e5, f = folder.getFiles(); while (f.hasNext()) { var x = f.next(); if (/^mahrjan-backup-/.test(x.getName()) && x.getDateCreated().getTime() < old) x.setTrashed(true); }

@@ -1652,6 +1652,7 @@ async function vSettings(){
       for (let i = 0; i < T.length; i++) { const rows = [];
         for (let off = 0; ; off += 5000) { s.textContent = ` ${Math.round(i * 100 / T.length)}% · ${T[i]} ${rows.length}`; const p = await rpc('backup_table', { p_table:T[i], p_offset:off, p_limit:5000 }); rows.push(...p); if (p.length < 5000) break; }
         files.push({ name:T[i] + '.json', text:JSON.stringify(rows) }); info.push(T[i] + '\t' + rows.length); }
+      try { files.push({ name:'_schema.sql', text:await rpc('backup_schema') }); } catch (e) { info.push('(structure not saved: ' + (e.message || e) + ')'); }
       const stamp = new Date(Date.now() + 240*60000).toISOString().slice(0,16).replace('T',' ').replace(':','');
       files.unshift({ name:'_README.txt', text:`MAHRJAN SYSTEM - DATABASE BACKUP\r\nTaken ${stamp} (Dubai) by ${S.me.name}\r\nOne JSON file per table (array of rows). Restore order and steps: see HANDOVER document, section Backup and restore.\r\n\r\nTable\tRows\r\n${info.join('\r\n')}\r\n` });
       const a = document.createElement('a'); a.href = URL.createObjectURL(makeZip(files)); a.download = `MAHRJAN DB BACKUP ${stamp}.zip`; document.body.append(a); a.click(); a.remove();
