@@ -12,7 +12,7 @@
   var KEY = 'mjsc:', root = null, V = { view: 'list' }, LIST = [], busy = false, err = '';
 
   var CSS = '#mjsc{position:fixed;inset:0;z-index:2100;background:#f2f2ee;display:none;flex-direction:column;font-family:Archivo,system-ui,sans-serif;color:#14181a}'
-    + '#mjsc .hd{background:#0d4a28;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}#mjsc .hd b{font-size:16px;flex:1}#mjsc .hd small{display:block;font-weight:400;opacity:.8;font-size:11px}'
+    + '#mjsc .hd{background:#1B4332;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}#mjsc .hd b{font-size:16px;flex:1}#mjsc .hd small{display:block;font-weight:400;opacity:.8;font-size:11px}'
     + '#mjsc .hd button{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 11px;font:600 13px Archivo}'
     + '#mjsc .bd{flex:1;overflow:auto;padding:12px}#mjsc .ft{display:flex;gap:8px;padding:10px 12px;background:#fff;border-top:1px solid #ddd}'
     + '#mjsc .ft button{flex:1;padding:13px;border-radius:10px;border:1px solid #c9cfca;background:#fff;font:700 14px Archivo}#mjsc .ft .pri{background:#147b3d;color:#fff;border-color:#147b3d}'

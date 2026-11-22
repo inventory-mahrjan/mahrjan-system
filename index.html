@@ -7,14 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#f6f6f4;--surface:#fff;--ink:#1b1f1e;--muted:#6b7370;--line:#e7e8e4;--line2:#d8dad5;--accent:#0f5f57;--accent-ink:#0c363b;--soft:#eef3f1;--neg:#b0432e;--amb:#a8650f;
+  :root{--bg:#f6f6f4;--surface:#fff;--ink:#1b1f1e;--muted:#6b7370;--line:#e7e8e4;--line2:#d8dad5;--accent:#1B4332;--accent-ink:#0c363b;--soft:#eef3f1;--neg:#b0432e;--amb:#a8650f;
     font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;-webkit-font-smoothing:antialiased}
   *{box-sizing:border-box} body{margin:0}
   h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em} h1{font-size:26px} h3{font-size:15px;margin:0 0 12px}
   button,input,select{font:inherit;font-size:13.5px}
   button{cursor:pointer;border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:6px;padding:8px 13px;font-weight:500;line-height:1.2;white-space:nowrap}
   button:hover{background:#f2f3f0} button:disabled{opacity:.45;cursor:default}
-  button.p{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff} button.p:hover{background:#15474d}
+  button.p{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff} button.p:hover{background:#14382A}
   button.d{color:var(--neg);border-color:var(--neg)}
   button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   input,select{min-width:0;height:36px;padding:0 10px;border:1px solid var(--line2);border-radius:6px;background:#fff;color:var(--ink)}
@@ -81,7 +81,7 @@
   footer{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding-top:8px}
   .notice{font-size:13px;color:#5f5233;background:#faf6ea;border:1px solid #efe5c8;border-radius:8px;padding:10px 14px;line-height:1.5}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px} @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
-  .dbars{display:flex;align-items:flex-end;gap:4px;height:210px;padding-top:18px} .dbars>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0} .dbars i{display:block;width:70%;background:#0f5f57;border-radius:3px 3px 0 0} .dbars i.z{background:#d8dad5} .dbars em{font-style:normal;font-size:9px;color:#6b7370;white-space:nowrap} .dbars b{font-size:10px;color:#6b7370;font-weight:500;margin-top:4px}
+  .dbars{display:flex;align-items:flex-end;gap:4px;height:210px;padding-top:18px} .dbars>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0} .dbars i{display:block;width:70%;background:#1B4332;border-radius:3px 3px 0 0} .dbars i.z{background:#d8dad5} .dbars em{font-style:normal;font-size:9px;color:#6b7370;white-space:nowrap} .dbars b{font-size:10px;color:#6b7370;font-weight:500;margin-top:4px}
   .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
   .kpi span{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.kpi b{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}.kpi small{color:var(--muted);font-size:12px}
   .sheet-head{display:flex;justify-content:space-between;border-bottom:2px solid var(--accent-ink);padding-bottom:6px;margin-bottom:8px;font-size:14px}
@@ -96,7 +96,7 @@
   .os tr.h td{background:var(--accent-ink);color:#fff;font-weight:600} .os tr.b td{font-weight:600} .os tr.t td{background:var(--soft);font-weight:600;color:var(--accent-ink)} .os tr.g td{border:0;height:10px} .os tr.s td{border:0;padding-top:34px}
   .rtabs{display:flex;gap:6px;flex-wrap:wrap} .rtabs button.on{background:var(--accent-ink);color:#fff;border-color:var(--accent-ink)}
 #osh button.primary{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff}
-#osh button.primary:hover{background:#15474d}
+#osh button.primary:hover{background:#14382A}
 #osh .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px}
 #osh .filter-primary{display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end}
 #osh .section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
@@ -157,6 +157,13 @@
   .mjload i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,#eceeea 25%,#f6f7f4 37%,#eceeea 63%);background-size:400% 100%;animation:skel 1.3s ease infinite}
   .mjload i:nth-child(3){width:85%} .mjload i:nth-child(4){width:65%}
   .sidebar::-webkit-scrollbar,.tw::-webkit-scrollbar{width:8px;height:8px} .sidebar::-webkit-scrollbar-thumb,.tw::-webkit-scrollbar-thumb{background:#d8dad5;border-radius:8px} .sidebar::-webkit-scrollbar-thumb:hover,.tw::-webkit-scrollbar-thumb:hover{background:#c2c6be}
+  /* brand palette: Deep Forest #0D2818 / #1B4332 + Amber Glow #F2994A / #F2C94C on white */
+  :root{--accent:#1B4332;--accent-ink:#0D2818;--soft:#EEF4F0}
+  button.p,#osh button.primary{background:linear-gradient(90deg,#F2994A,#F2C94C);border-color:#F2B04B;color:#0D2818;font-weight:600}
+  button.p:not(:disabled):hover,#osh button.primary:not(:disabled):hover{background:linear-gradient(90deg,#EE8C3A,#F0C03A);box-shadow:0 3px 10px rgba(242,153,74,.35)}
+  nav button::before{background:linear-gradient(180deg,#F2994A,#F2C94C)}
+  .rtabs button.on{background:var(--accent-ink);border-color:var(--accent-ink)}
+  th{background:#EAF2EC}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   @media print{#v>*,.kpi{animation:none!important}}
 </style>
@@ -164,9 +171,9 @@
 <body>
 <div id="app"></div>
 <script>/* loading % : counts database requests in flight; bar on top + "Loading… NN%" */
-(function(){var S=0,D=0,P=0,bar,lab,t;function ui(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#0f5f57;z-index:9999;transition:width .2s;width:0';lab=document.createElement('div');lab.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#0f5f57;color:#fff;font:600 12px system-ui;padding:3px 9px;border-radius:10px';document.body.appendChild(bar);document.body.appendChild(lab);}var on=S>D;bar.style.width=(on?P:100)+'%';bar.style.opacity=lab.style.opacity=on?1:0;lab.textContent='Loading… '+P+'%';document.querySelectorAll('.mjpct').forEach(function(e){e.textContent=P+'%';});}
+(function(){var S=0,D=0,P=0,bar,lab,t;function ui(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#1B4332;z-index:9999;transition:width .2s;width:0';lab=document.createElement('div');lab.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#1B4332;color:#fff;font:600 12px system-ui;padding:3px 9px;border-radius:10px';document.body.appendChild(bar);document.body.appendChild(lab);}var on=S>D;bar.style.width=(on?P:100)+'%';bar.style.opacity=lab.style.opacity=on?1:0;lab.textContent='Loading… '+P+'%';document.querySelectorAll('.mjpct').forEach(function(e){e.textContent=P+'%';});}
 function step(){P=Math.max(P,Math.min(99,Math.round(D/Math.max(S,1)*100)));if(S===D){P=100;clearTimeout(t);t=setTimeout(function(){if(S===D){S=D=P=0;}},400);}if(document.body)ui();}
-var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=20"></script><script src="old-sheets.js?v=4"></script><script src="old-views.js?v=6"></script>
+var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=20"></script><script src="old-sheets.js?v=5"></script><script src="old-views.js?v=7"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -683,7 +690,7 @@ async function vStockBatch(id){ const __t = S.nav;
   const missingShelves = prevShelves.filter(x => !shelves.includes(x));
   const tabs = [['sum','Summary'],['ent','Entries'],['shelf','Shelves'],['exp','Expiry & country'],['use','Tray & label usage']];
   const dtm = v => v ? new Date(v).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-  const PH = `<div class="printonly"><div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #0f5f57;padding-bottom:6px"><img src="${LOGO}" style="height:38px">
+  const PH = `<div class="printonly"><div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #1B4332;padding-bottom:6px"><img src="${LOGO}" style="height:38px">
       <div><div style="font-weight:800;font-size:15px">MAHRJAN GENERAL TRADING LLC – ${esc(String(co).toUpperCase())}</div><div style="font-weight:700;font-size:12.5px;letter-spacing:.04em">STOCK COUNT REPORT — ${esc((tabs.find(t => t[0] === S.sctab) || [,''])[1].toUpperCase())}</div></div></div>
     <table style="margin:6px 0 4px;font-size:10.5px"><tr><td class="l"><b>Batch</b> ${esc(b.batch_no)}</td><td class="l"><b>Count date</b> ${b.count_date}</td><td class="l"><b>Type</b> ${b.count_type === 'WEEKLY' ? 'Weekly' : 'Daily'}</td><td class="l"><b>Counted by</b> ${esc(nm(b.counted_by))}</td><td class="l"><b>Status</b> ${({OPEN:'Open',DOWNLOADED:'Counting',POSTED:'Posted',CANCELLED:'Cancelled'})[b.status]}</td></tr>
       <tr><td class="l" colspan="2"><b>Categories</b> ${b.categories.map(c => SC_CAT[c]).join(', ')}</td><td class="l"><b>Cut-off</b> ${dtm(b.cutoff_at)}</td><td class="l"><b>Posted</b> ${dtm(b.posted_at)}</td><td class="l"><b>Printed</b> ${dtm(new Date())}</td></tr></table></div>`;
