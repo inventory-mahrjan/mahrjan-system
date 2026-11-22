@@ -986,7 +986,7 @@ const kpi = (l, v, sub = '') => `<div class="kpi"><span>${esc(l)}</span><b>${v}<
 function aggregate(rows, keyF, init, add){ const m = new Map(); rows.forEach(r => { const k = keyF(r); if (k == null) return; if (!m.has(k)) m.set(k, init(r)); add(m.get(k), r); }); return [...m.values()]; }
 
 // ---------- OVERVIEW ----------
-async function vOverview(){ const __t = S.nav; if (!S.ovCmp) { try { S.ovCmp = localStorage.getItem('mj_ovcmp') || 'prev'; } catch (e) { S.ovCmp = 'prev'; } }
+async function vOverview(){ const __t = S.nav; if (S.ovCmp == null) S.ovCmp = '';   // default: only the selected days, no comparison
   loading();
   const [sales, days] = await Promise.all([getSales(), getDays()]);
   const [cash, coll, exp] = await Promise.all([getCash(days), getColl(days), getExp(days)]);
@@ -1009,7 +1009,7 @@ async function vOverview(){ const __t = S.nav; if (!S.ovCmp) { try { S.ovCmp = l
   const it = aggregate(sales, r => r.item_id || r.item_code, r => ({ name:r.item_id ? iNm(r.item_id) : r.item_name, qty:0, net:0 }), (o,r) => { o.qty += num(r.qty_base); o.net += num(r.net_incl_vat); }).sort((a,b) => b.net - a.net).slice(0, 15);
   const custN = new Set(cr.map(r => r.customer_code).filter(Boolean)).size, crInv = new Set(cr.map(r => r.invoice_no)).size;
   const dl = k => `<span class="ovd" data-k="${k}"></span>`;
-  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="row noprint" style="margin:0;align-items:center;gap:10px"><span class="muted">Compare with</span><div class="rtabs" id="ovcmp"><button data-c="prev" class="${S.ovCmp === 'lm' ? '' : 'on'}">Previous same number of days</button><button data-c="lm" class="${S.ovCmp === 'lm' ? 'on' : ''}">Same dates last month (MTD)</button></div></div><div class="kpis">
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="row noprint" style="margin:0;align-items:center;gap:10px"><span class="muted">Compare with</span><div class="rtabs" id="ovcmp"><button data-c="" class="${S.ovCmp ? '' : 'on'}">No comparison</button><button data-c="prev" class="${S.ovCmp === 'prev' ? 'on' : ''}">Previous same number of days</button><button data-c="lm" class="${S.ovCmp === 'lm' ? 'on' : ''}">Same dates last month (MTD)</button></div></div><div class="kpis">
       ${kpi('Net sales', 'AED ' + money(tNet), 'incl. VAT, after returns' + dl('net'))}
       ${kpi('Sales', 'AED ' + money(tCr), new Set(cr.map(r => r.invoice_no)).size + ' invoices' + dl('cr'))}
       ${kpi('Returns', 'AED ' + money(tRt), new Set(rt.map(r => r.invoice_no)).size + ' returns · ' + (tCr ? (tRt / tCr * 100).toFixed(1) : '0.0') + '% of sales' + dl('rt'))}
@@ -1025,7 +1025,8 @@ async function vOverview(){ const __t = S.nav; if (!S.ovCmp) { try { S.ovCmp = l
       {k:'share',l:'Share',left:1,html:r => `<span class="ovshare"><i style="width:${Math.max(0, Math.min(100, r.share)).toFixed(1)}%"></i></span>${r.share.toFixed(1)}%`},
       {k:'net',l:'Net sales AED',money:1,sum:1}], sm)}</div>
     <div class="card"><h3>Top items</h3>${table([{k:'name',l:'Item',left:1},{k:'qty',l:'Qty (pk / pcs)',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], it)}</div>`;
-  $('#ovcmp').querySelectorAll('button').forEach(b => b.onclick = () => { S.ovCmp = b.dataset.c; try { localStorage.setItem('mj_ovcmp', S.ovCmp); } catch (e) {} vOverview(); });
+  $('#ovcmp').querySelectorAll('button').forEach(b => b.onclick = () => { S.ovCmp = b.dataset.c; vOverview(); });
+  if (!S.ovCmp) { document.querySelectorAll('.ovd').forEach(el => el.textContent = ''); return; }
   // comparison with the previous period of the same length — loaded after the page shows, so the page stays fast
   const pend = all.length > 1 && all[all.length - 1].d === tdy && !all[all.length - 1].net, n = all.length - (pend ? 1 : 0), cTo = addDays(S.date, pend ? -1 : 0);
   const lastMonth = d => { const y = +d.slice(0, 4), mo = +d.slice(5, 7), py = mo === 1 ? y - 1 : y, pm = mo === 1 ? 12 : mo - 1, last = new Date(Date.UTC(py, pm, 0)).getUTCDate();
