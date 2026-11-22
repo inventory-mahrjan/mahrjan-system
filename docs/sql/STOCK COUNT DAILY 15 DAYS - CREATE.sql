@@ -8,7 +8,7 @@ language plpgsql security definer set search_path to 'public' as $$
 declare n int := 0; cut date := (now() at time zone 'Asia/Dubai')::date - p_days;
 begin
   create temp table if not exists _sc_old (id bigint primary key) on commit drop;
-  delete from _sc_old;
+  delete from _sc_old where true;   -- a bare DELETE is blocked for portal logins
   insert into _sc_old select id from public.sc_batches where count_type = 'DAILY' and count_date < cut on conflict do nothing;
   loop   -- recounts of an old batch go too (whatever their own date)
     insert into _sc_old select b.id from public.sc_batches b join _sc_old o on o.id = b.parent_id on conflict do nothing;
