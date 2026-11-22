@@ -339,9 +339,9 @@
     if (stage === 'OFFICE') return 'Petty cash is now entered in the portal';
     if (r === 'VIEWER') return 'Viewer cannot change data';
     if (stage === 'USERS') return 'Users are managed in the portal (Admin → Staff & access).';
-    if (stage.indexOf('WH_') === 0 && ['ADMIN', 'RECEIVER', 'ACCOUNTANT'].indexOf(r) < 0) return 'Only admin, receiver or accountant can use the warehouse';
+    if (stage.indexOf('WH_') === 0 && ['ADMIN', 'RECEIVER', 'ACCOUNTANT'].indexOf(r) < 0) return 'Only admin, supervisor or accountant can use the warehouse';
     if ((stage === 'DELETE' || stage === 'UNDELETE') && ['ADMIN', 'ACCOUNTANT', 'RECEIVER'].indexOf(r) < 0) return 'You cannot delete invoices';
-    if (r === 'RECEIVER' && ['COLLECTION', 'EXPENSE', 'REQUIREMENT'].indexOf(stage) >= 0) return 'A receiver cannot post ' + stage.toLowerCase();
+    if (r === 'RECEIVER' && ['COLLECTION', 'EXPENSE', 'REQUIREMENT'].indexOf(stage) >= 0) return 'A supervisor cannot post ' + stage.toLowerCase();
     if (r === 'ACCOUNTANT' && ['COLLECTION', 'EXPENSE', 'REQUIREMENT'].indexOf(stage) >= 0) return 'An accountant cannot post ' + stage.toLowerCase();
     if (r === 'SALESMAN') { if (['BOARD', 'RETURN', 'OFFICE', 'DELETE', 'UNDELETE'].indexOf(stage) >= 0) return 'A salesman cannot post ' + stage.toLowerCase();
       if (p.salesman !== undefined && up(p.salesman) !== up(s.name)) return 'You can only post for ' + s.name; }
@@ -442,7 +442,7 @@
     var B = await q(c.from('wh_batches').select('*').eq('branch_id', m.br.id).or('status.eq.ISSUED,work_date.gte.' + from).neq('status', 'CANCELLED').order('id'));
     var L = B.length ? await byIds('wh_lines', '*', 'batch_id', B.map(function (b) { return b.id; })) : []; return B.map(function (b) { return batchOut(m, b, L); }); }
   async function whInit(m, s) {
-    if (['ADMIN', 'RECEIVER', 'ACCOUNTANT'].indexOf(s.role) < 0) return { ok: false, error: 'Only admin, receiver or accountant can use the warehouse' };
+    if (['ADMIN', 'RECEIVER', 'ACCOUNTANT'].indexOf(s.role) < 0) return { ok: false, error: 'Only admin, supervisor or accountant can use the warehouse' };
     var W = whMasters(m), sh = shiftNow(), ppl = m.staff.filter(function (x) { return x.active && (x.branch_id == null || x.branch_id === m.br.id); });
     return { ok: true, unit: m.unit, unitCode: WH_CODE[m.unit], shift: sh.shift, work: sh.work,
       supervisors: ppl.filter(function (x) { return x.role === 'ACCOUNTANT' || x.role === 'RECEIVER'; }).map(function (x) { return up(x.name); }).sort(),

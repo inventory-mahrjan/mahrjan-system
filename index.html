@@ -598,7 +598,7 @@ function scBatchDialog(b, recount){
     <label>Note (optional)<input name="nt" value="${esc(b?.note||'')}"></label>
     <p class="bad st"></p><div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="bsv">${b ? 'Save' : 'Create batch'}</button></div></form>`;
   document.body.append(d); const f = d.querySelector('form');
-  const fill = () => { const br = +f.br.value; f.cb.innerHTML = recv(br).map(s => `<option value="${s.id}" ${s.id===b?.counted_by?'selected':''}>${esc(s.name)} · ${s.role.toLowerCase()}</option>`).join(''); };
+  const fill = () => { const br = +f.br.value; f.cb.innerHTML = recv(br).map(s => `<option value="${s.id}" ${s.id===b?.counted_by?'selected':''}>${esc(s.name)} · ${RN(s.role).toLowerCase()}</option>`).join(''); };
   f.br.onchange = fill; fill();
   d.querySelector('#bsv').onclick = async ev => { ev.preventDefault(); const st = d.querySelector('.st'); st.textContent = '';
     const cs = [...f.querySelectorAll('[name=cat]:checked')].map(x => x.value);
