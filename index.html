@@ -272,7 +272,11 @@ function tabsFor(){
   return t;
 }
 
+const ONE_CO = ['wh','ite','pc','se','wo','qs','whr','dd','sri'];   // pages that work for one company at a time
 function render(){
+  // one-company page while 'Both' is ticked: switch to Al Quoz for it, and go back to Both on the next page that takes both
+  if (S.brs.length > 1 && ONE_CO.includes(S.tab)) { const aq = (S.branches.find(b => b.code === 'MGAZ') || S.branches[0]).id; S.brsAuto = S.brs; S.brs = [aq]; S.br = aq; S.dayId = null; S.lsm = null; S.rsm = null; }
+  else if (S.brsAuto && !ONE_CO.includes(S.tab)) { S.brs = S.brsAuto; S.br = S.brs[0]; S.brsAuto = null; S.dayId = null; S.lsm = null; S.rsm = null; }
   const T = tabsFor(), title = (T.find(t => t[0] === S.tab) || [])[1] || '';
   const brN = id => { const b = S.branches.find(x => x.id === id); return b ? (b.code === 'MGT' ? 'Ajman' : 'Al Quoz') : ''; }, br = S.brs.length > 1 ? 'Al Quoz + Ajman' : (S.branches.find(b => b.id === S.br)?.name || '');
   const unitName = S.brs.length > 1 ? 'SALES PORTAL' : br.toUpperCase();
@@ -299,7 +303,7 @@ function render(){
   $('.sidebar').scrollTop = navTop;
   $('#out').onclick = () => sb.auth.signOut();
   document.querySelectorAll('[data-br]').forEach(c => c.onchange = () => { const v = [...document.querySelectorAll('[data-br]:checked')].map(x => +x.dataset.br); if (!v.length) { c.checked = true; return; }
-    S.brs = v; S.br = v[0]; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
+    S.brs = v; S.br = v[0]; S.brsAuto = null; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   document.addEventListener('click', e => { const d = $('#cosel'); if (d && d.open && !d.contains(e.target)) d.open = false; }, { once: true });
   $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   $('#dt') && ($('#dt').onchange = e => { S.date = e.target.value; if (S.from > S.date) { S.from = S.date; if ($('#df')) $('#df').value = S.date; } S.dayId = null; view(); });
