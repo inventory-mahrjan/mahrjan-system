@@ -1645,7 +1645,17 @@ async function vSettings(){
   const L = await q(sb.from('app_settings').select('*').order('key'));
   $('#v').innerHTML = `<div class="card"><h3>Rates & device lock</h3><p class="muted">Carton rate = AED charged per empty carton returned (small / big). A new rate is used for returns saved from now on; days already saved keep their amount.</p>
     <div class="tw" style="max-width:560px"><table><tr><th class="l">Setting</th><th>Value</th><th>Last changed</th></tr>${L.map(x => `<tr><td class="l">${esc(x.label || x.key)}</td><td><input type="number" step="0.01" min="0" data-k="${esc(x.key)}" value="${x.value}" style="width:100px"></td><td class="muted">${new Date(x.updated_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})}</td></tr>`).join('')}</table></div>
-    <div class="row" style="margin-top:8px"><button class="p" id="ssv">Save</button></div></div>`;
+    <div class="row" style="margin-top:8px"><button class="p" id="ssv">Save</button></div></div>
+    ${S.me.role === 'ADMIN' ? `<div class="card"><h3>Database backup</h3><p class="muted">Downloads every table of the live database as a zip (one JSON file per table). A copy is also saved every night at 02:30 to the Google Drive folder "Mahrjan Backup".</p><div class="row"><button class="p" id="bkp">Download database backup</button><span id="bkps" class="muted"></span></div></div>` : ''}`;
+  $('#bkp') && ($('#bkp').onclick = async () => { const b = $('#bkp'), s = $('#bkps'); b.disabled = true;
+    try { const T = await rpc('backup_tables'), files = [], info = [];
+      for (let i = 0; i < T.length; i++) { const rows = [];
+        for (let off = 0; ; off += 5000) { s.textContent = ` ${Math.round(i * 100 / T.length)}% · ${T[i]} ${rows.length}`; const p = await rpc('backup_table', { p_table:T[i], p_offset:off, p_limit:5000 }); rows.push(...p); if (p.length < 5000) break; }
+        files.push({ name:T[i] + '.json', text:JSON.stringify(rows) }); info.push(T[i] + '\t' + rows.length); }
+      const stamp = new Date(Date.now() + 240*60000).toISOString().slice(0,16).replace('T',' ').replace(':','');
+      files.unshift({ name:'_README.txt', text:`MAHRJAN SYSTEM - DATABASE BACKUP\r\nTaken ${stamp} (Dubai) by ${S.me.name}\r\nOne JSON file per table (array of rows). Restore order and steps: see HANDOVER document, section Backup and restore.\r\n\r\nTable\tRows\r\n${info.join('\r\n')}\r\n` });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(makeZip(files)); a.download = `MAHRJAN DB BACKUP ${stamp}.zip`; document.body.append(a); a.click(); a.remove();
+      s.textContent = ` 100% · ${T.length} tables`; toast('Backup downloaded'); } catch (e) { s.textContent = ''; toast(e.message || String(e), false); } finally { b.disabled = false; } });
   $('#ssv').onclick = async () => { try { for (const i of $('#v').querySelectorAll('[data-k]')) { const v = Number(i.value); if (!(v >= 0)) return toast('Enter a valid rate', false); if (i.dataset.k === 'DEVICE_LOCK' && ![0,1,2].includes(v)) return toast('Device lock must be 0, 1 or 2', false);
       const x = L.find(y => y.key === i.dataset.k); if (Number(x.value) !== v) await q(sb.from('app_settings').update({ value:v, updated_at:new Date().toISOString() }).eq('key', i.dataset.k)); }
     toast('Saved'); vSettings(); } catch (e) { toast(e.message || String(e), false); } };

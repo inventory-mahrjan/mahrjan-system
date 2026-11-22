@@ -340,7 +340,11 @@ var BACKUP_TABLES = ['branches','routes','vans','staff','customers','customer_as
   'requirement_lines','sales_lines','sales_deletes','petty_cash','day_close_items','wh_batches','wh_lines','sc_batches','sc_lines','sc_system','office_log','email_recipients','role_access'];
 function jobBackup() {
   var day = day_(0), blobs = [], miss = [];
-  BACKUP_TABLES.forEach(function (t) { try { blobs.push(Utilities.newBlob(JSON.stringify(rest_(t, '')), 'application/json', t + '.json')); } catch (e) { miss.push(t); Logger.log('backup ' + t + ': ' + e.message); } });
+  var all = BACKUP_TABLES; try { all = rpc_('backup_tables', {}) || BACKUP_TABLES; } catch (e) { Logger.log('backup_tables: ' + e.message); }   // every table, read past the access rules (admin / mailer only)
+  all.forEach(function (t) { try { var rows = [];
+      for (var off = 0; ; off += 5000) { var p = rpc_('backup_table', { p_table: t, p_offset: off, p_limit: 5000 }) || []; rows = rows.concat(p); if (p.length < 5000) break; }
+      blobs.push(Utilities.newBlob(JSON.stringify(rows), 'application/json', t + '.json')); }
+    catch (e) { try { blobs.push(Utilities.newBlob(JSON.stringify(rest_(t, '')), 'application/json', t + '.json')); } catch (e2) { miss.push(t); Logger.log('backup ' + t + ': ' + e2.message); } } });
   var it = DriveApp.getFoldersByName('Mahrjan Backup'), folder = it.hasNext() ? it.next() : DriveApp.createFolder('Mahrjan Backup');
   folder.createFile(Utilities.zip(blobs, 'mahrjan-backup-' + day + '.zip'));
   var old = Date.now() - 30 * 864e5, f = folder.getFiles(); while (f.hasNext()) { var x = f.next(); if (/^mahrjan-backup-/.test(x.getName()) && x.getDateCreated().getTime() < old) x.setTrashed(true); }
