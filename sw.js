@@ -1,5 +1,5 @@
-const CACHE = 'mahrjan-new-14';
-const ASSETS = ['./', './index-app.html', './app.html', './manifest.json', './mj-bridge.js', './mj-stockcount.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
+const CACHE = 'mahrjan-new-15';
+const ASSETS = ['./', './index-app.html', './app.html', './manifest.json', './mj-bridge.js', './mj-stockcount.js', './mj-datefmt.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(ASSETS.map(a => c.add(a).catch(() => null)))).then(() => self.skipWaiting()));
 });

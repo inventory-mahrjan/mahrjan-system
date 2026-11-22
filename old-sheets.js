@@ -1,6 +1,6 @@
 /* Daily sheets: the old SALES_PORTAL screen, print and Excel, unchanged (copied from old-portal.html). Data comes live through MJ_SHEET_CTX. */
 function mahrjanXlsx(sheets){
- const enc=new TextEncoder(),x=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+ const enc=new TextEncoder(),x=v=>String(window.mjFmtDates?window.mjFmtDates(String(v??'')):(v??'')).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
  const colName=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
  const cv=v=>v!==null&&typeof v==='object'?v:{v:v};
  const sheetXml=sh=>{const rows=Array.from(sh.rows||[],r=>Array.from(r||[])),bold=new Set(sh.bold||[]),w=sh.widths?sh.widths.slice():[];if(!sh.widths)rows.forEach(r=>r.forEach((v,c)=>{const l=String(cv(v).v??'').length;w[c]=Math.max(w[c]||6,Math.min(48,l+2));}));
