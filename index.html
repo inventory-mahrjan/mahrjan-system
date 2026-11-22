@@ -281,7 +281,7 @@ function render(){
   const brN = id => { const b = S.branches.find(x => x.id === id); return b ? (b.code === 'MGT' ? 'Ajman' : 'Al Quoz') : ''; }, br = S.brs.length > 1 ? 'Al Quoz + Ajman' : (S.branches.find(b => b.id === S.br)?.name || '');
   const unitName = S.brs.length > 1 ? 'SALES PORTAL' : br.toUpperCase();
   const SUB = { load:'Board issued to the van, item-wise, for the selected date.', ret:'Good, damage, expiry, waste and FOC returned by the van.',
-    days:'Van day status, cash to hand over, settlement and closing.', oe:'Correct a salesman\'s loading, return, expense, collection, requirement or deleted bill for the date — like Office entry in the old portal.', imp:'Upload the iTrade Periodical Sales Detailed Report.', sri:'Upload the iTrade Stock Report. The latest report replaces the previous one and sets each item\'s cost.',
+    days:'Van day status, cash to hand over, settlement and closing.', oe:'Correct a salesman\'s loading, return, expense, collection, requirement or deleted bill for the date.', imp:'Upload the iTrade Periodical Sales Detailed Report.', sri:'Upload the iTrade Stock Report. The latest report replaces the previous one and sets each item\'s cost.',
     req:'Next-day order by salesman, qty as the salesman gives it.', wh:'Production and cleaning batches: issue, return, differences and output.',
     ite:'Production, unwrap, broken and wastage to post in iTrade, from closed batches and van returns.', sc:'Count batches: create here, the supervisor counts offline in the app and posts; compare with iTrade, recount, expiry, shelves, tray & label usage.',
     ov:'Sales, cash, collections and expenses for the period, with the daily trend.', dd:'Today at a glance: one row per salesman, problems in red.',
@@ -1611,9 +1611,9 @@ async function vEmail(){ const __t = S.nav;
     <td><input type="checkbox" data-k="active" ${r.active!==false?'checked':''}></td><td><button class="d" data-x="${i}">✕</button></td></tr>`;
   const draw = () => {
     if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Who gets which email</h3><div class="row" style="margin:0"><button id="ead">Add person</button><button class="p" id="esv">Save</button></div></div>
-      <p class="muted">Tick the reports each person gets. "Both" = Al Quoz and Ajman. The emails are sent by the Mahrjan Mailer script in Google (see the cheat sheet).</p>
+      <p class="muted">Tick the reports each person gets. "Both" = Al Quoz and Ajman. Emails go out automatically.</p>
       <div class="tw"><table><tr><th class="l">Name</th><th class="l">Email</th><th>Company</th>${REP.map(([,l]) => `<th style="font-size:11px">${l}</th>`).join('')}<th>Active</th><th></th></tr>${R.map(row).join('') || ''}</table></div></div>
-      <div class="card"><h3>Last emails</h3>${table([{l:'Sent at',f:x=>new Date(x.sent_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})},{k:'report',l:'Report'},{k:'period',l:'Period'},{k:'recipient',l:'To',left:1},{k:'status',l:'Status',cls:x=>x.status==='FAILED'?'bad':''},{k:'note',l:'Note',left:1}], L, { empty:'Nothing sent yet. The mailer is not set up or has not run.' })}</div>`;
+      <div class="card"><h3>Last emails</h3>${table([{l:'Sent at',f:x=>new Date(x.sent_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'})},{k:'report',l:'Report'},{k:'period',l:'Period'},{k:'recipient',l:'To',left:1},{k:'status',l:'Status',cls:x=>x.status==='FAILED'?'bad':''},{k:'note',l:'Note',left:1}], L, { empty:'Nothing sent yet.' })}</div>`;
     const read = () => { $('#v').querySelectorAll('tr[data-i]').forEach(tr => { const r = R[+tr.dataset.i];
       r.name = $('[data-k=name]',tr).value.trim(); r.email = $('[data-k=email]',tr).value.trim(); r.branch_id = +$('[data-k=branch_id]',tr).value || null; r.active = $('[data-k=active]',tr).checked;
       r.reports = [...tr.querySelectorAll('[data-r]')].filter(c => c.checked).map(c => c.dataset.r); }); };
