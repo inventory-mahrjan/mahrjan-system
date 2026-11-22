@@ -1007,6 +1007,7 @@ async function vOverview(){ const __t = S.nav;
   const sm = aggregate(sales, saleName, r => ({ name:saleName(r), net:0, gross:0, inv:new Set(), cust:new Set() }), (o,r) => { o.net += num(r.net_incl_vat); if (r.tran_type === 'CR') { o.gross += num(r.net_incl_vat); o.inv.add(r.invoice_no); o.cust.add(r.customer_code); } })
     .map(o => ({ ...o, invoices:o.inv.size, customers:o.cust.size, share:tNet ? o.net / tNet * 100 : 0, retPct:o.gross ? (rtBy[o.name] || 0) / o.gross * 100 : 0, avgInv:o.inv.size ? o.gross / o.inv.size : 0 })).sort((a,b) => b.net - a.net);
   const it = aggregate(sales, r => r.item_id || r.item_code, r => ({ name:r.item_id ? iNm(r.item_id) : r.item_name, qty:0, net:0 }), (o,r) => { o.qty += num(r.qty_base); o.net += num(r.net_incl_vat); }).sort((a,b) => b.net - a.net).slice(0, 15);
+  const custN = new Set(cr.map(r => r.customer_code).filter(Boolean)).size, crInv = new Set(cr.map(r => r.invoice_no)).size;
   const dl = k => `<span class="ovd" data-k="${k}"></span>`;
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="kpis">
       ${kpi('Net sales', 'AED ' + money(tNet), 'incl. VAT, after returns' + dl('net'))}
@@ -1016,7 +1017,7 @@ async function vOverview(){ const __t = S.nav;
         <div><b>${credPct.toFixed(0)}% credit</b><div class="lg"><i style="background:#1B4332"></i>Cash ${money(tCash)}<br><i style="background:#F2C94C"></i>Credit ${money(tCred)}</div></div></div></div>
       ${kpi('Collections', 'AED ' + money(tColl), coll.length + ' receipts' + dl('coll'))}
       ${kpi('Expenses', 'AED ' + money(tExp), exp.length + ' lines' + dl('exp'))}
-      ${kpi('Cash due from salesmen', 'AED ' + money(sum(cash,'cash_to_hand_over')), 'cash sales + collections − cash returns − expenses · ' + days.length + ' van days')}
+      ${kpi('Customers served', custN.toLocaleString('en-US'), 'avg AED ' + money(custN ? tCr / custN : 0) + ' per customer · ' + (custN ? (crInv / custN).toFixed(1) : '0') + ' invoices each' + dl('cu'))}
       ${kpi('Profit', 'AED ' + money(tPr), 'margin ' + (tNet ? (tPr / tNet * 100).toFixed(1) : '0.0') + '% of net sales' + dl('pr'))}</div>
     <div class="card"><div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:4px"><h3 style="margin:0">Daily net sales (AED)</h3><span class="muted">Average per selling day AED ${money(avg)}${best ? ` · best ${wd(best.d)} ${best.d} AED ${money(best.net)}` : ''}</span></div>${chart}</div>
     <div class="card"><h3>Salesman performance</h3>${table([{k:'name',l:'Salesman',left:1},{k:'customers',l:'Customers',sum:1},{k:'invoices',l:'Invoices',sum:1},
@@ -1030,18 +1031,18 @@ async function vOverview(){ const __t = S.nav;
   if (S.from.slice(8) === '01' && S.from.slice(0, 7) === S.date.slice(0, 7)) {   // month to date: same days of last month
     const y = +S.from.slice(0, 4), mo = +S.from.slice(5, 7), py = mo === 1 ? y - 1 : y, pm = mo === 1 ? 12 : mo - 1, last = new Date(Date.UTC(py, pm, 0)).getUTCDate(), dd = Math.min(+S.date.slice(8), last);
     pFrom = `${py}-${String(pm).padStart(2, '0')}-01`; pTo = `${py}-${String(pm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; pLab = `same days last month (${M3[pm - 1]} 1–${dd})`; }
-  const key = 'pv' + S.brs.join(',') + '|' + pFrom + '|' + pTo;
+  const key = 'pv2' + S.brs.join(',') + '|' + pFrom + '|' + pTo;
   try {
     const pv = await cached(key, async () => {
       const [ps, pd] = await Promise.all([
-        perDay(pFrom, pTo, d => sb.from('sales_lines').select('tran_type,net_incl_vat,profit').in('branch_id', S.brs).eq('cancelled', false).eq('tran_date', d)),
+        perDay(pFrom, pTo, d => sb.from('sales_lines').select('tran_type,net_incl_vat,profit,customer_code').in('branch_id', S.brs).eq('cancelled', false).eq('tran_date', d)),
         fetchAll(() => sb.from('van_day').select('id').in('branch_id', S.brs).gte('business_date', pFrom).lte('business_date', pTo))]);
       const ids = pd.map(d => d.id), [pc, pe] = ids.length ? await Promise.all([byIds('collections', 'amount', 'van_day_id', ids), byIds('expenses', 'amount', 'van_day_id', ids)]) : [[], []];
       const pcr = ps.filter(r => r.tran_type === 'CR');
-      return { net:sum(ps,'net_incl_vat'), cr:sum(pcr,'net_incl_vat'), rt:-sum(ps.filter(r => r.tran_type !== 'CR'),'net_incl_vat'), pr:sum(ps,'profit'), coll:sum(pc,'amount'), exp:sum(pe,'amount') };
+      return { cu:new Set(pcr.map(r => r.customer_code).filter(Boolean)).size, net:sum(ps,'net_incl_vat'), cr:sum(pcr,'net_incl_vat'), rt:-sum(ps.filter(r => r.tran_type !== 'CR'),'net_incl_vat'), pr:sum(ps,'profit'), coll:sum(pc,'amount'), exp:sum(pe,'amount') };
     });
     if (__t !== S.nav) return;
-    const cur = { net:tNet, cr:tCr, rt:tRt, pr:tPr, coll:tColl, exp:tExp }, lowGood = { rt:1, exp:1 };
+    const cur = { cu:custN, net:tNet, cr:tCr, rt:tRt, pr:tPr, coll:tColl, exp:tExp }, lowGood = { rt:1, exp:1 };
     document.querySelectorAll('.ovd').forEach(el => { const k = el.dataset.k, a = cur[k], b = pv[k]; if (!b) { el.textContent = k === 'net' ? 'No earlier figures to compare yet' : ''; return; }
       const ch = (a - b) / Math.abs(b) * 100, up = ch >= 0, good = lowGood[k] ? !up : up;
       el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + (pLab || pFrom + ' – ' + pTo); });
