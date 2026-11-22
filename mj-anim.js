@@ -59,10 +59,11 @@
   function start(kind) {
     if (!SCENES[kind] || document.visibilityState === 'hidden' || Date.now() - lastTap > 20000) return null;   // shown even when the phone has animations turned off (PDTs often do)
     var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(13,40,24,.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(13,40,24,.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s';
     ov.innerHTML = '<div style="background:#fff;border-radius:22px;padding:18px 18px 16px;width:300px;max-width:88vw;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.25);font-family:inherit">' +
       '<canvas width="320" height="230" style="width:100%;height:auto;display:block"></canvas><div class="mjal" style="font:700 17px sans-serif;color:' + FOREST + ';margin-top:6px;min-height:24px"></div></div>';
-    document.body.appendChild(ov); requestAnimationFrame(function () { ov.style.opacity = '1'; });
+    var hide = document.createElement('style'); hide.textContent = '#postOv{display:none!important}';   // the plain "Posting… %" screen steps aside while the animation shows
+    document.head.appendChild(hide); document.body.appendChild(ov); requestAnimationFrame(function () { ov.style.opacity = '1'; });
     var cv = ov.querySelector('canvas'), lab = ov.querySelector('.mjal'), dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = 320 * dpr; cv.height = 230 * dpr; var c = cv.getContext('2d');
     var t0 = performance.now(), state = 'run', tEnd = 0, msg = '', raf, closeAt = 0;
@@ -79,7 +80,7 @@
       if (closeAt && now >= closeAt) return close();
       raf = requestAnimationFrame(tick);
     }
-    function close() { cancelAnimationFrame(raf); ov.style.opacity = '0'; setTimeout(function () { ov.remove(); }, 220); }
+    function close() { cancelAnimationFrame(raf); ov.style.opacity = '0'; setTimeout(function () { ov.remove(); hide.remove(); }, 220); }
     ov.addEventListener('click', function () { if (state !== 'run') close(); });
     raf = requestAnimationFrame(tick);
     return {
