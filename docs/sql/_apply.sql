@@ -1,35 +1,31 @@
--- STOCK COUNT DAILY 15 DAYS - CREATE.sql
--- Daily stock count batches are kept for 15 days only (weekly counts are kept).
--- Every time a new batch is created, daily batches with a count date more than 15 days ago
--- (and their recounts, entries and iTrade figures) are deleted.
--- Undo with: STOCK COUNT DAILY 15 DAYS - REVERT.sql (stops the clean-up; deleted batches do not come back)
-create or replace function public.sc_purge_daily(p_days int default 15) returns int
-language plpgsql security definer set search_path to 'public' as $$
-declare n int := 0; cut date := (now() at time zone 'Asia/Dubai')::date - p_days;
+-- BACKUP FULL - CREATE.sql
+-- Full database backup for the nightly mailer job and the portal "Download database backup" button.
+-- backup_tables()                 -> every table in the public schema
+-- backup_table(name, offset, n)   -> rows of one table as JSON, a page at a time
+-- Only ADMIN and the MAILER login may call them (they read every table, past the access rules).
+-- Undo with: BACKUP FULL - REVERT.sql
+create or replace function public.backup_allowed() returns boolean language sql stable security definer set search_path to 'public' as $$
+  select coalesce((public.me()).role = 'ADMIN' or upper((public.me()).name) = 'MAILER', false) $$;
+
+create or replace function public.backup_tables() returns text[]
+language plpgsql stable security definer set search_path to 'public' as $$
 begin
-  create temp table if not exists _sc_old (id bigint primary key) on commit drop;
-  delete from _sc_old;
-  insert into _sc_old select id from public.sc_batches where count_type = 'DAILY' and count_date < cut on conflict do nothing;
-  loop   -- recounts of an old batch go too (whatever their own date)
-    insert into _sc_old select b.id from public.sc_batches b join _sc_old o on o.id = b.parent_id on conflict do nothing;
-    exit when not found;
-  end loop;
-  delete from public.sc_lines where batch_id in (select id from _sc_old);
-  delete from public.sc_system where batch_id in (select id from _sc_old);
-  loop   -- children first, then parents
-    delete from public.sc_batches b where b.id in (select id from _sc_old) and not exists (select 1 from public.sc_batches c where c.parent_id = b.id);
-    get diagnostics n = row_count;
-    exit when n = 0;
-  end loop;
-  select count(*) into n from _sc_old;
-  return n;
+  if not public.backup_allowed() then raise exception 'Only the admin can take a backup.'; end if;
+  return (select array_agg(c.relname::text order by c.relname) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relkind = 'r');
 end $$;
-revoke all on function public.sc_purge_daily(int) from public, anon, authenticated;
 
-create or replace function public.sc_purge_daily_trg() returns trigger
-language plpgsql security definer set search_path to 'public' as $$
-begin perform public.sc_purge_daily(15); return null; end $$;
-drop trigger if exists trg_sc_purge_daily on public.sc_batches;
-create trigger trg_sc_purge_daily after insert on public.sc_batches for each statement execute function public.sc_purge_daily_trg();
+create or replace function public.backup_table(p_table text, p_offset int default 0, p_limit int default 5000) returns jsonb
+language plpgsql stable security definer set search_path to 'public' as $$
+declare r jsonb;
+begin
+  if not public.backup_allowed() then raise exception 'Only the admin can take a backup.'; end if;
+  if not exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and c.relname = p_table) then
+    raise exception 'Unknown table %', p_table; end if;
+  execute format('select coalesce(jsonb_agg(to_jsonb(t)), ''[]''::jsonb) from (select * from public.%I order by ctid offset %s limit %s) t', p_table, greatest(p_offset, 0), least(greatest(p_limit, 1), 10000)) into r;
+  return r;
+end $$;
 
-select public.sc_purge_daily(15) as old_daily_batches_removed_now;
+revoke all on function public.backup_allowed(), public.backup_tables(), public.backup_table(text, int, int) from public, anon;
+grant execute on function public.backup_allowed(), public.backup_tables(), public.backup_table(text, int, int) to authenticated;
+select array_length(public.backup_tables(), 1) as tables_in_backup;
