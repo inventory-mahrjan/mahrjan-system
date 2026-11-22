@@ -1,24 +1,35 @@
--- DELETE LIST APPLY - CREATE.sql
--- When an invoice is added to (or removed from) the DELETE list, its sales lines already in the
--- database are re-checked at once (cancelled / restored by trg_sales_lines_deleted).
--- Before this, only sales lines imported after the delete were cancelled.
--- Undo with: DELETE LIST APPLY - REVERT.sql
-create or replace function public.sales_deletes_apply() returns trigger
+-- STOCK COUNT DAILY 15 DAYS - CREATE.sql
+-- Daily stock count batches are kept for 15 days only (weekly counts are kept).
+-- Every time a new batch is created, daily batches with a count date more than 15 days ago
+-- (and their recounts, entries and iTrade figures) are deleted.
+-- Undo with: STOCK COUNT DAILY 15 DAYS - REVERT.sql (stops the clean-up; deleted batches do not come back)
+create or replace function public.sc_purge_daily(p_days int default 15) returns int
 language plpgsql security definer set search_path to 'public' as $$
-declare v_branch bigint; v_inv text;
+declare n int := 0; cut date := (now() at time zone 'Asia/Dubai')::date - p_days;
 begin
-  if tg_op = 'DELETE' then v_branch := old.branch_id; v_inv := old.invoice; else v_branch := new.branch_id; v_inv := new.invoice; end if;
-  update public.sales_lines s set invoice_no = s.invoice_no
-   where s.branch_id = v_branch and public.inv_key(s.invoice_no) = public.inv_key(v_inv);
-  return null;
+  create temp table if not exists _sc_old (id bigint primary key) on commit drop;
+  delete from _sc_old;
+  insert into _sc_old select id from public.sc_batches where count_type = 'DAILY' and count_date < cut on conflict do nothing;
+  loop   -- recounts of an old batch go too (whatever their own date)
+    insert into _sc_old select b.id from public.sc_batches b join _sc_old o on o.id = b.parent_id on conflict do nothing;
+    exit when not found;
+  end loop;
+  delete from public.sc_lines where batch_id in (select id from _sc_old);
+  delete from public.sc_system where batch_id in (select id from _sc_old);
+  loop   -- children first, then parents
+    delete from public.sc_batches b where b.id in (select id from _sc_old) and not exists (select 1 from public.sc_batches c where c.parent_id = b.id);
+    get diagnostics n = row_count;
+    exit when n = 0;
+  end loop;
+  select count(*) into n from _sc_old;
+  return n;
 end $$;
-drop trigger if exists trg_sales_deletes_apply on public.sales_deletes;
-create trigger trg_sales_deletes_apply after insert or delete on public.sales_deletes for each row execute function public.sales_deletes_apply();
+revoke all on function public.sc_purge_daily(int) from public, anon, authenticated;
 
--- one-off: re-check November lines whose invoice is on the DELETE list but still counted
-with t as (
-  update public.sales_lines s set invoice_no = s.invoice_no
-   where s.tran_date >= '2026-11-01' and not s.cancelled
-     and exists (select 1 from public.sales_deletes d where d.branch_id = s.branch_id and public.inv_key(d.invoice) = public.inv_key(s.invoice_no))
-  returning s.invoice_no, s.cancelled)
-select count(*) as lines_rechecked, count(*) filter (where cancelled) as now_cancelled, string_agg(distinct invoice_no, ', ') as invoices from t;
+create or replace function public.sc_purge_daily_trg() returns trigger
+language plpgsql security definer set search_path to 'public' as $$
+begin perform public.sc_purge_daily(15); return null; end $$;
+drop trigger if exists trg_sc_purge_daily on public.sc_batches;
+create trigger trg_sc_purge_daily after insert on public.sc_batches for each statement execute function public.sc_purge_daily_trg();
+
+select public.sc_purge_daily(15) as old_daily_batches_removed_now;
