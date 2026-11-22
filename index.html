@@ -1026,10 +1026,10 @@ async function vOverview(){ const __t = S.nav;
       {k:'net',l:'Net sales AED',money:1,sum:1}], sm)}</div>
     <div class="card"><h3>Top items</h3>${table([{k:'name',l:'Item',left:1},{k:'qty',l:'Qty (pk / pcs)',sum:1},{k:'net',l:'Net sales AED',money:1,sum:1}], it)}</div>`;
   // comparison with the previous period of the same length — loaded after the page shows, so the page stays fast
-  const n = all.length, M3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pend = all.length > 1 && all[all.length - 1].d === tdy && !all[all.length - 1].net, n = all.length - (pend ? 1 : 0), M3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let pTo = addDays(S.from, -1), pFrom = addDays(S.from, -n), pLab = '';
-  if (S.from.slice(8) === '01' && S.from.slice(0, 7) === S.date.slice(0, 7)) {   // month to date: same days of last month
-    const y = +S.from.slice(0, 4), mo = +S.from.slice(5, 7), py = mo === 1 ? y - 1 : y, pm = mo === 1 ? 12 : mo - 1, last = new Date(Date.UTC(py, pm, 0)).getUTCDate(), dd = Math.min(+S.date.slice(8), last);
+  if (S.from.slice(8) === '01' && S.from.slice(0, 7) === S.date.slice(0, 7)) {   // (today, if not imported yet, is left out of both sides)   // month to date: same days of last month
+    const y = +S.from.slice(0, 4), mo = +S.from.slice(5, 7), py = mo === 1 ? y - 1 : y, pm = mo === 1 ? 12 : mo - 1, last = new Date(Date.UTC(py, pm, 0)).getUTCDate(), dd = Math.min(+S.date.slice(8) - (pend ? 1 : 0), last);
     pFrom = `${py}-${String(pm).padStart(2, '0')}-01`; pTo = `${py}-${String(pm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; pLab = `same days last month (${M3[pm - 1]} 1–${dd})`; }
   const key = 'pv2' + S.brs.join(',') + '|' + pFrom + '|' + pTo;
   try {
@@ -1045,7 +1045,7 @@ async function vOverview(){ const __t = S.nav;
     const cur = { cu:custN, net:tNet, cr:tCr, rt:tRt, pr:tPr, coll:tColl, exp:tExp }, lowGood = { rt:1, exp:1 };
     document.querySelectorAll('.ovd').forEach(el => { const k = el.dataset.k, a = cur[k], b = pv[k]; if (!b) { el.textContent = k === 'net' ? 'No earlier figures to compare yet' : ''; return; }
       const ch = (a - b) / Math.abs(b) * 100, up = ch >= 0, good = lowGood[k] ? !up : up;
-      el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + (pLab || pFrom + ' – ' + pTo); });
+      el.className = 'ovd ' + (Math.abs(ch) < 0.05 ? '' : good ? 'up' : 'dn'); el.textContent = (up ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(1) + '% vs ' + (pLab || pFrom + ' – ' + pTo) + (pend ? ' (today not imported yet)' : ''); });
   } catch (e) { document.querySelectorAll('.ovd').forEach(el => el.textContent = ''); }
 }
 
