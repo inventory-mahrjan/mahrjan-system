@@ -185,7 +185,7 @@
 <script>/* loading % : counts database requests in flight; bar on top + "Loading… NN%" */
 (function(){var S=0,D=0,P=0,bar,lab,t;function ui(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#1B4332;z-index:9999;transition:width .2s;width:0';lab=document.createElement('div');lab.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#1B4332;color:#fff;font:600 12px system-ui;padding:3px 9px;border-radius:10px';document.body.appendChild(bar);document.body.appendChild(lab);}var on=S>D;bar.style.width=(on?P:100)+'%';bar.style.opacity=lab.style.opacity=on?1:0;lab.textContent='Loading… '+P+'%';document.querySelectorAll('.mjpct').forEach(function(e){e.textContent=P+'%';});}
 function step(){P=Math.max(P,Math.min(99,Math.round(D/Math.max(S,1)*100)));if(S===D){P=100;clearTimeout(t);t=setTimeout(function(){if(S===D){S=D=P=0;}},400);}if(document.body)ui();}
-var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=21"></script><script src="old-sheets.js?v=6"></script><script src="old-views.js?v=7"></script>
+var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=21"></script><script src="old-sheets.js?v=6"></script><script src="old-views.js?v=8"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -314,7 +314,8 @@ function render(){
       <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
   $('.sidebar').scrollTop = navTop;
   $('#out').onclick = () => sb.auth.signOut();
-  document.querySelectorAll('[data-br]').forEach(c => c.onchange = () => { const v = [...document.querySelectorAll('[data-br]:checked')].map(x => +x.dataset.br); if (!v.length) { c.checked = true; return; }
+  document.querySelectorAll('[data-br]').forEach(c => c.onchange = () => { let v = [...document.querySelectorAll('[data-br]:checked')].map(x => +x.dataset.br); if (!v.length) { c.checked = true; return; }
+    if (ONE_CO.includes(S.tab) && v.length > 1) { S.brs = [+c.dataset.br]; S.br = +c.dataset.br; S.dayId = null; S.lsm = null; S.rsm = null; return render(); }   // one-company page: ticking a company switches to it
     S.brs = v; S.br = v[0]; S.brsAuto = null; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   document.addEventListener('click', e => { const d = $('#cosel'); if (d && d.open && !d.contains(e.target)) d.open = false; }, { once: true });
   $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
