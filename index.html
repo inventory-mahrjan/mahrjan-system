@@ -736,7 +736,7 @@ async function vStockBatch(id){ const __t = S.nav;
     const edit = office;
     body = `<div class="card"><p class="muted">${edit ? (posted ? 'Posted count — you can still correct a line or add one; every change is recorded.' : 'Lines saved from the app so far. You can correct them here.') : ''}</p>
       <div class="tw"><table id="ent"><tr><th>#</th><th>Shelf</th><th>Category</th><th>Type</th><th class="l">Item</th><th>Big</th><th>Tray</th><th>Small</th><th>Total</th><th>Expiry</th><th>Country</th><th>Scanned</th>${edit?'<th></th>':''}</tr>
-      ${L.map(l => { const it = item(l.item_id); return `<tr data-l="${l.id}"><td>${l.entry_no}</td><td>${edit?`<input data-k="shelf" value="${esc(l.shelf||'')}" style="width:70px">`:esc(l.shelf||'')}</td><td>${SC_CAT[l.category]}</td><td>${SC_TYPE[l.stock_type]||''}</td>
+      ${L.map(l => { const it = item(l.item_id); return `<tr data-l="${l.id}"><td>${l.entry_no}</td><td>${edit?`<input data-k="shelf" value="${esc(l.shelf||'')}" style="width:70px">`:esc(l.shelf||'')}</td><td>${SC_CAT[l.category]}</td><td>${edit && (l.category === 'RAW' || l.category === 'FG') ? `<select data-k="stock_type">${Object.entries(SC_TYPE).map(([k,v]) => `<option value="${k}"${(l.stock_type||'FRESH') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>` : SC_TYPE[l.stock_type]||''}</td>
         <td class="l">${esc(it.short_name||it.name)}${l.zero_confirmed?' <span class="muted">(confirmed zero)</span>':''}</td>
         ${['qty_big','qty_tray','qty_small'].map(k => `<td>${edit?`<input type="number" min="0" data-k="${k}" value="${+l[k]||''}" style="width:64px">`:(+l[k]||'')}</td>`).join('')}
         <td data-tot>${+num(l.total_qty).toFixed(2)}</td><td>${edit?`<input type="date" data-k="exp_date" value="${l.exp_date||''}">`:(l.exp_date||'')}</td><td>${edit?`<input data-k="country" value="${esc(l.country||'')}" style="width:90px">`:esc(l.country||'')}</td>
@@ -797,7 +797,7 @@ async function vStockBatch(id){ const __t = S.nav;
     const keep = [...$('#ent').querySelectorAll('tr[data-l]')].map(tr => { const l = L.find(z => z.id === +tr.dataset.l), it = item(l.item_id), v = k => tr.querySelector(`[data-k="${k}"]`).value;
       const qb = num(v('qty_big')), qt = num(v('qty_tray')), qs = num(v('qty_small')), k = big(it);
       const total = l.category === 'RAW' ? qb * (it.pcs_per_carton||0) + qt * (it.pcs_per_tray||0) + qs : qb * (k||0) + qs;
-      return { ...l, shelf:v('shelf'), qty_big:qb, qty_tray:qt, qty_small:qs, total_qty: k || l.category === 'RAW' ? total : (qb || qs), exp_date:v('exp_date'), country:v('country') }; });
+      const stv = tr.querySelector('[data-k="stock_type"]'); return { ...l, stock_type: stv ? stv.value : l.stock_type, shelf:v('shelf'), qty_big:qb, qty_tray:qt, qty_small:qs, total_qty: k || l.category === 'RAW' ? total : (qb || qs), exp_date:v('exp_date'), country:v('country') }; });
     if (!confirm(`Save ${keep.length} line${keep.length===1?'':'s'}${keep.length < L.length ? ' (' + (L.length - keep.length) + ' removed)' : ''}?`)) return;
     try { await rpc('sc_upload', { p_id:id, p_lines:keep, p_post:false }); toast('Count saved'); vStockBatch(id); } catch (e) { toast(e.message, false); } });
   $('#sf') && ($('#sf').onchange = async e => {
