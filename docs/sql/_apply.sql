@@ -1,17 +1,34 @@
--- FG PACKS PER BOX - CREATE.sql
--- Packets per box for finished goods, as given on 23 Nov 2026:
---   6's = 30, 10's = 18, 15's = 12, 20's = 9, 30's = 8 (ROYAL KHALEEJ WHITE EGG (M) 30's = 6), quail 18's = 24.
--- Old values are kept in item_ppc_backup. Undo with: FG PACKS PER BOX - REVERT.sql
-create table if not exists public.item_ppc_backup (item_id bigint primary key, packs_per_carton numeric, saved_at timestamptz default now());
-alter table public.item_ppc_backup enable row level security;
-insert into public.item_ppc_backup (item_id, packs_per_carton)
-  select id, packs_per_carton from public.items where item_type = 'FG' on conflict (item_id) do nothing;
-update public.items i set packs_per_carton = v.ppc
-  from (select id,
-          case when name ilike '%QUAIL%' then 24
-               when name ilike '%WHITE EGG (M) 30%' then 6
-               when pcs_per_pack = 6 then 30 when pcs_per_pack = 10 then 18 when pcs_per_pack = 15 then 12
-               when pcs_per_pack = 20 then 9 when pcs_per_pack = 30 then 8 end as ppc
-        from public.items where item_type = 'FG') v
- where i.id = v.id and v.ppc is not null and i.packs_per_carton is distinct from v.ppc;
-select string_agg(name || ' = ' || packs_per_carton, ' | ' order by display_order) as fg_packs_per_box from public.items where item_type = 'FG';
+-- STOCK COUNT TOTAL FROM ITEM - CREATE.sql
+-- The total of a raw egg / finished-good count line is always worked out in the database from the item's current sizes:
+--   raw egg  = cartons x pcs per carton + trays x pcs per tray + pcs
+--   finished = boxes x packets per box + packets
+-- (a device that had old box sizes can no longer save a wrong total), and today's lines are recalculated.
+-- Undo with: STOCK COUNT TOTAL FROM ITEM - REVERT.sql
+create table if not exists public.sc_total_backup (line_id bigint primary key, total_qty numeric, saved_at timestamptz default now());
+alter table public.sc_total_backup enable row level security;
+
+create or replace function public.sc_lines_total() returns trigger language plpgsql security definer set search_path to 'public' as $$
+declare it public.items;
+begin
+  if new.category in ('FG', 'RAW') and (coalesce(new.qty_big, 0) > 0 or coalesce(new.qty_tray, 0) > 0) then
+    select * into it from public.items where id = new.item_id;
+    if found then
+      new.total_qty := case when new.category = 'RAW'
+        then coalesce(new.qty_big, 0) * coalesce(it.pcs_per_carton, 0) + coalesce(new.qty_tray, 0) * coalesce(it.pcs_per_tray, 0) + coalesce(new.qty_small, 0)
+        else coalesce(new.qty_big, 0) * coalesce(it.packs_per_carton, 0) + coalesce(new.qty_small, 0) end;
+    end if;
+  end if;
+  return new;
+end $$;
+revoke all on function public.sc_lines_total() from public, anon;
+drop trigger if exists trg_sc_lines_total on public.sc_lines;
+create trigger trg_sc_lines_total before insert or update on public.sc_lines for each row execute function public.sc_lines_total();
+
+-- recalculate the lines of batches counted from 23 Nov 2026 (old totals kept in sc_total_backup)
+insert into public.sc_total_backup (line_id, total_qty)
+  select l.id, l.total_qty from public.sc_lines l join public.sc_batches b on b.id = l.batch_id
+   where b.count_date >= '2026-11-23' and l.category in ('FG', 'RAW') on conflict (line_id) do nothing;
+update public.sc_lines l set qty_big = l.qty_big from public.sc_batches b
+ where b.id = l.batch_id and b.count_date >= '2026-11-23' and l.category in ('FG', 'RAW') and (l.qty_big > 0 or l.qty_tray > 0);
+select string_agg(i.short_name || ': ' || bk.total_qty || ' -> ' || l.total_qty, ' | ') as changed
+  from public.sc_lines l join public.sc_total_backup bk on bk.line_id = l.id join public.items i on i.id = l.item_id where bk.total_qty <> l.total_qty;
