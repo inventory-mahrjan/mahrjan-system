@@ -705,7 +705,12 @@ async function vStockBatch(id){ const __t = S.nav;
   const soon = addDays(S.date, S.scexp), nearExp = L.filter(l => l.exp_date && l.exp_date <= soon).sort((x,y) => x.exp_date.localeCompare(y.exp_date));
   const shelves = [...new Set(L.map(l => l.shelf).filter(Boolean))].sort(), prevShelves = [...new Set(PL.map(l => l.shelf).filter(Boolean))].sort();
   const missingShelves = prevShelves.filter(x => !shelves.includes(x));
-  const tabs = [['sum','Summary'],['ent','Entries'],['shelf','Shelves'],['exp','Expiry & country'],['use','Tray & label usage']];
+  // out of stock: active items of the counted categories with nothing counted
+  const catOf = it => it.item_type === 'RAW_EGG' ? ['RAW'] : it.item_type === 'FG' ? ['FG'] : it.material_kind === 'LABEL' ? ['LABEL','LTRAY'] : it.material_kind === 'TRAY' ? ['TRAY','LTRAY'] : [];
+  const oos = S.items.filter(it => it.active !== false && catOf(it).some(c => (b.categories || []).includes(c)) && (!b.recount_items || b.recount_items.includes(it.id)) && !(by[it.id] && num(by[it.id].tot)))
+    .sort((x, y) => (x.display_order ?? 9999) - (y.display_order ?? 9999) || (x.name||'').localeCompare(y.name||''))
+    .map(it => ({ it, cat: it.item_type === 'RAW_EGG' ? 'Raw egg' : it.item_type === 'FG' ? 'Finished goods' : it.material_kind === 'LABEL' ? 'Label roll' : 'Tray', sys: sys[it.id] }));
+  const tabs = [['sum','Summary'],['ent','Entries'],['shelf','Shelves'],['exp','Expiry & country'],['oos','Out of stock'],['use','Tray & label usage']];
   const dtm = v => v ? new Date(v).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
   const PH = `<div class="printonly"><div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #1B4332;padding-bottom:6px"><img src="${LOGO}" style="height:38px">
       <div><div style="font-weight:800;font-size:15px">MAHRJAN GENERAL TRADING LLC – ${esc(String(co).toUpperCase())}</div><div style="font-weight:700;font-size:12.5px;letter-spacing:.04em">STOCK COUNT REPORT — ${esc((tabs.find(t => t[0] === S.sctab) || [,''])[1].toUpperCase())}</div></div></div>
@@ -760,6 +765,11 @@ async function vStockBatch(id){ const __t = S.nav;
     body = `<div class="card"><div class="row noprint"><label>Near expiry within (days)<input type="number" id="ned" value="${S.scexp}" style="width:80px"></label>${nearExp.length ? `<span class="bad">${nearExp.length} entr${nearExp.length>1?'ies':'y'} expire by ${soon}</span>` : '<span class="ok">Nothing near expiry.</span>'}</div>
       <div class="tw"><table class="ctr"><tr><th class="l">Item</th><th>Expiry</th><th>Country</th><th>Qty</th><th>Total (pcs / pkts)</th></tr>${ex.map(r => `<tr class="${r.exp && r.exp <= soon ? 'warn' : ''}"><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.exp||''}</td><td>${esc(r.country||'')}</td><td>${esc(r.split)}</td><td><b>${r.qty}</b> ${r.unit}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No expiry or country entered.</td></tr>'}</table></div></div>`;
     xl = [['Expiry & country', [{l:'Item',f:r=>r.it.name},{k:'exp',l:'Expiry'},{k:'country',l:'Country'},{k:'split',l:'Qty'},{k:'qty',l:'Total (pcs / pkts)'},{k:'unit',l:'Unit'}], ex]];
+  } else if (S.sctab === 'oos') {
+    const warnN = oos.filter(r => num(r.sys) > 0).length;
+    body = `<div class="card"><div class="row noprint">${oos.length ? `<span class="muted">${oos.length} item${oos.length>1?'s':''} with nothing counted</span>` : '<span class="ok">Every item was counted.</span>'}${warnN ? `<span class="bad">${warnN} still show stock in iTrade — check them</span>` : ''}</div>
+      <div class="tw"><table class="ctr"><tr><th>#</th><th class="l">Item</th><th>Category</th><th>Counted</th>${hasSys ? '<th>iTrade stock</th>' : ''}</tr>${oos.map((r, i) => `<tr class="${num(r.sys) > 0 ? 'warn' : ''}"><td>${i + 1}</td><td class="l">${esc(r.it.short_name||r.it.name)}</td><td>${r.cat}</td><td>0</td>${hasSys ? `<td>${r.sys == null ? '' : splitTxt(r.it, r.sys) || '0'}</td>` : ''}</tr>`).join('') || `<tr><td colspan="${hasSys?5:4}" class="muted">Nothing out of stock.</td></tr>`}</table></div></div>`;
+    xl = [['Out of stock', [{l:'Item',f:r=>r.it.name},{k:'cat',l:'Category'},{l:'Counted',f:()=>0}].concat(hasSys ? [{l:'iTrade stock',f:r=>r.sys == null ? '' : r.sys}] : []), oos]];
   } else {
     // tray & label usage: last count + received − used in production = expected; compare with this count
     let use = [];
