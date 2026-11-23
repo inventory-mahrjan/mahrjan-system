@@ -10,8 +10,8 @@ with src(n, code, name, typ, kind, ppp, ppc, cost, act) as (values
   (4, '6294455889706', 'MAHRJAN ORGANIC EGGS 10''S', 'FG', null, 10, 18, null, false)),
 base as (select coalesce(max(id), 0) mid, coalesce(max(display_order), 0) mo from public.items),
 tpl as (select material_type from public.items where material_kind = 'TRAY' and material_type is not null limit 1)
-insert into public.items (id, barcode, itrade_code, name, item_type, material_kind, material_type, pcs_per_pack, packs_per_carton, unit_cost, active, display_order, segment)
-select base.mid + src.n, src.code, src.code, src.name, src.typ, src.kind, case when src.typ = 'MATERIAL' then (select material_type from tpl) end, src.ppp, src.ppc, src.cost, src.act, base.mo + src.n, 'NORMAL'
+insert into public.items (barcode, itrade_code, name, item_type, material_kind, material_type, pcs_per_pack, packs_per_carton, unit_cost, active, display_order, segment)
+select src.code, src.code, src.name, src.typ, src.kind, case when src.typ = 'MATERIAL' then (select material_type from tpl) end, src.ppp, src.ppc, src.cost, src.act, base.mo + src.n, 'NORMAL'
   from src, base
  where not exists (select 1 from public.items i where i.barcode = src.code or i.itrade_code = src.code);
 select string_agg(id || ' ' || name || ' (' || item_type || coalesce('/' || material_kind, '') || ', active ' || active || ')', ' | ') as added
