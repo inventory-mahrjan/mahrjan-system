@@ -167,7 +167,7 @@
         + '<div class="tot" id="mjscTot">= ' + totalOf(f.cat, lead, v) + ' ' + (f.cat === 'FG' ? 'packs' : 'pcs') + '</div>';
       if (f.cat === 'RAW' || f.cat === 'FG') h += '<div class="lbl">EXPIRY DATE</div><input type="date" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)">';
       if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
-      if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
+      if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button data-sct="' + t + '" class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
       h += '<button class="big" onclick="MJSC.add()">Add entry</button></div>';
     }
     var last = D.lines.slice().sort(function (x, y) { return y.entry_no - x.entry_no; }).slice(0, 5);
@@ -226,7 +226,7 @@
     backCount: function () { V.view = 'count'; err = ''; render(); },
     shelf: function (v) { C.shelf = String(v || '').trim().toUpperCase(); localStorage.setItem('mjsc_shelf', C.shelf); render(); setTimeout(focusScan, 30); },
     cat: function (c) { C.cat = c; C.found = null; C.msg = ''; if (TYPES[c] && TYPES[c].indexOf(C.type) < 0) C.type = 'FRESH'; render(); setTimeout(focusScan, 30); },
-    type: function (t) { C.type = t; render(); },
+    type: function (t) { C.type = t; root.querySelectorAll('[data-sct]').forEach(function (b) { b.className = b.getAttribute('data-sct') === t ? 'on' : ''; }); },   // update in place: the screen stays where it is
     scan: scan, add: addEntry, undo: undo,
     q: function (k, v) { C.v = C.v || {}; C.v[k] = v; var t = root.querySelector('#mjscTot'); if (t && C.found) t.textContent = '= ' + totalOf(C.found.cat, C.found.items[0], C.v) + ' ' + (C.found.cat === 'FG' ? 'packs' : 'pcs'); },
     exp: function (v) { C.exp = v; }, cty: function (v) { C.country = v; },
