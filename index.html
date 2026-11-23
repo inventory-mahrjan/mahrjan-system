@@ -565,7 +565,10 @@ async function vImport(){ const __t = S.nav;
   };
   const branchSplit = rs => rs.reduce((a,r) => { const c = String(r['Company Name'] || '').toUpperCase(); const b = /AJMAN/.test(c) ? 'MGT' : /QUOZ|QOUZ/.test(c) ? 'MGAZ' : String(r['Invoice No']).split('-')[0].toUpperCase(); (a[b] ||= []).push(r); return a; }, {});
   $('#go').onclick = async () => {
-    $('#go').disabled = true; const out = [];
+    $('#go').disabled = true; const out = []; const tot = rows.length; let sent = 0, imp = 0;
+    const prog = (lab) => { const pc = tot ? Math.round(sent / tot * 100) : 0;
+      $('#out').innerHTML = `<p><b>Importing ${pc}%</b> · ${sent.toLocaleString()} of ${tot.toLocaleString()} lines processed · ${imp.toLocaleString()} new lines imported${lab ? ' · ' + lab : ''}</p>
+        <div style="height:10px;background:#E8EFEA;border-radius:6px;overflow:hidden;margin:6px 0 10px"><div style="height:100%;width:${pc}%;background:linear-gradient(90deg,#1B4332,#F2994A);transition:width .3s"></div></div>` + out.join(''); };
     try {
       for (const [code, rs] of Object.entries(branchSplit(rows))) {
         const br = S.branches.find(b => b.code === code);
@@ -574,8 +577,8 @@ async function vImport(){ const __t = S.nav;
         const days = [...new Set(rs.map(x => x['Tran Date']))].sort(), parts = []; let cur = [];
         days.forEach(d => { const dl = rs.filter(x => x['Tran Date'] === d); if (cur.length && cur.length + dl.length > 400) { parts.push(cur); cur = []; } cur = cur.concat(dl); }); if (cur.length) parts.push(cur);
         const r = { rows:0, new:0, already_there:0, replaced_invoices:0, cancelled:0, new_customers:0, customers_moved:0, from:days[0], to:days[days.length-1], unknown_items:'', not_salesman_sales_executives:'' };
-        for (const [k, part] of parts.entries()) { $('#out').innerHTML = `<p>${esc(br.name)}: part ${k+1} of ${parts.length}…</p>` + out.join('');
-          const x = await rpc('import_sales', { p_branch:br.id, p_rows:part, p_full_export:true });
+        for (const [k, part] of parts.entries()) { prog(`${esc(br.name)} part ${k+1} of ${parts.length}`);
+          const x = await rpc('import_sales', { p_branch:br.id, p_rows:part, p_full_export:true }); sent += part.length; imp += num(x.new); prog(`${esc(br.name)} part ${k+1} of ${parts.length}`);
           ['rows','new','already_there','replaced_invoices','cancelled','new_customers','customers_moved'].forEach(f => r[f] += num(x[f]));
           ['unknown_items','not_salesman_sales_executives'].forEach(f => { if (x[f]) r[f] = [...new Set((r[f] ? r[f] + ', ' : '').concat(x[f]).split(', ').filter(Boolean))].join(', '); }); }
         out.push(`<div class="card"><b>${esc(br.name)}</b> ${r.from} to ${r.to}<br>Lines ${r.rows} · new ${r.new} · already there ${r.already_there} · invoices changed in iTrade and replaced ${r.replaced_invoices} · cancelled ${r.cancelled}
@@ -583,8 +586,8 @@ async function vImport(){ const __t = S.nav;
           ${r.unknown_items?`<br><span class="bad">Unknown items: ${esc(r.unknown_items)}</span>`:''}
           ${r.not_salesman_sales_executives?`<br><span class="muted">Not a salesman (store/office sales): ${esc(r.not_salesman_sales_executives)}</span>`:''}</div>`);
       }
-      toast('Import finished');
-    } catch (e) { out.push(`<p class="bad">Import stopped: ${esc(e.message || e)}</p>`); } finally { $('#out').innerHTML += out.join(''); }
+      sent = tot; toast('Import finished');
+    } catch (e) { out.push(`<p class="bad">Import stopped: ${esc(e.message || e)}</p>`); } finally { prog(sent >= tot ? 'done' : 'stopped'); }
   };
 }
 
