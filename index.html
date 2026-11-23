@@ -1228,12 +1228,13 @@ async function vAnalysis(){ const __t = S.nav;
       ${sel('f_type','Transactions',[['NET','Net sales'],['CR','Sales'],['SR','Sales returns']],F.type)}
       <label>Customer<input id="f_cust" value="${esc(F.cust)}" placeholder="Name or code"></label>
       <button id="f_clr">Clear filters</button>${tools()}</div>
-    <p class="muted">${rows.length} lines · ${new Set(rows.map(r=>r.invoice_no)).size} invoices · AED incl. VAT ${money(rows.reduce((a,r)=>a+num(r.net_incl_vat),0))}. Click a row to drill down.</p>
-    ${table(cols, G, { click:1, max:640 })}</div><div id="drill"></div>`;
+    <div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0">${rows.length} lines · ${new Set(rows.map(r=>r.invoice_no)).size} invoices · AED incl. VAT ${money(rows.reduce((a,r)=>a+num(r.net_incl_vat),0))}. Click a row to drill down.</p>
+      <input id="f_q" type="search" placeholder="🔍 Search ${esc(K[2].toLowerCase())}…" value="${esc(S.saq || '')}" style="min-width:240px;margin:6px 0"></div>
+    <div id="sat"></div></div><div id="drill"></div>`;
   ['by','sm','item','tender','type'].forEach(k => $('#f_' + k).onchange = e => { F[k] = e.target.value; vAnalysis(); });
   $('#f_cust').onchange = e => { F.cust = e.target.value.trim(); vAnalysis(); };
-  $('#f_clr').onclick = () => { S.saf = null; vAnalysis(); };
-  bindRows($('#v'), G, g => {
+  $('#f_clr').onclick = () => { S.saf = null; S.saq = ''; vAnalysis(); };
+  const onRow = g => {
     if (F.by === 'iv') { const L = rows.filter(r => r.invoice_no === g.key);
       // invoice opens in a popup (like the old portal): who entered it, the executive, each product line
       const dlg = document.createElement('dialog'); dlg.className = 'udlg'; dlg.style.cssText = 'max-width:1320px;width:96vw';
@@ -1244,9 +1245,13 @@ async function vAnalysis(){ const __t = S.nav;
       document.body.append(dlg); dlg.querySelector('#dclose').onclick = () => dlg.close(); dlg.addEventListener('close', () => dlg.remove());
       dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); }); dlg.showModal(); return;
     } else { const nf = { ...F, by:'iv' }; const fk = { sm:'sm', it:'item', cu:'cust', td:'tender' }[F.by]; if (fk) nf[fk] = String(g.key);
-      if (F.by === 'dt') { S.from = S.date = g.key; } S.saf = nf; render(); return; }
+      if (F.by === 'dt') { S.from = S.date = g.key; } S.saf = nf; S.saq = ''; render(); return; }
     $('#drill').scrollIntoView({ behavior:'smooth' });
-  });
+  };
+  // search box filters the table rows (and its total) as you type
+  const drawT = () => { const qq = (S.saq || '').toLowerCase().trim(); const Gf = qq ? G.filter(g => [g.label, g.code, g.sub, g.key].some(v => String(v ?? '').toLowerCase().includes(qq))) : G;
+    $('#sat').innerHTML = table(cols, Gf, { click:1, max:640, empty:'No match for this search.' }); bindRows($('#sat'), Gf, onRow); };
+  $('#f_q').oninput = e => { S.saq = e.target.value; drawT(); }; drawT();
   bindTools('Sales analysis', () => [[K[2] + '-wise', cols, G], ['Lines', [{k:'tran_date',l:'Date'},{k:'invoice_no',l:'Invoice'},{k:'tran_type',l:'Type'},{k:'tender_type',l:'Tender'},{l:'Salesman',f:saleName},{k:'customer_code',l:'Customer code'},{k:'customer_name',l:'Customer'},{k:'item_code',l:'Item code'},{l:'Item',f:r=>r.item_id?iNm(r.item_id):r.item_name},{k:'qty_base',l:'Qty',sum:1},{k:'gross',l:'Gross',sum:1},{k:'disc',l:'Discount',sum:1},{k:'net',l:'Net',sum:1},{k:'vat',l:'VAT',sum:1},{k:'net_incl_vat',l:'Net incl. VAT',sum:1},{k:'profit',l:'Profit',sum:1}], rows]]);
 }
 
