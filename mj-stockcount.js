@@ -84,7 +84,11 @@
     C = C && C.id === id ? C : { id: id, shelf: localStorage.getItem('mjsc_shelf') || '', cat: D.batch.categories[0], type: 'FRESH', found: null, msg: '' }; err = ''; render(); setTimeout(focusScan, 50); }
   // when online, refresh the item list and BOM of a downloaded batch (office changes in Items & BOM reach the device); counted lines stay as they are
   function refreshMaster(id) { if (!navigator.onLine) return Promise.resolve(false); return rpc('sc_download', { p_id: id }).then(function (data) { var d = load(id); if (!d) return;
-      d.items = data.items; d.bom = data.bom; d.countries = data.countries; store(id, d); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; } return true; }).catch(function () { return false; }); }
+      d.items = data.items; d.bom = data.bom; d.countries = data.countries; retot(d); store(id, d); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; D.lines = d.lines; if (V.view === 'count') render(); } return true; }).catch(function () { return false; }); }
+  // box / carton sizes can change in Items & BOM after counting started: work every raw egg and finished-good total out again from the current sizes
+  function retot(d) { if (!d || !d.lines) return; d.lines.forEach(function (l) { if (l.category !== 'FG' && l.category !== 'RAW') return;
+      var it = (d.items || []).find(function (i) { return i.id === l.item_id; }); if (!it) return; var b = +l.qty_big || 0, t = +l.qty_tray || 0, sm = +l.qty_small || 0;
+      if (!b && !t) return; l.total_qty = l.category === 'RAW' ? b * (it.pcc || 0) + t * (it.ppt || 0) + sm : b * (it.ppc || 0) + sm; }); }
   function itemsBy(id) { return D.items.find(function (i) { return i.id === id; }); }
   function isRecount(id) { return !D.batch.recount_items || D.batch.recount_items.indexOf(id) >= 0; }
   function nm(i) { return i ? (i.s || i.n) : ''; }
@@ -195,7 +199,7 @@
     shell('Post count', navigator.onLine ? 'Online' : 'OFFLINE — connect to post', h, '<button onclick="MJSC.count(' + V.id + ')">Back to counting</button><button class="pri" onclick="MJSC.post()"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Posting…' : (m.length ? 'Confirm zero & post' : 'Post')) + '</button>', 'backCount');
   }
   async function save(quiet) {
-    store(V.id, D);
+    retot(D); store(V.id, D);
     if (!navigator.onLine) { C.msg = '✓ Saved on this device (offline). Post when you are online.'; render(); return; }
     try { await rpc('sc_upload', { p_id: V.id, p_lines: D.lines, p_post: false }); C.msg = '✓ Saved on this device and in the system (' + D.lines.length + ' entries).'; }
     catch (e) { C.msg = '✓ Saved on this device. (System: ' + (e.message || e) + ')'; }
@@ -203,7 +207,7 @@
   }
   async function post() {
     if (!navigator.onLine) { err = 'You are offline. Your count is saved on this device — post when connected.'; render(); return; }
-    var m = missing(), lines = D.lines.slice(), no = lines.reduce(function (x, l) { return Math.max(x, l.entry_no || 0); }, 0);
+    retot(D); var m = missing(), lines = D.lines.slice(), no = lines.reduce(function (x, l) { return Math.max(x, l.entry_no || 0); }, 0);
     m.forEach(function (x) { lines.push({ entry_no: ++no, shelf: null, category: x.cat, stock_type: (x.cat === 'RAW' || x.cat === 'FG') ? 'FRESH' : null, scanned_barcode: null, item_id: x.it.id, qty_big: 0, qty_tray: 0, qty_small: 0, total_qty: 0, unit: x.cat === 'FG' ? 'PACKS' : 'PCS', zero_confirmed: true, scanned_at: new Date().toISOString() }); });
     busy = true; err = ''; render();
     try { await rpc('sc_upload', { p_id: V.id, p_lines: lines, p_post: true }); busy = false; drop(V.id); D = null; C = null; V = { view: 'list', posted: true }; err = ''; await refresh(); root.querySelector('.bd').insertAdjacentHTML('afterbegin', '<div class="ok">✓ Count posted. Thank you.</div>'); }
