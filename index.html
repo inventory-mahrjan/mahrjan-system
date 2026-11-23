@@ -750,7 +750,7 @@ async function vStockBatch(id){ const __t = S.nav;
     xl = [['Shelves', [{k:'shelf',l:'Shelf'},{k:'n',l:'Entries'},{k:'items',l:'Items'}], sh]];
   } else if (S.sctab === 'exp') {
     const g = {}; L.filter(l => l.exp_date || l.country || num(l.total_qty)).forEach(l => { const k = l.item_id + '|' + (l.exp_date||'') + '|' + (l.country||''); (g[k] ||= { it:item(l.item_id), exp:l.exp_date, country:l.country, qty:0 }).qty += num(l.total_qty); });
-    const ex = Object.values(g).sort((x,y) => (x.exp||'9').localeCompare(y.exp||'9'));
+    const ex = Object.values(g).sort((x,y) => ((x.it.display_order ?? 9999) - (y.it.display_order ?? 9999)) || (x.exp||'9').localeCompare(y.exp||'9') || (x.country||'~').localeCompare(y.country||'~'));   // item master order, then expiry
     // split total into carton (box for material) / tray / pcs (packs for finished goods)
     const split = (it, v) => { v = Math.round(num(v) * 100) / 100; const k = big(it), t = it.item_type === 'RAW_EGG' ? num(it.pcs_per_tray) || 30 : 0;
       const c = k ? Math.floor(v / k) : 0, r1 = +(v - c * k).toFixed(2), tr = t ? Math.floor(r1 / t) : 0; return [c, tr, +(r1 - tr * t).toFixed(2)]; };
