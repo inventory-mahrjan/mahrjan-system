@@ -157,17 +157,17 @@
     if (C.msg) h += '<div class="' + (C.msg.charAt(0) === '✓' ? 'ok' : 'err') + '">' + esc(C.msg) + '</div>';
     h += '<div class="lbl">SHELF ID (stays until you change it)</div><input id="mjscShelf" value="' + esc(C.shelf) + '" placeholder="Type or scan the shelf" onchange="MJSC.shelf(this.value)" onkeydown="if(event.key===\'Enter\'){this.blur();}">';
     h += '<div class="lbl">CATEGORY</div><div class="pills">' + b.categories.map(function (c) { return '<button class="' + (C.cat === c ? 'on' : '') + '" onclick="MJSC.cat(\'' + c + '\')">' + CAT[c] + '</button>'; }).join('') + '</div>';
-    if (TYPES[C.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[C.cat].map(function (t) { return '<button class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';
     h += '<div class="lbl">SCAN ' + (C.cat === 'RAW' ? 'THE FINISHED-GOOD BARCODE (finds its raw egg)' : 'THE PRODUCT BARCODE') + (C.cat === 'TRAY' || C.cat === 'LTRAY' || C.cat === 'LABEL' ? ' (finds its ' + (C.cat === 'LABEL' ? 'label' : C.cat === 'TRAY' ? 'tray' : 'tray + label') + ')' : '') + '</div>'
       + '<input id="mjscScan" placeholder="Scan or type barcode, then Enter" onkeydown="if(event.key===\'Enter\'){MJSC.scan(this.value);this.value=\'\';}">'
       + (C.cat === 'RAW' ? '<div class="pills" style="margin-top:6px">' + D.items.filter(function (i) { return i.t === 'RAW_EGG' && isRecount(i.id) && !D.bom.some(function (x) { return x.m === i.id; }); }).map(function (i) { return '<button onclick="MJSC.scan(\'' + esc(i.bc || i.code) + '\')">' + esc(nm(i)) + '</button>'; }).join('') + '</div>' : '');
     if (f) {
       var lead = f.items[0], u = units(f.cat, lead), v = C.v || {};
-      h += '<div class="card" style="margin-top:10px"><div class="it">' + f.items.map(function (i) { return esc(nm(i)); }).join(' + ') + '</div><div class="mut">' + CAT[f.cat] + (f.fg ? ' · from ' + esc(nm(f.fg)) : '') + (TYPES[f.cat] ? ' · ' + TNAME[C.type] : '') + '</div>'
+      h += '<div class="card" style="margin-top:10px"><div class="it">' + f.items.map(function (i) { return esc(nm(i)); }).join(' + ') + '</div><div class="mut">' + CAT[f.cat] + (f.fg ? ' · from ' + esc(nm(f.fg)) : '') + '</div>'
         + '<div class="q" style="margin-top:8px">' + u.map(function (x) { return '<label>' + x[1] + '<input type="number" inputmode="decimal" min="0" value="' + esc(v[x[0]] || '') + '" oninput="MJSC.q(\'' + x[0] + '\',this.value)"></label>'; }).join('') + '</div>'
         + '<div class="tot" id="mjscTot">= ' + totalOf(f.cat, lead, v) + ' ' + (f.cat === 'FG' ? 'packs' : 'pcs') + '</div>';
       if (f.cat === 'RAW' || f.cat === 'FG') h += '<div class="lbl">EXPIRY DATE</div><input type="date" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)">';
       if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+      if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
       h += '<button class="big" onclick="MJSC.add()">Add entry</button></div>';
     }
     var last = D.lines.slice().sort(function (x, y) { return y.entry_no - x.entry_no; }).slice(0, 5);
