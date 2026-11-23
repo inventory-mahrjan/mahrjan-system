@@ -672,7 +672,8 @@ function scBatchDialog(b, recount){
 
 async function vStockBatch(id){ const __t = S.nav;
   loading();
-  const b = (await q(sb.from('sc_batches').select('*').eq('id', id)))[0];
+  const [b0, it0] = await Promise.all([q(sb.from('sc_batches').select('*').eq('id', id)), q(sb.from('items').select('*'))]);   // fresh item sizes every time (box / carton sizes can change during the day)
+  S.items = it0; const b = b0[0];
   if (!b) { S.scb = null; return vStock(); }
   const [L, SY, prevA] = await Promise.all([q(sb.from('sc_lines').select('*').eq('batch_id', id).order('entry_no')),
     has('ADMIN','ACCOUNTANT','VIEWER') ? q(sb.from('sc_system').select('*').eq('batch_id', id)) : [],
