@@ -1202,11 +1202,19 @@ async function vAnalysis(){ const __t = S.nav;
   const crL = rows.filter(r => r.tran_type === 'CR'), srL = rows.filter(r => r.tran_type !== 'CR');
   const tTot = rows.reduce((a,r)=>a+num(r.net_incl_vat),0), tNet = rows.reduce((a,r)=>a+num(r.net),0), tPro = rows.reduce((a,r)=>a+num(r.profit),0);
   const nInv = new Set(crL.map(r=>r.invoice_no)).size, nCus = new Set(crL.map(r=>r.customer_code).filter(Boolean)).size, sCr = crL.reduce((a,r)=>a+num(r.net_incl_vat),0), sSr = Math.abs(srL.reduce((a,r)=>a+num(r.net_incl_vat),0));
+  // three middle tiles follow "Group by": count, the top one with its share, and the average
+  const pos = G.filter(g => num(g.tot) > 0), top = [...pos].sort((x, y) => y.tot - x.tot)[0], sh = v => tTot ? ' · ' + (v / tTot * 100).toFixed(1) + '%' : '';
+  const NM = { sm:['Salesmen','Top salesman','Avg per salesman'], cu:['Customers','Top customer','Avg per customer'], it:['Items sold','Top item','Avg per item'],
+    iv:['Invoices','Largest invoice','Avg invoice'], dt:['Selling days','Best day','Avg per day'], td:['Tender types','Bigger share','Avg per type'] }[F.by] || ['Groups','Top','Average'];
+  const cash = rows.filter(r => r.tender_type === 'Cash').reduce((a,r)=>a+num(r.net_incl_vat),0), cred = rows.filter(r => r.tender_type === 'Credit').reduce((a,r)=>a+num(r.net_incl_vat),0);
+  const dynTiles = F.by === 'td'
+    ? kpi('Cash', 'AED ' + money(cash), (tTot ? (cash / tTot * 100).toFixed(1) : '0.0') + '% of sales') + kpi('Credit', 'AED ' + money(cred), (tTot ? (cred / tTot * 100).toFixed(1) : '0.0') + '% of sales') + kpi('Invoices', nInv.toLocaleString('en-US'), 'avg AED ' + money(nInv ? sCr / nInv : 0))
+    : kpi(NM[0], pos.length.toLocaleString('en-US'), F.by === 'iv' ? new Set(srL.map(r=>r.invoice_no)).size + ' returns' : nInv.toLocaleString('en-US') + ' invoices · ' + nCus.toLocaleString('en-US') + ' customers')
+      + kpi(NM[1], top ? esc(String(F.by === 'it' ? top.label : top.label).slice(0, 26)) : '—', top ? 'AED ' + money(top.tot) + (F.by === 'it' ? ' · qty ' + Math.round(top.qty).toLocaleString('en-US') : sh(top.tot)) : '')
+      + kpi(NM[2], 'AED ' + money(pos.length ? pos.reduce((a,g)=>a+num(g.tot),0) / pos.length : 0), F.by === 'iv' ? 'per sales invoice' : 'over ' + pos.length + ' ' + NM[0].toLowerCase());
   const tiles = `<div class="kpis sakpi" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:12px">
       ${kpi('Net sales', 'AED ' + money(tTot), 'incl. VAT')}
-      ${kpi('Invoices', nInv.toLocaleString('en-US'), new Set(srL.map(r=>r.invoice_no)).size + ' returns')}
-      ${kpi('Customers', nCus.toLocaleString('en-US'), 'with a sale')}
-      ${kpi('Avg invoice', 'AED ' + money(nInv ? sCr / nInv : 0), 'per sales invoice')}
+      ${dynTiles}
       ${kpi('Returns', 'AED ' + money(sSr), (sCr ? (sSr / sCr * 100).toFixed(1) : '0.0') + '% of sales')}
       ${kpi('Profit', 'AED ' + money(tPro), 'margin ' + (tNet ? (tPro / tNet * 100).toFixed(1) : '0.0') + '%')}</div>`;
   if (__t !== S.nav) return; $('#v').innerHTML = tiles + `<div class="card"><div class="row">
