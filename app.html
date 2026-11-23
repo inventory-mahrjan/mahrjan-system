@@ -27,7 +27,17 @@
   (function () {
     var ok = typeof DecompressionStream !== 'undefined' && typeof Promise !== 'undefined';
     try { new Function('var a = {}; return a?.b ?? 1;'); } catch (e) { ok = false; }
-    if (ok) return;
+    var errs = [];
+    window.addEventListener('error', function (e) { errs.push((e.message || 'resource failed: ' + ((e.target && (e.target.src || e.target.href)) || '')) + (e.filename ? ' @' + String(e.filename).slice(-40) + ':' + e.lineno : '')); }, true);
+    window.addEventListener('unhandledrejection', function (e) { errs.push('promise: ' + ((e.reason && (e.reason.message || e.reason)) || '')); });
+    if (ok) {   // still unpacking after 20 s: show what went wrong on screen, so it can be photographed
+      setTimeout(function () { if (!document.getElementById('__bundler_loading')) return;
+        var v2 = (navigator.userAgent.match(/Chrome\/([\d.]+)/) || [])[1] || '?', an2 = (navigator.userAgent.match(/Android ([\d.]+)/) || [])[1] || '?';
+        var d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#1B4332;color:#fff;font:14px/1.5 sans-serif;padding:24px 18px;overflow:auto';
+        d.innerHTML = '<div style="font-size:18px;font-weight:700;margin-bottom:10px">The app did not open</div>Engine: ' + v2 + ' &middot; Android: ' + an2 + ' &middot; online: ' + navigator.onLine +
+          '<br><br>' + (errs.length ? errs.slice(0, 8).map(function (x) { return '&bull; ' + String(x).replace(/</g, '&lt;'); }).join('<br>') : 'No error reported.') + '<br><br>Send a photo of this screen to the office.';
+        document.body.appendChild(d); }, 20000);
+      return; }
     var m = navigator.userAgent.match(/Chrome\/(\d+)/), v = m ? m[1] : '?', an = (navigator.userAgent.match(/Android ([\d.]+)/) || [])[1] || '?';
     document.addEventListener('DOMContentLoaded', function () {
       document.body.innerHTML = '<div style="font:16px/1.5 sans-serif;color:#fff;background:#1B4332;min-height:100vh;padding:28px 22px;box-sizing:border-box">' +
