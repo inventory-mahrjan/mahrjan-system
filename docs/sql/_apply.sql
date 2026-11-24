@@ -1,14 +1,27 @@
--- CUSTOMER 45 DAY BASE - CREATE.sql (24 Nov 2026)
--- The last-visit dates from the Customer Visit Status of 04-Nov-2026 are loaded into customer_visit_base
--- (loaded from the browser, not kept here). That report listed only customers with a sale in the 45 days
--- before 04-Nov, so a customer not in it and not billed since is taken as last visited before 20-Sep-2026.
--- The temporary "1 Nov" floor is removed. Undo with: CUSTOMER 45 DAY BASE - REVERT.sql
-create or replace function public.customer_last_visit() returns table (customer_id bigint, last_visit date)
-language sql stable security definer set search_path = public as $$
-  select c.id, coalesce(greatest(s.last, b.last_visit, case when c.created_at > timestamptz '2026-11-22' then c.created_at::date end), date '2026-09-19')
-    from public.customers c
-    left join (select customer_id, max(tran_date) last from public.sales_lines where tran_type = 'CR' and not cancelled and customer_id is not null group by 1) s on s.customer_id = c.id
-    left join public.customer_visit_base b on b.customer_id = c.id $$;
-update public.customers c set active = (v.last_visit >= (now() at time zone 'Asia/Dubai')::date - 45), updated_at = now()
-  from public.customer_last_visit() v where v.customer_id = c.id and c.active is distinct from (v.last_visit >= (now() at time zone 'Asia/Dubai')::date - 45);
-select count(*) filter (where active) || ' active, ' || count(*) filter (where not active) || ' inactive' as result from public.customers;
+-- STOCK COUNT EXPIRY LIST - CREATE.sql (24 Nov 2026)
+-- For the app's stock count: countries and expiry dates per raw egg, taken from
+--   1) the previous posted stock count of the same company (and its recounts) - finished goods map to their raw egg through the BOM
+--   2) raw egg issued to production (wh_lines ISSUE RAW, origin + expiry) from that count date up to this count date (7 days back if no earlier count)
+-- Returns [{m: raw egg item id, c: country, d: expiry date or null}]. Read-only. Undo with: STOCK COUNT EXPIRY LIST - REVERT.sql
+create or replace function public.sc_expiry_hints(p_id bigint) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare b record; p record;
+begin
+  select * into b from public.sc_batches where id = p_id;
+  if b.id is null or my_role() is null or not can_branch(b.branch_id) then return '[]'::jsonb; end if;
+  select * into p from public.sc_batches x where x.branch_id = b.branch_id and x.status = 'POSTED' and x.parent_id is null and x.count_date < b.count_date order by x.count_date desc, x.id desc limit 1;
+  return coalesce((select jsonb_agg(distinct jsonb_build_object('m', z.m, 'c', z.c, 'd', z.d)) from (
+      select case when i.item_type = 'RAW_EGG' then l.item_id else (select v.item_id from public.v_fg_bom v where v.fg_item_id = l.item_id and v.item_type = 'RAW_EGG' limit 1) end m,
+             upper(trim(l.country)) c, l.exp_date d
+        from public.sc_lines l join public.items i on i.id = l.item_id
+       where p.id is not null and l.batch_id in (select id from public.sc_batches where id = p.id or parent_id = p.id)
+         and l.category in ('RAW','FG') and nullif(trim(l.country), '') is not null
+      union
+      select w.item_id, upper(trim(w.origin)), w.exp_date
+        from public.wh_lines w join public.wh_batches wb on wb.id = w.batch_id
+       where wb.branch_id = b.branch_id and w.line_type = 'ISSUE RAW' and nullif(trim(w.origin), '') is not null
+         and wb.work_date between coalesce(p.count_date, b.count_date - 7) and b.count_date) z where z.m is not null), '[]'::jsonb);
+end $$;
+revoke all on function public.sc_expiry_hints(bigint) from public, anon;
+grant execute on function public.sc_expiry_hints(bigint) to authenticated;
+select 'ok' as result;
