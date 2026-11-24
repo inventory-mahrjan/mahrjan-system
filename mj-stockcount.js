@@ -26,7 +26,7 @@
     + '#mjsc .err{background:#fdecea;color:#a1271b;border-radius:9px;padding:10px;margin-bottom:10px;font-size:13px}#mjsc .ok{background:#e6f2ea;color:#147b3d;border-radius:9px;padding:10px;margin-bottom:10px;font-size:13px}'
     + '#mjsc .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}#mjsc .row:last-child{border:0}'
     + '#mjsc .row button{border:1px solid #e0b4ae;color:#a1271b;background:#fff;border-radius:8px;padding:6px 9px;font:600 12px Archivo}'
-    + '#mjsc .mono{font-family:"IBM Plex Mono",monospace}#mjsc .two{display:flex;gap:8px}#mjsc .two>*{flex:1}#mjsc .big{width:100%;padding:14px;border-radius:10px;border:0;background:#147b3d;color:#fff;font:700 15px Archivo;margin-top:10px}#mjscCty::placeholder{text-transform:none}';
+    + '#mjsc .mono{font-family:"IBM Plex Mono",monospace}#mjsc .two{display:flex;gap:8px}#mjsc .two>*{flex:1}#mjsc .big{width:100%;padding:14px;border-radius:10px;border:0;background:#147b3d;color:#fff;font:700 15px Archivo;margin-top:10px}#mjscCty::placeholder{text-transform:none}#mjsc .ft .sct{flex-wrap:nowrap;margin-bottom:8px}#mjsc .ft .sct button{flex:1;padding:10px 4px;border-radius:20px;font:600 13px Archivo}#mjsc .ft .sct .on{background:#147b3d;color:#fff;border-color:#147b3d}';
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
@@ -183,7 +183,6 @@
           + '<input id="mjscExpCal" type="date" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;padding:0;border:0"></label></div></div>';
         h += qty;
       } else { h += qty; if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'; }
-      if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button data-sct="' + t + '" class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
       h += '</div>';   // Add entry is in the fixed bottom bar
     }
     var last = D.lines.slice().sort(function (x, y) { return y.entry_no - x.entry_no; }).slice(0, 5);
@@ -191,7 +190,8 @@
       return '<div class="row"><div><b>' + esc(nm(it)) + '</b><div class="mut">#' + l.entry_no + ' · ' + esc(l.shelf || '') + ' · ' + CAT[l.category] + (l.stock_type ? ' · ' + TNAME[l.stock_type] : '') + (l.exp_date ? ' · exp ' + fmtD(l.exp_date) : '') + (l.country ? ' · ' + esc(l.country) : '') + '</div></div><span class="mono">' + l.total_qty + '</span><button onclick="MJSC.undo(' + l.entry_no + ')">Undo</button></div>'; }).join('') : '<div class="mut">No entries yet.</div>')
       + (D.lines.length > 5 ? '<button class="big" style="background:#fff;color:#147b3d;border:1px solid #147b3d" onclick="MJSC.all()">See all ' + D.lines.length + ' entries</button>' : '') + '</div>';
     shell(b.no, fmtD(b.date) + ' · ' + (b.counted_by || '') + (navigator.onLine ? '' : ' · OFFLINE'), h,
-      f ? '<button class="pri" style="background:#147b3d;color:#fff;border-color:#147b3d" onclick="MJSC.add()">Add entry</button>'   // item being entered: only Add entry, no save / post half-entered
+      f ? '<div style="flex:1">' + (TYPES[f.cat] ? '<div class="pills sct">' + TYPES[f.cat].map(function (t) { return '<button data-sct="' + t + '" class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>' : '')   // stock type fixed just above Add entry
+        + '<button class="pri" style="width:100%;background:#147b3d;color:#fff;border-color:#147b3d" onclick="MJSC.add()">Add entry</button></div>'   // item being entered: only Add entry, no save / post half-entered
         : '<button onclick="MJSC.save()">💾 Save</button><button class="pri" onclick="MJSC.prePost()">Post count</button>', 'toList');
     expOpts();
   }
