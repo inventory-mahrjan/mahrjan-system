@@ -737,8 +737,17 @@
     var K = ['DMG', 'EXP', 'WST', 'FOC'], byItem = {}, byMan = {}, detail = [], tot = { DMG: 0, EXP: 0, WST: 0, FOC: 0 };
     rows.forEach(function (x) { var cd = String(x.BARCODE), i = byItem[cd] || (byItem[cd] = { code: cd, name: x['ITEM NAME'], DMG: 0, EXP: 0, WST: 0, FOC: 0 }), mm = byMan[x.SALESMAN] || (byMan[x.SALESMAN] = { salesman: x.SALESMAN, DMG: 0, EXP: 0, WST: 0, FOC: 0 }), dl = { date: x.date, salesman: x.SALESMAN, code: cd, name: x['ITEM NAME'] };
       K.forEach(function (k) { var v = num(x[k]); i[k] += v; mm[k] += v; tot[k] += v; dl[k] = v; }); detail.push(dl); });
-    return addValues({ salesman: sm || '', from: V.from, to: V.to, items: Object.keys(byItem).map(function (cd) { return byItem[cd]; }).sort(function (a, b) { return rk(a.code) - rk(b.code); }),
+    var R = addValues({ salesman: sm || '', from: V.from, to: V.to, items: Object.keys(byItem).map(function (cd) { return byItem[cd]; }).sort(function (a, b) { return rk(a.code) - rk(b.code); }),
       men: Object.keys(byMan).sort().map(function (k) { return byMan[k]; }), detail: detail.sort(function (a, b) { return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.salesman < b.salesman ? -1 : a.salesman > b.salesman ? 1 : 0) || rk(a.code) - rk(b.code); }), total: tot }, P, 'wo');
+    /* net sales (AED incl. VAT, finished goods, sales less sales returns) for the same period, per salesman and item - for the % column */
+    try { var c = await sb(), f0 = from < to ? from : to, t0 = from < to ? to : from, sM = {}, sI = {}, sT = 0;
+      (await perDay(f0, t0, function (d) { return c.from('sales_lines').select('item_id,item_code,net_incl_vat,tran_type,salesman_id').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); }))
+        .forEach(function (l) { var st = m.staffById[l.salesman_id], it = l.item_id && m.itemById[l.item_id]; if (it && it.item_type !== 'FG') return;
+          var v = Math.abs(num(l.net_incl_vat)) * (up(l.tran_type) === 'SR' ? -1 : 1), cd = it ? String(m.code(it)) : String(l.item_code || ''), nm = st ? st.name : '';
+          if (U && up(nm) !== U) return; if (nm) sM[up(nm)] = (sM[up(nm)] || 0) + v; sI[cd] = (sI[cd] || 0) + v; sT += v; });
+      R.men.forEach(function (x) { x.SALES = sM[up(x.salesman)] || 0; }); R.items.forEach(function (x) { x.SALES = sI[String(x.code)] || 0; });
+      R.total.SALES = U ? (sM[U] || 0) : sT; R.hasSales = true; } catch (e) {}
+    return R;
   }
   async function oQtySales(m, sm, from, to) {
     if (from > to) { var x0 = from; from = to; to = x0; }

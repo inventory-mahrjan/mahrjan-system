@@ -48,9 +48,11 @@ window.SimplePrint=(file,title,sub,sections,signs)=>{const esc=s=>String(s??'').
    const file=()=>((sm||'ALL SALESMEN')+'_FOC & WRITE-OFF'+(allOn()?'':'_'+KS().join('-'))+'_'+rvNice(from)+' TO '+rvNice(to)).toUpperCase();
    function el(){if(!host||!host.isConnected){host=document.createElement('section');host.id='writeOffView';host.className='panel users';oldHost().appendChild(host);}return host;}
    const m2w=v=>Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-   const sec=()=>{if(!data||!KS().length)return [];const K=KS(),T=data.total,has=x=>K.some(k=>Number(x[k]||0)),one=K.length===1,QC=one?[['QTY','r'],['VALUE (AED)','r']]:K.flatMap(k=>[[k,'r'],[k+' AED','r']]).concat([['TOTAL AED','r']]),zv=v=>Number(v||0)?m2w(v):'',QV=x=>one?[rvQ(x[K[0]]||''),zv(x[K[0]+'V'])]:K.flatMap(k=>[rvQ(x[k]||''),zv(x[k+'V'])]).concat([zv(K.reduce((a,k)=>a+Number(x[k+'V']||0),0))]);return [
-     {h:'SALESMAN-WISE',cols:[['Salesman']].concat(QC),rows:data.men.filter(has).map(m=>[m.salesman].concat(QV(m))),total:['TOTAL'].concat(QV(T))},
-     {h:'ITEM-WISE SUMMARY',cols:[['Sl'],['Barcode'],['Item name']].concat(QC),rows:data.items.filter(has).map((x,i)=>[i+1,x.code,x.name].concat(QV(x))),total:['','','TOTAL'].concat(QV(T))},
+   const sec=()=>{if(!data||!KS().length)return [];const K=KS(),T=data.total,has=x=>K.some(k=>Number(x[k]||0)),one=K.length===1,QC=one?[['QTY','r'],['VALUE (AED)','r']]:K.flatMap(k=>[[k,'r'],[k+' AED','r']]).concat([['TOTAL AED','r']]),zv=v=>Number(v||0)?m2w(v):'',QV=x=>one?[rvQ(x[K[0]]||''),zv(x[K[0]+'V'])]:K.flatMap(k=>[rvQ(x[k]||''),zv(x[k+'V'])]).concat([zv(K.reduce((a,k)=>a+Number(x[k+'V']||0),0))]);
+     /* sales of the same period and write-off as % of sales */
+     const SC=data.hasSales?[['SALES AED','r'],['% OF SALES','r']]:[],SV=x=>{if(!data.hasSales)return [];const w=K.reduce((a,k)=>a+Number(x[k+'V']||0),0),sl=Number(x.SALES||0);return [zv(sl),sl>0?(w/sl*100).toFixed(2)+'%':''];};return [
+     {h:'SALESMAN-WISE',cols:[['Salesman']].concat(QC,SC),rows:data.men.filter(has).map(m=>[m.salesman].concat(QV(m),SV(m))),total:['TOTAL'].concat(QV(T),SV(T))},
+     {h:'ITEM-WISE SUMMARY',cols:[['Sl'],['Barcode'],['Item name']].concat(QC,SC),rows:data.items.filter(has).map((x,i)=>[i+1,x.code,x.name].concat(QV(x),SV(x))),total:['','','TOTAL'].concat(QV(T),SV(T))},
      ].concat((()=>{const by={};data.detail.filter(has).forEach(x=>{(by[x.salesman]=by[x.salesman]||[]).push(x);});const qh=QC;
        return Object.keys(by).sort().map(s=>{const R=by[s].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:String(a.name).localeCompare(String(b.name))),t={};K.forEach(k=>{t[k]=R.reduce((v,x)=>v+Number(x[k]||0),0);t[k+'V']=R.reduce((v,x)=>v+Number(x[k+'V']||0),0);});
          return {h:s,w:one?['18%','52%','12%','18%']:null,cols:[['Date'],['Item name']].concat(qh),rows:R.map(x=>[rvNice(x.date),x.name].concat(QV(x))),total:['','TOTAL '+s].concat(QV(t))};});})());};
