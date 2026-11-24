@@ -439,6 +439,9 @@ async function vDays(){ const __t = S.nav;
   $('#v').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { S.dayId = +b.dataset.d; vDays(); });
 }
 
+// customers of one salesman (current assignment) for the customer drop-downs; all customers if none assigned
+async function custOf(smId){ if (!S.custAsg) S.custAsg = await q(sb.from('customer_assignment').select('customer_id,salesman_id').is('to_date', null));
+  const ids = new Set(S.custAsg.filter(a => a.salesman_id === smId).map(a => a.customer_id)); const L = S.customers.filter(c => ids.has(c.id)); return L.length ? L : S.customers; }
 async function vDay(id){ const __t = S.nav;
   const [day] = await q(sb.from('van_day').select('*').eq('id', id));
   const closed = day.status === 'CLOSED';
@@ -451,7 +454,8 @@ async function vDay(id){ const __t = S.nav;
   const exp = day.cash_expected ?? cash.cash_to_hand_over;
   const sm = S.staff.find(s=>s.id===day.salesman_id)?.name;
   const ET = ['FUEL','PARKING','CARTON BIG','CARTON SMALL','SHELF RENT','CREDIT NOTE','OTHER'];
-  const custOpts = `<datalist id="cl">${S.customers.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist>`;
+  const myCust = await custOf(day.salesman_id);
+  const custOpts = `<datalist id="cl">${myCust.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist>`;
   const custVal = cid => { const c = S.customers.find(x=>x.id===cid); return c ? (c.itrade_code||'')+' | '+c.name : ''; };
   const custId = v => S.customers.find(c => (c.itrade_code||'')+' | '+c.name === v)?.id || null;
 
@@ -1654,7 +1658,8 @@ async function vOffice(){ const __t = S.nav;
       const R = ex ? exRow : coRow, line = r => ex ? { expense_type:$('.t',r).value, amount:num($('.a',r).value), customer_id:custId($('.c',r).value), note:$('.n',r).value }
         : { receipt_no:$('.r',r).value.trim(), invoice_no:$('.i',r).value.trim(), customer_id:custId($('.c',r).value), mode:$('.m',r).value, amount:num($('.a',r).value) };
       const txt = l => ex ? `${l.expense_type} ${money(l.amount)}${l.note ? ' ' + l.note : ''}` : `${l.receipt_no} ${l.mode} ${money(l.amount)}`;
-      g().innerHTML = st + `<datalist id="ocl">${S.customers.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist><div id="orows">${main.map(R).join('')}</div>`
+      const myCust = await custOf(S.osm);
+      g().innerHTML = st + `<datalist id="ocl">${myCust.map(c=>`<option value="${esc((c.itrade_code||'')+' | '+c.name)}">`).join('')}</datalist><div id="orows">${main.map(R).join('')}</div>`
         + (cart.length ? `<p class="muted">Cartons (from the return): ${cart.map(c => esc(c.expense_type + ' ' + money(c.amount))).join(', ')} — change them in Return.</p>` : '')
         + (ro ? '' : `<div class="row" style="margin-top:8px"><button id="oad">+ Add</button><button class="p" id="osv">Save ${ex ? 'expenses' : 'collections'}</button></div>`);
       const bindX = () => g().querySelectorAll('.x').forEach(b => b.onclick = () => b.closest('.row').remove());
