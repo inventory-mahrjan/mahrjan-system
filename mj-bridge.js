@@ -379,9 +379,7 @@
     // no back-date entry from the app: requirement is for today or later, a deleted bill is recorded on today's work day
     var wd2 = new Date(Date.now() + (new Date().getTimezoneOffset() + TZ_OFF) * 60000 - 2 * 3600000).toISOString().slice(0, 10);
     if (stage === 'REQUIREMENT' && String(p.forDate || p.date || '') < wd2) return { ok: false, error: 'Requirement for a past date is not allowed. Ask the office to correct it in the portal.' };
-    /* accountant and admin: deleted bills up to 5 days back; others today only */
-    var back5 = ['ADMIN', 'ACCOUNTANT'].indexOf(who.s.role) > -1, wd5 = new Date(Date.parse(wd2 + 'T12:00:00Z') - 5 * 86400000).toISOString().slice(0, 10);
-    if ((stage === 'DELETE' || stage === 'UNDELETE') && p.date && String(p.date) < (back5 ? wd5 : wd2)) return { ok: false, error: back5 ? 'Only the last 5 days can be entered in the app. Ask the admin to correct older days in the portal.' : 'Back date is not allowed in the app. Ask the office to correct it in the portal.' };
+    if ((stage === 'DELETE' || stage === 'UNDELETE') && p.date && String(p.date) < wd2) return { ok: false, error: 'Back date is not allowed in the app. Ask the office to correct it in the portal.' };
     var sm = p.salesman ? m.smByName(p.salesman) : null;
     var itemId = function (code) { var it = m.itemByCode[String(code).trim()]; if (!it) throw new Error('Item ' + code + ' is not in the item list'); return it.id; };
     var dayId = async function (create) { var c = await sb(); var d = (await q(c.from('van_day').select('id,status').eq('salesman_id', sm.id).eq('business_date', p.date)))[0];
