@@ -159,7 +159,9 @@
   function hintD(f, c) { var r = rawOf(f), L = []; c = String(c || '').toUpperCase().trim(); if (!c) return L; (D.hints || []).forEach(function (h) { if (r && h.m === r.id && h.c === c && h.d && L.indexOf(h.d) < 0) L.push(h.d); }); return L.sort(); }
   function dmy(d) { var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], p = String(d).split('-'); return p.length === 3 ? p[2] + '-' + m[+p[1] - 1] + '-' + p[0] : d; }
   function expOpts() { var sel = root && root.querySelector('#mjscExpSel'); if (!sel || !C.found) return; var c = C.country, L = hintD(C.found, c);
-    sel.disabled = !c; sel.innerHTML = '<option value="">' + (!c ? 'Choose country first' : L.length ? 'Select expiry date' : 'No dates — use calendar') + '</option>' + L.map(function (d) { return '<option value="' + d + '"' + (C.exp === d ? ' selected' : '') + '>' + dmy(d) + '</option>'; }).join(''); }
+    if (C.exp && L.indexOf(C.exp) < 0) L = L.concat([C.exp]);   // a date picked on the calendar shows here too
+    sel.disabled = !c && !C.exp; sel.innerHTML = '<option value="">' + (!c ? (C.exp ? 'Date' : 'Country first') : L.length ? 'Select' : 'Use calendar') + '</option>' + L.map(function (d) { return '<option value="' + d + '"' + (C.exp === d ? ' selected' : '') + '>' + dmy(d) + '</option>'; }).join('');
+    var bx = root.querySelector('#mjscCalBox'); if (bx) bx.style.background = C.exp ? '#e6f2ea' : '#fff'; }
   function focusScan() { var s = root && root.querySelector('#mjscScan'); if (s) s.focus(); }
   function vCount() {
     var b = D.batch, f = C.found, h = '';
@@ -171,13 +173,16 @@
       + (C.cat === 'RAW' ? '<div class="pills" style="margin-top:6px">' + D.items.filter(function (i) { return i.t === 'RAW_EGG' && isRecount(i.id) && !D.bom.some(function (x) { return x.m === i.id; }); }).map(function (i) { return '<button onclick="MJSC.scan(\'' + esc(i.bc || i.code) + '\')">' + esc(nm(i)) + '</button>'; }).join('') + '</div>' : '');
     if (f) {
       var lead = f.items[0], u = units(f.cat, lead), v = C.v || {};
-      h += '<div class="card" style="margin-top:10px"><div class="it">' + f.items.map(function (i) { return esc(nm(i)); }).join(' + ') + '</div><div class="mut">' + CAT[f.cat] + (f.fg ? ' · from ' + esc(nm(f.fg)) : '') + '</div>'
-        + '<div class="q" style="margin-top:8px">' + u.map(function (x) { return '<label>' + x[1] + '<input type="number" inputmode="decimal" min="0" value="' + esc(v[x[0]] || '') + '" oninput="MJSC.q(\'' + x[0] + '\',this.value)"></label>'; }).join('') + '</div>'
+      var qty = '<div class="q" style="margin-top:8px">' + u.map(function (x) { return '<label>' + x[1] + '<input type="number" inputmode="decimal" min="0" value="' + esc(v[x[0]] || '') + '" oninput="MJSC.q(\'' + x[0] + '\',this.value)"></label>'; }).join('') + '</div>'
         + '<div class="tot" id="mjscTot">= ' + totalOf(f.cat, lead, v) + ' ' + (f.cat === 'FG' ? 'packs' : 'pcs') + '</div>';
-      if (f.cat === 'RAW' || f.cat === 'FG') {   // country first (choose or type a new one), then expiry: 70% list for that raw egg + country, 30% calendar
-        h += '<div class="lbl">COUNTRY OF ORIGIN</div><input id="mjscCty" list="mjscCtyL" autocomplete="off" value="' + esc(C.country || '') + '" placeholder="Choose or type a new country" oninput="MJSC.cty(this.value)" style="text-transform:uppercase"><datalist id="mjscCtyL">' + hintC(f).map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>';
-        h += '<div class="lbl">EXPIRY DATE</div><div style="display:flex;gap:8px"><select id="mjscExpSel" style="flex:7;min-width:0" onchange="MJSC.expSel(this.value)"></select><input id="mjscExpCal" type="date" style="flex:3;min-width:0;padding:11px 4px;font-size:12.5px" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)"></div>';
-      } else if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+      h += '<div class="card" style="margin-top:10px"><div class="it">' + f.items.map(function (i) { return esc(nm(i)); }).join(' + ') + '</div><div class="mut">' + CAT[f.cat] + (f.fg ? ' · from ' + esc(nm(f.fg)) : '') + '</div>';
+      if (f.cat === 'RAW' || f.cat === 'FG') {   // one row 40:40:20 - country (choose or type new) | expiry list for that raw egg + country | calendar icon; quantity below
+        h += '<div style="display:flex;gap:6px;margin-top:10px"><div style="flex:4;min-width:0"><div class="lbl" style="margin-top:0">COUNTRY</div><input id="mjscCty" list="mjscCtyL" autocomplete="off" value="' + esc(C.country || '') + '" placeholder="Country" oninput="MJSC.cty(this.value)" style="text-transform:uppercase;padding:11px 8px"><datalist id="mjscCtyL">' + hintC(f).map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist></div>'
+          + '<div style="flex:4;min-width:0"><div class="lbl" style="margin-top:0">EXPIRY DATE</div><select id="mjscExpSel" style="padding:11px 6px" onchange="MJSC.expSel(this.value)"></select></div>'
+          + '<div style="flex:2;min-width:0"><div class="lbl" style="margin-top:0">&nbsp;</div><label style="position:relative;display:flex;align-items:center;justify-content:center;height:41px;box-sizing:border-box;border:1px solid #c9cfca;border-radius:9px;background:' + (C.exp ? '#e6f2ea' : '#fff') + ';font-size:22px" id="mjscCalBox">📅'
+          + '<input id="mjscExpCal" type="date" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;padding:0;border:0"></label></div></div>';
+        h += qty;
+      } else { h += qty; if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'; }
       if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button data-sct="' + t + '" class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
       h += '</div>';   // Add entry is in the fixed bottom bar
     }
@@ -243,8 +248,8 @@
     type: function (t) { C.type = t; root.querySelectorAll('[data-sct]').forEach(function (b) { b.className = b.getAttribute('data-sct') === t ? 'on' : ''; }); },   // update in place: the screen stays where it is
     scan: scan, add: addEntry, undo: undo,
     q: function (k, v) { C.v = C.v || {}; C.v[k] = v; var t = root.querySelector('#mjscTot'); if (t && C.found) t.textContent = '= ' + totalOf(C.found.cat, C.found.items[0], C.v) + ' ' + (C.found.cat === 'FG' ? 'packs' : 'pcs'); },
-    exp: function (v) { C.exp = v; var s2 = root.querySelector('#mjscExpSel'); if (s2) s2.value = [].some.call(s2.options, function (o) { return o.value === v; }) ? v : ''; },
-    expSel: function (v) { C.exp = v; var c2 = root.querySelector('#mjscExpCal'); if (c2) c2.value = v; },
+    exp: function (v) { C.exp = v; expOpts(); },
+    expSel: function (v) { C.exp = v; var c2 = root.querySelector('#mjscExpCal'); if (c2) c2.value = v; var bx = root.querySelector('#mjscCalBox'); if (bx) bx.style.background = v ? '#e6f2ea' : '#fff'; },
     cty: function (v) { C.country = String(v || '').toUpperCase().trim(); if (C.exp && hintD(C.found, C.country).indexOf(C.exp) < 0 && root.querySelector('#mjscExpSel') && root.querySelector('#mjscExpSel').value) { C.exp = ''; var c3 = root.querySelector('#mjscExpCal'); if (c3) c3.value = ''; } expOpts(); },
     all: function () { V.view = 'all'; render(); },
     save: function () { save(); }, prePost: function () { store(V.id, D); V.view = 'post'; err = ''; render(); }, post: post
