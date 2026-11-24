@@ -1,7 +1,7 @@
 -- CUSTOMER 45 DAY INACTIVE - CREATE.sql (24 Nov 2026)
 -- A customer with no sales invoice (visit) in the last 45 days is marked inactive; billed again -> active again.
 -- Last visit = latest of: last CR invoice in the system, the last visit date given as of 1 Nov (customer_visit_base),
--- the day the customer was created, and 1 Nov 2026 (sales in the system start 2 Nov).
+-- the day the customer was created (new customers added after the move to the new system), and 1 Nov 2026 (sales in the system start 2 Nov).
 -- Runs by itself after every sales import (statement trigger on sales_lines) - no timer needed.
 -- Old active flags kept in customers_active_backup. Undo with: CUSTOMER 45 DAY INACTIVE - REVERT.sql
 create table if not exists public.customer_visit_base (customer_id bigint primary key references public.customers(id) on delete cascade, last_visit date not null);
@@ -16,7 +16,7 @@ insert into public.customers_active_backup (id, active) select id, active from p
 
 create or replace function public.customer_last_visit() returns table (customer_id bigint, last_visit date)
 language sql stable security definer set search_path = public as $$
-  select c.id, greatest(s.last, b.last_visit, c.created_at::date, date '2026-11-01')
+  select c.id, greatest(s.last, b.last_visit, case when c.created_at > timestamptz '2026-11-22' then c.created_at::date end, date '2026-11-01')
     from public.customers c
     left join (select customer_id, max(tran_date) last from public.sales_lines where tran_type = 'CR' and not cancelled and customer_id is not null group by 1) s on s.customer_id = c.id
     left join public.customer_visit_base b on b.customer_id = c.id $$;
