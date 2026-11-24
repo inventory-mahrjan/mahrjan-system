@@ -43,6 +43,8 @@
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th{position:sticky;top:0;background:#e8f3ee;font-weight:500;color:var(--accent-ink);font-size:12px;border-bottom:1px solid var(--line2);padding:9px 12px;white-space:nowrap;text-align:center}
   td{padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}
+  /* FOC & write-offs: wide tables fit smaller screens without side scrolling */
+  #writeOffView th{white-space:normal;padding:7px 6px;line-height:1.25} #writeOffView td{padding:7px 6px} @media (max-width:1600px){#writeOffView table{font-size:12px} #writeOffView td{white-space:normal}}
   th+th,td+td{border-left:1px solid var(--line)}
   td.l,th.l{text-align:left}
   tbody tr:hover td,tr:hover td{background:#fafbf9}
