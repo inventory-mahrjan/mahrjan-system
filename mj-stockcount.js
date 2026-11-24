@@ -179,13 +179,15 @@
         h += '<div class="lbl">EXPIRY DATE</div><div style="display:flex;gap:8px"><select id="mjscExpSel" style="flex:7;min-width:0" onchange="MJSC.expSel(this.value)"></select><input id="mjscExpCal" type="date" style="flex:3;min-width:0;padding:11px 4px;font-size:12.5px" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)"></div>';
       } else if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
       if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button data-sct="' + t + '" class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
-      h += '<button class="big" onclick="MJSC.add()">Add entry</button></div>';
+      h += '</div>';   // Add entry is in the fixed bottom bar
     }
     var last = D.lines.slice().sort(function (x, y) { return y.entry_no - x.entry_no; }).slice(0, 5);
     h += '<div class="lbl">LAST ENTRIES · ' + D.lines.length + ' in total</div><div class="card">' + (last.length ? last.map(function (l) { var it = itemsBy(l.item_id) || {};
       return '<div class="row"><div><b>' + esc(nm(it)) + '</b><div class="mut">#' + l.entry_no + ' · ' + esc(l.shelf || '') + ' · ' + CAT[l.category] + (l.stock_type ? ' · ' + TNAME[l.stock_type] : '') + (l.exp_date ? ' · exp ' + fmtD(l.exp_date) : '') + (l.country ? ' · ' + esc(l.country) : '') + '</div></div><span class="mono">' + l.total_qty + '</span><button onclick="MJSC.undo(' + l.entry_no + ')">Undo</button></div>'; }).join('') : '<div class="mut">No entries yet.</div>')
       + (D.lines.length > 5 ? '<button class="big" style="background:#fff;color:#147b3d;border:1px solid #147b3d" onclick="MJSC.all()">See all ' + D.lines.length + ' entries</button>' : '') + '</div>';
-    shell(b.no, fmtD(b.date) + ' · ' + (b.counted_by || '') + (navigator.onLine ? '' : ' · OFFLINE'), h, '<button onclick="MJSC.save()">💾 Save</button><button class="pri" onclick="MJSC.prePost()">Post count</button>', 'toList');
+    shell(b.no, fmtD(b.date) + ' · ' + (b.counted_by || '') + (navigator.onLine ? '' : ' · OFFLINE'), h,
+      f ? '<button class="pri" style="background:#147b3d;color:#fff;border-color:#147b3d" onclick="MJSC.add()">Add entry</button>'   // item being entered: only Add entry, no save / post half-entered
+        : '<button onclick="MJSC.save()">💾 Save</button><button class="pri" onclick="MJSC.prePost()">Post count</button>', 'toList');
     expOpts();
   }
   function vAll() {
