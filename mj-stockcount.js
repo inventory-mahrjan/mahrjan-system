@@ -26,7 +26,7 @@
     + '#mjsc .err{background:#fdecea;color:#a1271b;border-radius:9px;padding:10px;margin-bottom:10px;font-size:13px}#mjsc .ok{background:#e6f2ea;color:#147b3d;border-radius:9px;padding:10px;margin-bottom:10px;font-size:13px}'
     + '#mjsc .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}#mjsc .row:last-child{border:0}'
     + '#mjsc .row button{border:1px solid #e0b4ae;color:#a1271b;background:#fff;border-radius:8px;padding:6px 9px;font:600 12px Archivo}'
-    + '#mjsc .mono{font-family:"IBM Plex Mono",monospace}#mjsc .two{display:flex;gap:8px}#mjsc .two>*{flex:1}#mjsc .big{width:100%;padding:14px;border-radius:10px;border:0;background:#147b3d;color:#fff;font:700 15px Archivo;margin-top:10px}';
+    + '#mjsc .mono{font-family:"IBM Plex Mono",monospace}#mjsc .two{display:flex;gap:8px}#mjsc .two>*{flex:1}#mjsc .big{width:100%;padding:14px;border-radius:10px;border:0;background:#147b3d;color:#fff;font:700 15px Archivo;margin-top:10px}#mjscCty::placeholder{text-transform:none}';
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
@@ -74,6 +74,7 @@
     busy = true; err = ''; render();
     try { var data = await rpc('sc_download', { p_id: id });
       var d = { batch: data.batch, items: data.items, bom: data.bom, countries: data.countries, lines: (data.lines || []).map(function (l) { return { entry_no: l.entry_no, shelf: l.shelf, category: l.category, stock_type: l.stock_type, scanned_barcode: l.scanned_barcode, item_id: l.item_id, qty_big: +l.qty_big, qty_tray: +l.qty_tray, qty_small: +l.qty_small, total_qty: +l.total_qty, unit: l.unit, exp_date: l.exp_date, country: l.country, pair_key: l.pair_key, zero_confirmed: l.zero_confirmed, scanned_at: l.scanned_at }; }) };
+      try { d.hints = await rpc('sc_expiry_hints', { p_id: id }); } catch (e) { d.hints = []; }
       store(id, d); busy = false; count(id);
     } catch (e) { busy = false; err = 'Download failed: ' + (e.message || e); render(); }
   }
@@ -84,7 +85,8 @@
     C = C && C.id === id ? C : { id: id, shelf: localStorage.getItem('mjsc_shelf') || '', cat: D.batch.categories[0], type: 'FRESH', found: null, msg: '' }; err = ''; render(); setTimeout(focusScan, 50); }
   // when online, refresh the item list and BOM of a downloaded batch (office changes in Items & BOM reach the device); counted lines stay as they are
   function refreshMaster(id) { if (!navigator.onLine) return Promise.resolve(false); return rpc('sc_download', { p_id: id }).then(function (data) { var d = load(id); if (!d) return;
-      d.items = data.items; d.bom = data.bom; d.countries = data.countries; retot(d); store(id, d); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; D.lines = d.lines; if (V.view === 'count') render(); } return true; }).catch(function () { return false; }); }
+      d.items = data.items; d.bom = data.bom; d.countries = data.countries; retot(d); store(id, d);
+      rpc('sc_expiry_hints', { p_id: id }).then(function (h) { var d2 = load(id); if (!d2) return; d2.hints = h || []; store(id, d2); if (D && V.id === id) D.hints = d2.hints; }).catch(function () {}); if (D && V.id === id) { D.items = d.items; D.bom = d.bom; D.countries = d.countries; D.lines = d.lines; if (V.view === 'count') render(); } return true; }).catch(function () { return false; }); }
   // box / carton sizes can change in Items & BOM after counting started: work every raw egg and finished-good total out again from the current sizes
   function retot(d) { if (!d || !d.lines) return; d.lines.forEach(function (l) { if (l.category !== 'FG' && l.category !== 'RAW') return;
       var it = (d.items || []).find(function (i) { return i.id === l.item_id; }); if (!it) return; var b = +l.qty_big || 0, t = +l.qty_tray || 0, sm = +l.qty_small || 0;
@@ -151,6 +153,13 @@
   function undo(no) { var l = D.lines.find(function (x) { return x.entry_no === no; }); if (!l) return;
     if (!confirm('Remove ' + nm(itemsBy(l.item_id)) + ' · ' + l.total_qty + '?')) return;
     D.lines = D.lines.filter(function (x) { return x.entry_no !== no && !(l.pair_key && x.pair_key === l.pair_key); }); store(V.id, D); render(); }
+  // country / expiry lists for the scanned item: from the previous stock count and production issues (sc_expiry_hints)
+  function rawOf(f) { if (!f) return null; var it = f.items[0]; if (f.cat === 'RAW') return it; var r = D.bom.filter(function (b) { return b.fg === it.id; }).map(function (b) { return itemsBy(b.m); }).find(function (m) { return m && m.t === 'RAW_EGG'; }); return r || null; }
+  function hintC(f) { var r = rawOf(f), L = []; (D.hints || []).forEach(function (h) { if (r && h.m === r.id && h.c && L.indexOf(h.c) < 0) L.push(h.c); }); return L.length ? L.sort() : (D.countries || []); }
+  function hintD(f, c) { var r = rawOf(f), L = []; c = String(c || '').toUpperCase().trim(); if (!c) return L; (D.hints || []).forEach(function (h) { if (r && h.m === r.id && h.c === c && h.d && L.indexOf(h.d) < 0) L.push(h.d); }); return L.sort(); }
+  function dmy(d) { var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], p = String(d).split('-'); return p.length === 3 ? p[2] + '-' + m[+p[1] - 1] + '-' + p[0] : d; }
+  function expOpts() { var sel = root && root.querySelector('#mjscExpSel'); if (!sel || !C.found) return; var c = C.country, L = hintD(C.found, c);
+    sel.disabled = !c; sel.innerHTML = '<option value="">' + (!c ? 'Choose country first' : L.length ? 'Select expiry date' : 'No dates — use calendar') + '</option>' + L.map(function (d) { return '<option value="' + d + '"' + (C.exp === d ? ' selected' : '') + '>' + dmy(d) + '</option>'; }).join(''); }
   function focusScan() { var s = root && root.querySelector('#mjscScan'); if (s) s.focus(); }
   function vCount() {
     var b = D.batch, f = C.found, h = '';
@@ -165,8 +174,10 @@
       h += '<div class="card" style="margin-top:10px"><div class="it">' + f.items.map(function (i) { return esc(nm(i)); }).join(' + ') + '</div><div class="mut">' + CAT[f.cat] + (f.fg ? ' · from ' + esc(nm(f.fg)) : '') + '</div>'
         + '<div class="q" style="margin-top:8px">' + u.map(function (x) { return '<label>' + x[1] + '<input type="number" inputmode="decimal" min="0" value="' + esc(v[x[0]] || '') + '" oninput="MJSC.q(\'' + x[0] + '\',this.value)"></label>'; }).join('') + '</div>'
         + '<div class="tot" id="mjscTot">= ' + totalOf(f.cat, lead, v) + ' ' + (f.cat === 'FG' ? 'packs' : 'pcs') + '</div>';
-      if (f.cat === 'RAW' || f.cat === 'FG') h += '<div class="lbl">EXPIRY DATE</div><input type="date" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)">';
-      if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+      if (f.cat === 'RAW' || f.cat === 'FG') {   // country first (choose or type a new one), then expiry: 70% list for that raw egg + country, 30% calendar
+        h += '<div class="lbl">COUNTRY OF ORIGIN</div><input id="mjscCty" list="mjscCtyL" autocomplete="off" value="' + esc(C.country || '') + '" placeholder="Choose or type a new country" oninput="MJSC.cty(this.value)" style="text-transform:uppercase"><datalist id="mjscCtyL">' + hintC(f).map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>';
+        h += '<div class="lbl">EXPIRY DATE</div><div style="display:flex;gap:8px"><select id="mjscExpSel" style="flex:7;min-width:0" onchange="MJSC.expSel(this.value)"></select><input id="mjscExpCal" type="date" style="flex:3;min-width:0;padding:11px 4px;font-size:12.5px" value="' + esc(C.exp || '') + '" onchange="MJSC.exp(this.value)"></div>';
+      } else if (f.cat !== 'TRAY') h += '<div class="lbl">COUNTRY OF ORIGIN</div><select onchange="MJSC.cty(this.value)"><option value="">Choose…</option>' + D.countries.map(function (c) { return '<option' + (String(C.country || '').toUpperCase() === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
       if (TYPES[f.cat]) h += '<div class="lbl">STOCK TYPE</div><div class="pills">' + TYPES[f.cat].map(function (t) { return '<button data-sct="' + t + '" class="' + (C.type === t ? 'on' : '') + '" onclick="MJSC.type(\'' + t + '\')">' + TNAME[t] + '</button>'; }).join('') + '</div>';   // just above Add entry
       h += '<button class="big" onclick="MJSC.add()">Add entry</button></div>';
     }
@@ -175,6 +186,7 @@
       return '<div class="row"><div><b>' + esc(nm(it)) + '</b><div class="mut">#' + l.entry_no + ' · ' + esc(l.shelf || '') + ' · ' + CAT[l.category] + (l.stock_type ? ' · ' + TNAME[l.stock_type] : '') + (l.exp_date ? ' · exp ' + fmtD(l.exp_date) : '') + (l.country ? ' · ' + esc(l.country) : '') + '</div></div><span class="mono">' + l.total_qty + '</span><button onclick="MJSC.undo(' + l.entry_no + ')">Undo</button></div>'; }).join('') : '<div class="mut">No entries yet.</div>')
       + (D.lines.length > 5 ? '<button class="big" style="background:#fff;color:#147b3d;border:1px solid #147b3d" onclick="MJSC.all()">See all ' + D.lines.length + ' entries</button>' : '') + '</div>';
     shell(b.no, fmtD(b.date) + ' · ' + (b.counted_by || '') + (navigator.onLine ? '' : ' · OFFLINE'), h, '<button onclick="MJSC.save()">💾 Save</button><button class="pri" onclick="MJSC.prePost()">Post count</button>', 'toList');
+    expOpts();
   }
   function vAll() {
     var h = '<div class="card">' + D.lines.slice().sort(function (x, y) { return y.entry_no - x.entry_no; }).map(function (l) { var it = itemsBy(l.item_id) || {};
@@ -229,7 +241,9 @@
     type: function (t) { C.type = t; root.querySelectorAll('[data-sct]').forEach(function (b) { b.className = b.getAttribute('data-sct') === t ? 'on' : ''; }); },   // update in place: the screen stays where it is
     scan: scan, add: addEntry, undo: undo,
     q: function (k, v) { C.v = C.v || {}; C.v[k] = v; var t = root.querySelector('#mjscTot'); if (t && C.found) t.textContent = '= ' + totalOf(C.found.cat, C.found.items[0], C.v) + ' ' + (C.found.cat === 'FG' ? 'packs' : 'pcs'); },
-    exp: function (v) { C.exp = v; }, cty: function (v) { C.country = v; },
+    exp: function (v) { C.exp = v; var s2 = root.querySelector('#mjscExpSel'); if (s2) s2.value = [].some.call(s2.options, function (o) { return o.value === v; }) ? v : ''; },
+    expSel: function (v) { C.exp = v; var c2 = root.querySelector('#mjscExpCal'); if (c2) c2.value = v; },
+    cty: function (v) { C.country = String(v || '').toUpperCase().trim(); if (C.exp && hintD(C.found, C.country).indexOf(C.exp) < 0 && root.querySelector('#mjscExpSel') && root.querySelector('#mjscExpSel').value) { C.exp = ''; var c3 = root.querySelector('#mjscExpCal'); if (c3) c3.value = ''; } expOpts(); },
     all: function () { V.view = 'all'; render(); },
     save: function () { save(); }, prePost: function () { store(V.id, D); V.view = 'post'; err = ''; render(); }, post: post
   };
