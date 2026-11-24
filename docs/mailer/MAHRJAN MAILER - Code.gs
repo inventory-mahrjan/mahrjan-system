@@ -214,8 +214,8 @@ function visitHtml_(D, units, per, dateIso) {
     if (x.days >= 7) return '<td style="color:' + C_.amber + '">8-14 days</td>'; return '<td style="color:' + C_.green + '">Visited this week</td>'; };
   var pages = men.slice().sort(function (a, b) { var sa = S.filter(function (s) { return s.name === a.name; })[0], sb = S.filter(function (s) { return s.name === b.name; })[0]; return sb.served - sa.served || a.name.localeCompare(b.name); })
     .map(function (m, mi) {
-      // one salesman per page; long lists get slightly smaller rows (readable), more than 40 customers continue on a second page
-      var L = m.customers, n = L.length, fs = n > 36 ? 11.5 : 12.5, pd = n > 36 ? 3 : 4.5, k = 'v' + mi, out = '', per1 = 40;
+      // one salesman per page; long lists get slightly smaller rows (readable), more than 36 customers continue on a second page
+      var L = m.customers, n = L.length, fs = n > 36 ? 11.5 : 12.5, pd = n > 36 ? 3 : 4.5, k = 'v' + mi, out = '', per1 = 36;
       var hd = '<tr>' + ['Sl<br>No','Head No','Customer Name','Last Visit<br>Date','Visit Since<br>(Days)','Visit Status','No. of Visits<br>(Last 30 Days)','Tender<br>Type'].map(function (h, i) { return '<th' + (i === 2 ? ' class="l"' : '') + '>' + h + '</th>'; }).join('') + '</tr>';
       for (var a = 0; a < n || a === 0; a += per1) {
         out += '<div class="pg" style="page-break-inside:avoid">' + head_('SALESMAN VISIT STATUS - ' + m.name + (a ? ' (continued)' : ''), '', 'Report Date: ' + per) + '<table class="t ' + k + '">' + hd
