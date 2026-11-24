@@ -1,40 +1,44 @@
--- BOM PER PACK FIX - CREATE.sql (23 Nov 2026)
--- The BOM stores qty per carton; eggs/material per pack = qty_per_carton / packs_per_carton.
--- When packs per box changed today (e.g. 15's 24 -> 12) the per-pack use doubled, so production returns
--- showed a false egg / material difference. This rescales the BOM to the new packs per box (per pack stays
--- as before) and recalculates the production batches already closed.
--- Old values kept in item_recipe_backup / wh_fix_backup. Undo with: BOM PER PACK FIX - REVERT.sql
-create table if not exists public.item_recipe_backup as select id, qty_per_carton, now() saved_at from public.item_recipe where false;
-alter table public.item_recipe_backup enable row level security;
-insert into public.item_recipe_backup (id, qty_per_carton) select id, qty_per_carton from public.item_recipe
-  where not exists (select 1 from public.item_recipe_backup b where b.id = item_recipe.id);
-update public.item_recipe r set qty_per_carton = r.qty_per_carton * i.packs_per_carton / k.packs_per_carton
-  from public.items i join public.item_ppc_backup k on k.item_id = i.id
- where r.fg_item_id = i.id and k.packs_per_carton > 0 and i.packs_per_carton > 0 and k.packs_per_carton <> i.packs_per_carton
-   and r.qty_per_carton = (select b.qty_per_carton from public.item_recipe_backup b where b.id = r.id);
+-- CUSTOMER 45 DAY INACTIVE - CREATE.sql (24 Nov 2026)
+-- A customer with no sales invoice (visit) in the last 45 days is marked inactive; billed again -> active again.
+-- Last visit = latest of: last CR invoice in the system, the last visit date given as of 1 Nov (customer_visit_base),
+-- the day the customer was created, and 1 Nov 2026 (sales in the system start 2 Nov).
+-- Runs by itself after every sales import (statement trigger on sales_lines) - no timer needed.
+-- Old active flags kept in customers_active_backup. Undo with: CUSTOMER 45 DAY INACTIVE - REVERT.sql
+create table if not exists public.customer_visit_base (customer_id bigint primary key references public.customers(id) on delete cascade, last_visit date not null);
+alter table public.customer_visit_base enable row level security;
+drop policy if exists read_base on public.customer_visit_base;
+create policy read_base on public.customer_visit_base for select to authenticated using (true);
 
--- recalc closed production batches
-create table if not exists public.wh_fix_backup as
-  select l.id line_id, l.calculated, l.difference, l.reason, b.id batch_id, b.egg_diff, b.mat_diff from public.wh_lines l join public.wh_batches b on b.id = l.batch_id where false;
-alter table public.wh_fix_backup enable row level security;
-insert into public.wh_fix_backup select l.id, l.calculated, l.difference, l.reason, b.id, b.egg_diff, b.mat_diff
-  from public.wh_lines l join public.wh_batches b on b.id = l.batch_id
- where b.process = 'PRODUCTION' and b.status = 'CLOSED' and l.line_type = 'BALANCE'
-   and not exists (select 1 from public.wh_fix_backup f where f.line_id = l.id);
-with iss as (select batch_id, item_id, sum(qty) issued from public.wh_lines where slip = 'I1' group by 1,2),
-     used as (select f.batch_id, bom.item_id, sum(f.qty * bom.per_pack) used from public.wh_lines f join public.v_fg_bom bom on bom.fg_item_id = f.for_item_id where f.line_type = 'FG' group by 1,2),
-     oth as (select batch_id, item_id, sum(qty) q from public.wh_lines where line_type in ('BROKEN','WASTE','MATERIAL WASTE') and slip = 'R1' group by 1,2),
-     n as (select l.id, round(iss.issued - coalesce(used.used,0) - coalesce(oth.q,0)) calc, l.qty
-             from public.wh_lines l join public.wh_batches b on b.id = l.batch_id and b.process = 'PRODUCTION' and b.status = 'CLOSED'
-             join iss on iss.batch_id = l.batch_id and iss.item_id = l.item_id
-             left join used on used.batch_id = l.batch_id and used.item_id = l.item_id
-             left join oth on oth.batch_id = l.batch_id and oth.item_id = l.item_id
-            where l.line_type = 'BALANCE')
-update public.wh_lines l set calculated = n.calc, difference = l.qty - n.calc, reason = case when l.qty - n.calc <> 0 then l.reason end
-  from n where n.id = l.id and (l.calculated is distinct from n.calc);
-update public.wh_batches b set egg_diff = s.ed, mat_diff = s.md
-  from (select l.batch_id, sum(case when l.egg_pcs > 0 or i.item_type = 'RAW_EGG' then l.difference else 0 end) ed,
-               sum(case when i.item_type <> 'RAW_EGG' then l.difference else 0 end) md
-          from public.wh_lines l join public.items i on i.id = l.item_id where l.line_type = 'BALANCE' group by 1) s
- where s.batch_id = b.id and b.process = 'PRODUCTION' and b.status = 'CLOSED';
-select string_agg(batch_no || ' egg diff ' || egg_diff || ' mat diff ' || mat_diff, ' | ' order by id) from public.wh_batches where process = 'PRODUCTION' and status = 'CLOSED';
+create table if not exists public.customers_active_backup as select id, active, now() saved_at from public.customers where false;
+alter table public.customers_active_backup enable row level security;
+insert into public.customers_active_backup (id, active) select id, active from public.customers
+  where not exists (select 1 from public.customers_active_backup b where b.id = customers.id);
+
+create or replace function public.customer_last_visit() returns table (customer_id bigint, last_visit date)
+language sql stable security definer set search_path = public as $$
+  select c.id, greatest(s.last, b.last_visit, c.created_at::date, date '2026-11-01')
+    from public.customers c
+    left join (select customer_id, max(tran_date) last from public.sales_lines where tran_type = 'CR' and not cancelled and customer_id is not null group by 1) s on s.customer_id = c.id
+    left join public.customer_visit_base b on b.customer_id = c.id $$;
+
+create or replace function public.customers_visit_status() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare d date := (now() at time zone 'Asia/Dubai')::date;
+begin
+  update public.customers c set active = (v.last_visit >= d - 45), updated_at = now()
+    from public.customer_last_visit() v
+   where v.customer_id = c.id and c.active is distinct from (v.last_visit >= d - 45);
+  return null;
+end $$;
+revoke all on function public.customers_visit_status() from public, anon, authenticated;
+revoke all on function public.customer_last_visit() from public, anon;
+grant execute on function public.customer_last_visit() to authenticated;
+
+drop trigger if exists trg_customers_visit_status on public.sales_lines;
+create trigger trg_customers_visit_status after insert or update on public.sales_lines
+  for each statement execute function public.customers_visit_status();
+
+-- run once now
+do $$ begin perform 1; update public.customers c set active = (v.last_visit >= (now() at time zone 'Asia/Dubai')::date - 45)
+  from public.customer_last_visit() v where v.customer_id = c.id and c.active is distinct from (v.last_visit >= (now() at time zone 'Asia/Dubai')::date - 45); end $$;
+select count(*) filter (where active) || ' active, ' || count(*) filter (where not active) || ' inactive' as result from public.customers;
