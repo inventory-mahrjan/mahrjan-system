@@ -865,10 +865,11 @@ async function itradeZip(kind){
   const br = S.branches.find(b => b.id === S.br) || {}, site = br.code || 'MGAZ', tag = site === 'MGT' ? 'AJMAN' : 'ALQUOZ';
   const M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'], p = S.date.split('-'), day = p[2] + ' ' + M[+p[1]-1] + ' ' + p[0];
   const [days, st, sl] = await Promise.all([q(sb.from('van_day').select('id,salesman_id').eq('branch_id', S.br).eq('business_date', S.date)),
-    q(sb.from('staff').select('id,name,itrade_name').eq('branch_id', S.br)),
+    q(sb.from('staff').select('id,name,itrade_name,erp_user').eq('branch_id', S.br)),
     fetchAll(() => sb.from('sales_lines').select('salesman_id,itrade_user,item_id,tran_type,qty').eq('branch_id', S.br).eq('tran_date', S.date).eq('cancelled', false))]);
   const lines = days.length ? await byIds(kind === 'LOADING' ? 'loading_lines' : 'return_lines', '*', 'van_day_id', days.map(d => d.id)) : [];
-  const own = (r, s) => !r.itrade_user || !s.itrade_name || r.itrade_user.trim().toUpperCase() === s.itrade_name.trim().toUpperCase();
+  // the salesman's own invoice: iTrade user = his name, Sales Executive (ERP) name or ERP user - same rule as the reports
+  const own = (r, s) => { const u = String(r.itrade_user || '').trim().toUpperCase(); return !u || !s.itrade_name || [s.name, s.itrade_name, s.erp_user].some(n => n && String(n).trim().toUpperCase() === u); };
   const code = it => it.barcode || it.itrade_code, files = [];
   st.forEach(s => {
     const dm = days.filter(d => d.salesman_id === s.id).map(d => d.id), q1 = {};
