@@ -8,6 +8,7 @@ create table if not exists public.cash_opening (
 alter table public.cash_opening enable row level security;
 drop policy if exists read_cash_opening on public.cash_opening;
 create policy read_cash_opening on public.cash_opening for select to authenticated using (can_branch(branch_id));
+grant select on public.cash_opening to authenticated;
 create or replace function public.save_cash_opening(p_branch int, p_date date, p_amount numeric) returns void
 language plpgsql security definer set search_path = public as $$
 begin
