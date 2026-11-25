@@ -1378,7 +1378,7 @@ async function vPetty(){ const __t = S.nav;
   const draw = () => {
     const tin = lines.filter(l => pdir(l.line_type) > 0).reduce((a,l) => a + num(l.amount), 0), tout = lines.filter(l => pdir(l.line_type) < 0).reduce((a,l) => a + num(l.amount), 0);
     if (__t !== S.nav) return; $('#v').innerHTML = `<div class="pills noprint" style="margin-bottom:10px"><button class="on">Day</button><button id="toPer">Period</button></div>
-      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3><div class="row noprint" style="margin:0"><button id="csx">Download Excel</button><button id="csp">Print / Save PDF</button></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3><div class="row noprint" style="margin:0"><button id="csx">Download Excel</button></div></div>
       <div id="csBody">${sheetHtml(false)}</div></div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${E ? '<div class="row noprint" style="margin:0"><button class="p" id="sv">Save day</button></div>' : ''}</div>
       ${E ? `<div class="cbnew noprint"><select id="nT">${PT.map(([k,lb]) => `<option value="${k}" ${k===(S.cbT||'PAYMENT')?'selected':''}>${lb}</option>`).join('')}</select><input id="nR" placeholder="Ref"><input id="nP" placeholder="Particulars" list="sus"><input id="nN" placeholder="Narration" list="nts"><input id="nD" type="date" title="For date (bank deposit)" ${(S.cbT||'PAYMENT')==='DEPOSIT'?'':'disabled'}><input id="nA" placeholder="Amount" inputmode="decimal" style="text-align:right"><button class="p" id="nAdd">+ Add</button></div>` : ''}
@@ -1392,7 +1392,7 @@ async function vPetty(){ const __t = S.nav;
         <datalist id="sus">${openSus.map(o => `<option value="${esc(o.party)}">`).join('')}</datalist><datalist id="nts"><option value="Food allowance"><option value="Travel allowance"></datalist>
         <p class="muted" style="margin:8px 0 0">After <b>Save day</b> the receipts, payments, bank deposits and suspense in the cash sheet above update.</p></div>`;
     $('#toPer').onclick = () => { S.csTab = 'period'; vPetty(); };
-    $('#csx').onclick = excel; $('#csp').onclick = printIt;
+    $('#csx').onclick = excel;
     if (!E) return;
     const reCash = () => { $('#csBody').innerHTML = sheetHtml(false); bindSheet(); };
     const bindSheet = () => {
