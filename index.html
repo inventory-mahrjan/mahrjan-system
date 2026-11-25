@@ -292,7 +292,7 @@ function tabsFor(){
   return t;
 }
 
-const ONE_CO = ['wh','ite','pc','se','wo','qs','whr','dd','sri'];   // pages that work for one company at a time
+const ONE_CO = ['wh','ite','pc','se','wo','qs','whr','dd','sri','ds'];   // pages that work for one company at a time
 function render(){
   // one-company page while 'Both' is ticked: switch to Al Quoz for it, and go back to Both on the next page that takes both
   if (S.brs.length > 1 && ONE_CO.includes(S.tab)) { const aq = (S.branches.find(b => b.code === 'MGAZ') || S.branches[0]).id; S.brsAuto = S.brs; S.brs = [aq]; S.br = aq; S.dayId = null; S.lsm = null; S.rsm = null; }
