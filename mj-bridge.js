@@ -226,9 +226,7 @@
     Object.keys(D.exps).forEach(function (s) { var at = vans.indexOf(up(s)), b = row(at > -1 ? order[at] : s);
       D.exps[s].forEach(function (e) { var c = expCol_(e.type); b[c] += e.amount; if (EXP_COLS.indexOf(c) < 0) F.payments.push({ ref: e.ref || '', part: payPart_(at > -1 ? order[at] : s, c, e), amount: e.amount }); }); });
     Object.keys(D.cols).forEach(function (s) { D.cols[s].forEach(function (c) { if (c.mode === 'CHEQUE') { F.cheques += c.amount; return; } F.receipts.push({ ref: invTail_(c.invoice) || c.invoice, part: s + ' — ' + c.customer, amount: c.amount }); }); });
-    D.office.forEach(function (p) {
-      if (p.type === 'RECEIPT') F.receipts.push({ ref: p.ref, part: 'PETTY CASH — ' + p.party + (p.note ? ' — ' + p.note : ''), amount: p.amount });
-      else if (p.type === 'PAYMENT' || p.type === 'FOOD ALLOWANCE' || p.type === 'TRAVEL ALLOWANCE') F.payments.push({ ref: p.ref, part: 'PETTY CASH — ' + (p.type === 'PAYMENT' ? '' : p.type + ' — ') + p.party + (p.note ? ' — ' + p.note : ''), amount: p.amount }); });
+    /* petty cash receipts / payments are not shown in the cash sheet (kept in the Petty cash report) */
     var c2 = await sb();
     var sus = await q(c2.from('petty_cash').select('entry_date,line_type,party,amount').eq('branch_id', m.br.id).in('line_type', ['SUSPENSE', 'SUSPENSE CLEARED']).lte('entry_date', D.date)).catch(function () { return []; });
     var by = {}, list = []; sus.forEach(function (r) { var nm = up(r.party) || 'UNNAMED', b = by[nm]; if (!b) { b = by[nm] = { name: nm, given: 0, cleared: 0, before: 0, today: false }; list.push(b); }
