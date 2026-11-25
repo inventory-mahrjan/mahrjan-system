@@ -28,10 +28,13 @@
 
   // ---------- Supabase ----------
   var sbP = null;
+  /* supabase library is kept in the site (vendor/) so a CDN outage cannot stop sign-in; CDN only as fallback */
+  var SB_LIB = (function () { try { return new URL('vendor/supabase-2.119.2.esm.js', (document.currentScript && document.currentScript.src) || location.href).href; } catch (e) { return 'vendor/supabase-2.119.2.esm.js'; } })();
+  function sbLib() { return import(SB_LIB).catch(function () { return import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'); }); }
   /* each install has its own device id; the database only lets salesmen and supervisors work from approved devices */
   function devId() { var v = ''; try { v = localStorage.getItem('mj-device') || ''; if (!v) { v = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(16) + Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2)).replace(/-/g, ''); localStorage.setItem('mj-device', v); } } catch (e) {} return v; }
   function devLabel() { var u = navigator.userAgent || '', m = u.match(/Android[^;]*;\s*([^;)]+)/); return (m ? m[1] : (u.match(/\(([^;)]+)/) || [])[1] || 'Device').trim().slice(0, 120); }
-  function sb() { if (!sbP) sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.MJ_AUTH_KEY || 'mj-app-auth' }, global: { headers: { 'x-mj-device': devId() } } }); }); return sbP; }
+  function sb() { if (!sbP) sbP = sbLib().then(function (m) { return m.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.MJ_AUTH_KEY || 'mj-app-auth' }, global: { headers: { 'x-mj-device': devId() } } }); }); return sbP; }
   async function q(p) { var r = await p; if (r.error) throw new Error(r.error.message); return r.data; }
   async function rpc(fn, args) { var c = await sb(); return q(c.rpc(fn, args)); }
   window.MJ_SB = sb;   // the app's Stock count screen uses the same signed-in client
@@ -485,7 +488,7 @@
   }
 
   // ---------- read-only test hook (?mjdebug=1): reuse the portal's signed-in session ----------
-  if (/[?&]mjdebug=1/.test(location.search)) window.MJ_DEBUG = { doGet: doGet, portalCall: function (f, a) { return portalCall(f, a); }, usePortalSession: function () { sbP = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function (m) { return m.createClient(SB_URL, SB_KEY); }); ME = null; } };
+  if (/[?&]mjdebug=1/.test(location.search)) window.MJ_DEBUG = { doGet: doGet, portalCall: function (f, a) { return portalCall(f, a); }, usePortalSession: function () { sbP = sbLib().then(function (m) { return m.createClient(SB_URL, SB_KEY); }); ME = null; } };
 
 
   // =====================================================================
