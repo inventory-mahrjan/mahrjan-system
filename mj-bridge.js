@@ -528,9 +528,11 @@
       receipts: F.receipts.map(function (x) { return [ref(x.ref), x.part, r2(x.amount)]; }), payments: F.payments.map(function (x) { return [ref(x.ref), x.part, r2(x.amount)]; }),
       suspense: (F.suspense || []).filter(function (x) { return Math.abs(x.given - x.cleared) > 0.004; }).map(function (x) { return [x.name, r2(x.given - x.cleared)]; }) }; }
   // PICKING SHEET: items down, salesmen across (only those who raised a requirement), then who has not entered.
-  function picking_(m, reqs) { var R = {}, items = readItems(m), men = [], pending = [];
+  function picking_(m, reqs, lt) { var R = {}, items = readItems(m), men = [], pending = [];
     Object.keys(reqs).forEach(function (k) { R[up(k)] = reqs[k]; });
     readRoute(m).forEach(function (r) { var x = R[up(r.salesman)] || {}; if (Object.keys(x).some(function (k) { return x[k] > 0; })) men.push(r.salesman); else pending.push(r.salesman); });
+    // salesman columns in order of the previous day's loading time (earliest first); no loading time -> route order, after them
+    if (lt) { var ri = {}; men.forEach(function (sm, i) { ri[sm] = i; }); men.sort(function (a, b) { var x = lt[up(a)], y = lt[up(b)]; return (x && y ? (x < y ? -1 : x > y ? 1 : 0) : x ? -1 : y ? 1 : 0) || ri[a] - ri[b]; }); }
     var byKey = {}; items.forEach(function (it) { [it.shortName, it.name, it.code].forEach(function (k) { if (k && !byKey[up(k)]) byKey[up(k)] = it; }); });
     var lines = {}, order = [];
     men.forEach(function (sm) { var x = R[up(sm)] || {}; Object.keys(x).forEach(function (h) { var qn = Number(x[h]) || 0; if (qn <= 0) return; var it = byKey[up(h)], key = it ? 'C' + it.code : 'H' + up(h);
@@ -548,7 +550,11 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) throw new Error('Choose a valid report date.');
     var m = await masters(PU);
     if (name !== 'CASH SHEET' && name !== 'PICKING SHEET' && !readRoute(m).some(function (r) { return up(r.salesman) === up(sm); })) throw new Error('Choose a salesman from the route table.');
-    if (name === 'PICKING SHEET') { var pk = picking_(m, await readReqs(m, date)), po = new Sheet_(pk.w); pk.fill(po);
+    if (name === 'PICKING SHEET') { var lt = null;
+      try { var vd = await q((await sb()).from('van_day').select('salesman_id,business_date,load_time').eq('branch_id', m.br.id).gte('business_date', dayShift_(date, -7)).lt('business_date', date).not('load_time', 'is', null));
+        var last = vd.reduce(function (a, d) { return d.business_date > a ? d.business_date : a; }, '');   // previous loading day (skips a Sunday / holiday)
+        if (last) { lt = {}; vd.filter(function (d) { return d.business_date === last; }).forEach(function (d) { var st = m.staffById[d.salesman_id]; if (st) lt[up(st.name)] = String(d.load_time).slice(0, 5); }); } } catch (e) { lt = null; }
+      var pk = picking_(m, await readReqs(m, date), lt), po = new Sheet_(pk.w); pk.fill(po);
       return { ok: true, name: name, date: date, salesman: '', rows: po.rows, head: po.head, bold: po.bold, money: po.money, segs: po.segs, titles: po.titles, sign: po.sign, position: null, cash: null }; }
     var D = await dayData(m, date), o = new Sheet_(name === 'SALESMAN SUMMARY' ? 12 : name === 'CASH SHEET' ? 10 : 15), pos = null, cx = null;
     if (name === 'LOADING SHEET') await loadingSheet_(o, m, D, sm, await readReqs(m, date));
