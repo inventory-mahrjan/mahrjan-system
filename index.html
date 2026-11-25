@@ -1380,7 +1380,8 @@ async function vPetty(){ const __t = S.nav;
     if (__t !== S.nav) return; $('#v').innerHTML = `<div class="pills noprint" style="margin-bottom:10px"><button class="on">Day</button><button id="toPer">Period</button></div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3><div class="row noprint" style="margin:0"><button id="csx">Download Excel</button><button id="csp">Print / Save PDF</button></div></div>
       <div id="csBody">${sheetHtml(false)}</div></div>
-      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${E ? '<div class="row noprint" style="margin:0"><button id="add">Add line</button><button class="p" id="sv">Save day</button></div>' : ''}</div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${E ? '<div class="row noprint" style="margin:0"><button class="p" id="sv">Save day</button></div>' : ''}</div>
+      ${E ? `<div class="cbnew noprint"><select id="nT">${PT.map(([k,lb]) => `<option value="${k}" ${k===(S.cbT||'PAYMENT')?'selected':''}>${lb}</option>`).join('')}</select><input id="nR" placeholder="Ref"><input id="nP" placeholder="Particulars" list="sus"><input id="nN" placeholder="Narration" list="nts"><input id="nD" type="date" title="For date (bank deposit)" ${(S.cbT||'PAYMENT')==='DEPOSIT'?'':'disabled'}><input id="nA" placeholder="Amount" inputmode="decimal" style="text-align:right"><button class="p" id="nAdd">+ Add</button></div>` : ''}
       <div class="tw"><table><tr><th>#</th><th class="l">Type</th><th class="l">Ref</th><th class="l">Particulars</th><th class="l">Narration</th><th>For date</th><th>In</th><th>Out</th>${E ? '<th class="noprint"></th>' : ''}</tr>
         ${lines.map((l,i) => E ? `<tr data-i="${i}"><td>${i+1}</td><td class="l"><select data-k="line_type">${PT.map(([k,lb]) => `<option value="${k}" ${k===l.line_type?'selected':''}>${lb}</option>`).join('')}</select></td>
           <td class="l"><input data-k="ref" value="${esc(l.ref)}" style="width:90px"></td><td class="l"><input data-k="party" value="${esc(l.party)}" list="sus" style="width:180px"></td><td class="l"><input data-k="note" value="${esc(l.note)}" list="nts" style="width:180px"></td>
@@ -1408,7 +1409,11 @@ async function vPetty(){ const __t = S.nav;
     bindSheet();
     $('#v').querySelectorAll('tr[data-i]').forEach(tr => tr.onchange = e => { const k = e.target.dataset.k; if (!k) return; lines[+tr.dataset.i][k] = k === 'amount' ? num(e.target.value) : e.target.value; if (k === 'line_type' || k === 'amount') draw(); });
     $('#v').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { lines.splice(+b.dataset.x, 1); draw(); });
-    $('#add').onclick = () => { lines.push({ line_type:'PAYMENT', ref:'', party:'', note:'', for_date:'', amount:0 }); draw(); };
+    // new line is typed in the box above the table, then + Add (Enter also adds); it goes to the table, Save day saves the day
+    $('#nT').onchange = e => { S.cbT = e.target.value; $('#nD').disabled = e.target.value !== 'DEPOSIT'; };
+    const addNew = () => { const party = $('#nP').value.trim(), amount = num($('#nA').value); if (!party || amount <= 0) return toast('Particulars and amount are needed', false);
+      lines.push({ line_type:$('#nT').value, ref:$('#nR').value.trim(), party, note:$('#nN').value.trim(), for_date:$('#nT').value === 'DEPOSIT' ? $('#nD').value : '', amount }); draw(); $('#nP').focus(); toast('Line added · click Save day to save'); };
+    $('#nAdd').onclick = addNew; ['nR','nP','nN','nA'].forEach(id => $('#' + id).onkeydown = e => { if (e.key === 'Enter') addNew(); });
     $('#sv').onclick = async () => { const bad = lines.findIndex(l => !l.party.trim() || num(l.amount) <= 0); if (bad > -1) return toast(`Line ${bad+1}: particulars and amount are needed`, false);
       try { await rpc('save_petty_cash', { p_branch:S.br, p_date:S.date, p_lines:lines.map(l => ({ ...l, for_date:l.line_type === 'DEPOSIT' ? l.for_date : '' })) }); toast('Cash book saved'); vPetty(); } catch (e) { toast(e.message, false); } };
   };
@@ -1416,6 +1421,7 @@ async function vPetty(){ const __t = S.nav;
 }
 const CS_CSS = `.csg{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}.csh{background:#1B4332;color:#fff;font-weight:700;text-align:center;padding:5px;font-size:12px;letter-spacing:.04em}
   table.cst{width:100%;border-collapse:collapse;font-size:12px}table.cst th{background:#e8efe9;font-weight:700;padding:5px 6px;border:1px solid #cfd6d1;white-space:nowrap}table.cst td{padding:4px 6px;border:1px solid #dde2de;text-align:right;font-variant-numeric:tabular-nums}
+  .cbnew{display:grid;grid-template-columns:150px 90px minmax(0,1.4fr) minmax(0,1.2fr) 150px 120px auto;gap:8px;margin:10px 0;padding:10px;background:#f3f6f4;border:1px solid #dde2de;border-radius:8px}.cbnew input,.cbnew select{width:100%;min-width:0}
   table.cst td.l,table.cst th.l{text-align:left}table.cst tr.tot td{font-weight:700;background:#f3f6f4}table.cst td.q{background:#fff6d6}.csin{width:100%;text-align:right;padding:4px 6px}.cshint{font-size:10px;color:#9a6b1d;text-align:right}`;
 document.head.insertAdjacentHTML('beforeend', `<style>${CS_CSS} @media (max-width:1100px){.csg{grid-template-columns:1fr}}</style>`);
 // period view: cash book lines, deposits, suspense and counted cash across dates
