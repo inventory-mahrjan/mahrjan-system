@@ -1,4 +1,4 @@
-const CACHE = 'mahrjan-new-38';
+const CACHE = 'mahrjan-new-39';
 const ASSETS = ['./', './index-app.html', './app.html', './manifest.json', './mj-bridge.js', './mj-stockcount.js', './mj-datefmt.js', './mj-anim.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(ASSETS.map(a => c.add(a).catch(() => null)))).then(() => self.skipWaiting()));
