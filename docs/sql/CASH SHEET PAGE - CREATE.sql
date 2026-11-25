@@ -67,5 +67,6 @@ begin
     from jsonb_array_elements(coalesce(p_lines,'[]')) with ordinality t(x, o);
   get diagnostics n = row_count; return n;
 end $$;
+grant select on public.cash_count, public.cash_count_total, public.cash_opening to authenticated;
 notify pgrst, 'reload schema';
 select 'ok' as result;
