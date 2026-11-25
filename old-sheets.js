@@ -301,7 +301,8 @@ window.MobileReport = {fmtDate(v){return new Date(v+'T00:00:00').toLocaleDateStr
      // Stored copy is out of date: show it at once (print greyed out), build the fresh one in the background and swap it in.
      if(d.stale){const f=await MJ_SHEET_CTX.report(type,day,(type==='CASH SHEET'||type==='MONTHLY CLOSING'||type==='PICKING SHEET')?'':man,true);if(id!==ticket)return;if(f&&f.ok){selected=f;draw();}}}catch(err){if(id!==ticket)return;busy=false;draw();h.querySelector('#mobileReportResult').textContent=err.message||'Could not load report.';}};
    h.querySelector('#showMobileReport').onclick=()=>runRep(false);
-   {const co=h.querySelector('#cashOpen');if(co)co.onchange=async()=>{try{co.disabled=true;await MJ_SHEET_CTX.setOpening(day,co.value);runRep(true);}catch(err){co.disabled=false;alert(err.message||'Could not save the opening balance.');}};}{const fb=h.querySelector('#mobileFresh');if(fb)fb.onclick=()=>runRep(true);}
+   {const co=h.querySelector('#cashOpen');if(co&&co.value===''&&MJ_SHEET_CTX.getOpening){const d0=day;MJ_SHEET_CTX.getOpening(d0).then(v=>{if(v!=null&&d0===day&&co.value==='')co.value=v;}).catch(()=>{});}   // saved opening shows as soon as the date is picked; still editable
+    if(co)co.onchange=async()=>{try{co.disabled=true;await MJ_SHEET_CTX.setOpening(day,co.value);runRep(true);}catch(err){co.disabled=false;alert(err.message||'Could not save the opening balance.');}};}{const fb=h.querySelector('#mobileFresh');if(fb)fb.onclick=()=>runRep(true);}
    if(selected){
      h.querySelector('#mobilePrint').onclick=()=>MobileReport.openPrint_((selected.parts||[selected]).map(p=>MobileReport.reportPage_(p)),MobileReport.pdfName_(selected));
      // Save PDF: same A4 pages; the print window carries the file name, so "Save as PDF" suggests SALESMAN_REPORT_DATE.

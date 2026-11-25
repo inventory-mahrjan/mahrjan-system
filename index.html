@@ -193,7 +193,7 @@
 <script>/* loading % : counts database requests in flight; bar on top + "Loading… NN%" */
 (function(){var S=0,D=0,P=0,bar,lab,t;function ui(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#1B4332;z-index:9999;transition:width .2s;width:0';lab=document.createElement('div');lab.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#1B4332;color:#fff;font:600 12px system-ui;padding:3px 9px;border-radius:10px';document.body.appendChild(bar);document.body.appendChild(lab);}var on=S>D;bar.style.width=(on?P:100)+'%';bar.style.opacity=lab.style.opacity=on?1:0;lab.textContent='Loading… '+P+'%';document.querySelectorAll('.mjpct').forEach(function(e){e.textContent=P+'%';});}
 function step(){P=Math.max(P,Math.min(99,Math.round(D/Math.max(S,1)*100)));if(S===D){P=100;clearTimeout(t);t=setTimeout(function(){if(S===D){S=D=P=0;}},400);}if(document.body)ui();}
-var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=25"></script><script src="old-sheets.js?v=7"></script><script src="old-views.js?v=9"></script>
+var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=25"></script><script src="old-sheets.js?v=8"></script><script src="old-views.js?v=9"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -1142,6 +1142,7 @@ async function vSheets(){ const __t = S.nav;
     },
     // opening cash balance on the cash sheet: admin / accountant, one company at a time
     canOpen: () => ['ADMIN', 'ACCOUNTANT'].includes(S.me.role) && S.brs.length === 1,
+    getOpening: async day => { const r = await q(sb.from('cash_opening').select('amount').eq('branch_id', S.brs[0]).eq('open_date', day)); return r.length ? Number(r[0].amount) : null; },
     setOpening: async (day, v) => { const a = String(v).trim() === '' ? null : Number(v); if (a != null && !isFinite(a)) throw new Error('Enter a number.');
       const { error } = await sb.rpc('save_cash_opening', { p_branch: S.brs[0], p_date: day, p_amount: a }); if (error) throw error; }
   };
