@@ -81,7 +81,7 @@ window.QtySalesView=(()=>{let host,men=null,sm='',from='',to='',data=null,busy=f
    function tbl(s){return '<h3 style="margin:18px 0 8px;font-size:14px">'+escH(s.h)+'</h3><div class="table-scroll"><table><tbody>'+s.rows.map((r,ri)=>{const b=s.bold.includes(ri);return '<tr'+(b?' style="background:#f6f7f5"':'')+'>'+r.map((v,i)=>'<td style="'+(i?'text-align:right;':'')+(b?'font-weight:700':'')+'">'+escH(v)+'</td>').join('')+'</tr>';}).join('')
      +'<tr style="background:#12261a;color:#fff">'+s.total.map((v,i)=>'<td style="font-weight:700'+(i?';text-align:right':'')+'">'+escH(v)+'</td>').join('')+'</tr></tbody></table></div>';}
    function draw(){const h=el();h.hidden=false;
-     h.innerHTML='<div class="section-head"><div><h2>Salesman sales qty</h2><p>By salesman · live · sales net of GRV · raw egg not included · Ctn = pcs ÷ PCS IN CTN.</p></div></div>'
+     h.innerHTML='<div class="section-head"><div><h2>Salesman sales qty</h2><p>By salesman · live · sales net of GRV · raw egg not included · Ctn = raw egg cartons (pcs × eggs per pack ÷ raw egg pcs per carton).</p></div></div>'
       +'<form id="qsForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end;margin:14px 0 12px">'
       +'<label style="display:grid;gap:4px">Salesman<select name="sm" style="'+rvInp+'"><option value="">All salesmen</option>'+(men||[]).map(n=>'<option'+(n===sm?' selected':'')+'>'+escH(n)+'</option>').join('')+'</select></label>'
       +'<label style="display:grid;gap:4px">From<input name="from" type="date" value="'+escH(from)+'" style="'+rvInp+'"></label><label style="display:grid;gap:4px">To<input name="to" type="date" value="'+escH(to)+'" style="'+rvInp+'"></label>'

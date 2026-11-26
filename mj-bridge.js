@@ -779,7 +779,9 @@
     var L = await perDay(from, to, function (d) { return c.from('sales_lines').select('item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive,warehouse').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
     var list = [], seen = {}, noC = {};
     m.items.filter(function (it) { return it.item_type === 'FG' && m.code(it); }).sort(function (a, b) { return (a.display_order || 1e9) - (b.display_order || 1e9); }).forEach(function (it) {
-      var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
+      // CTN = raw egg cartons: packs × eggs per pack ÷ the raw egg's pcs per carton (e.g. KHALEEJ 6: 6 eggs, raw 360 per carton → 60 packs per carton)
+      var egg = (m.bom || []).filter(function (x) { return x.fg_item_id === it.id && x.item_type === 'RAW_EGG'; })[0], rw = egg && m.itemById[egg.item_id], rpc = egg && rw && num(egg.per_pack) > 0 && num(rw.pcs_per_carton) > 0 ? num(rw.pcs_per_carton) / num(egg.per_pack) : 0;
+      var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: rpc || it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
     var U = up(sm || ''), men = {}, allQ = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
     L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
       var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
