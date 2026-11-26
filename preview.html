@@ -87,7 +87,7 @@
     .fly{left:0;right:0;top:auto;bottom:0;width:auto;max-height:75vh;border-radius:18px 18px 0 0;transform:translateY(110%);padding-bottom:84px;z-index:41}
     .fly nav button{font-size:15px;padding:12px 12px}
     .flyshade{z-index:40}
-    .bbar{display:flex;position:fixed;left:0;right:0;bottom:0;height:66px;background:var(--accent);z-index:42;justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom)}
+    .bbar{display:flex;flex-direction:row;gap:0;position:fixed;left:0;right:0;bottom:0;height:66px;background:var(--accent);z-index:42;justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom)}
     .bbar button{width:auto!important;border:0;background:none!important;color:#cfe0d7;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;padding:6px 4px;min-width:60px}.bbar button.on{color:#F2C94C} .bbar button::before{display:none} .bbar button:hover{padding-left:4px}
     main{margin:0;padding:16px 14px 88px} main>header h1{font-size:22px} button,input,select{min-height:40px}.login-wrap{grid-template-columns:1fr}.login-side{display:none}
   }
@@ -1103,7 +1103,8 @@ async function ovTop(__t){
   const t5 = x => String(x || '').slice(0, 5), ev = [];
   vd.filter(d => d.business_date === td).forEach(d => { if (d.load_time) ev.push([t5(d.load_time), 'BOARD', nm(d.salesman_id) + ' loaded']); if (d.unload_time) ev.push([t5(d.unload_time), 'RETURN', nm(d.salesman_id) + ' returned']); });
   const dt = x => x ? new Date(new Date(x).getTime() + 4 * 3600000).toISOString().slice(11, 16) : '';
-  wb.filter(b => b.work_date >= addDays(td, -1)).forEach(b => { if (b.issued_at && b.issued_at.slice(0, 10) >= addDays(td, -1)) ev.push([dt(b.issued_at), b.process === 'CLEANING' ? 'CLEANING' : 'PRODUCTION', b.batch_no + ' issued']); if (b.returned_at) ev.push([dt(b.returned_at), 'RETURN', b.batch_no + ' returned']); });
+  const isTd = x => x && new Date(new Date(x).getTime() + 4 * 3600000).toISOString().slice(0, 10) === td;
+  wb.forEach(b => { if (isTd(b.issued_at)) ev.push([dt(b.issued_at), b.process === 'CLEANING' ? 'CLEANING' : 'PRODUCTION', b.batch_no + ' issued']); if (isTd(b.returned_at)) ev.push([dt(b.returned_at), 'RETURN', b.batch_no + ' returned']); });
   em.forEach(e => ev.push([dt(e.sent_at), 'EMAIL', e.report.replace(/_/g, ' ').toLowerCase() + ' ' + String(e.status || '').toLowerCase()]));
   ev.sort((a, b) => a[0] < b[0] ? 1 : -1);
   const QR = [['ds','Daily sheets'],['se','Short & excess'],['wo','FOC & write-offs'],['qs','Qty by salesman'],['pc','Cash sheet'],['sa','Sales analysis']].filter(([k]) => tabsFor().some(t => t[0] === k));
