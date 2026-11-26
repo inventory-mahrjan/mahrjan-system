@@ -1,13 +1,15 @@
--- GRANTS CLEANUP 3: remove table rights the portal / app never use.
--- New tables were getting TRUNCATE / TRIGGER / REFERENCES for anon and authenticated (Supabase default).
--- Safety-copy tables (*_backup) get no access at all from logins. Future tables no longer get anon rights.
-do $$ declare r record; begin
-  for r in select relname from pg_class where relnamespace='public'::regnamespace and relkind in ('r','p') loop
-    execute format('revoke truncate, trigger, references on public.%I from anon, authenticated', r.relname);
-    if r.relname like '%\_backup%' then
-      execute format('revoke all on public.%I from anon, authenticated', r.relname);
-    end if;
-  end loop;
+-- STAFF DESIGNATION - CREATE
+-- Job title shown under the name in the portal (e.g. Inventory Controller). The role (Admin, Accountant ...) still decides access.
+alter table public.staff add column if not exists designation text;
+update public.staff set designation = 'Inventory Controller' where upper(name) = 'MUSTHAFFIR' and designation is null;
+
+create or replace function public.admin_user_designation(p_id bigint, p_designation text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform public.require_role(array['ADMIN']);
+  update public.staff set designation = nullif(trim(coalesce(p_designation,'')),'') where id = p_id;
+  if not found then raise exception 'User not found.'; end if;
 end $$;
-alter default privileges for role postgres in schema public revoke all on tables from anon;
-alter default privileges for role postgres in schema public revoke truncate, trigger, references on tables from authenticated;
+revoke all on function public.admin_user_designation(bigint, text) from public, anon;
+grant execute on function public.admin_user_designation(bigint, text) to authenticated;
+notify pgrst, 'reload schema';

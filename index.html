@@ -314,7 +314,7 @@ function render(){
   $('#app').innerHTML = `
     <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
       <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
-      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(RN(S.me.role))} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
+      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.designation || RN(S.me.role))} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
     <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${OLDT.includes(S.tab) ? '' : SUB[S.tab]||''}</p></div>
       <div class="header-actions">${S.me.branch_id || NOCO.includes(S.tab) ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
         ${RANGE.has(S.tab) && !OLDT.includes(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}${S.tab === 'ds' || OLDT.includes(S.tab) || NODATE.includes(S.tab) ? '' : `<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label>`}</div></header>
@@ -1454,15 +1454,15 @@ async function vCashPeriod(){ const __t = S.nav;
 async function vStaff(){ const __t = S.nav;
   // Users (like the old portal's Users page): add, edit, disable, set or reset the password.
   loading(); let list;
-  try { list = await rpc('admin_user_list', {}); const erp = await q(sb.from('staff').select('id,erp_user,erp_warehouse')).catch(() => []); list.forEach(u => Object.assign(u, erp.find(x => x.id === u.id) || {})); }
+  try { list = await rpc('admin_user_list', {}); const erp = await q(sb.from('staff').select('id,erp_user,erp_warehouse,designation')).catch(() => []); list.forEach(u => Object.assign(u, erp.find(x => x.id === u.id) || {})); }
   catch (e) { if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="notice">The Users page is not installed in the database yet. Run <b>docs/sql/USER ADMIN - CREATE.sql</b> in the Supabase SQL editor once.</div><p class="muted">${esc(e.message||e)}</p></div>`; return; }
   const roles = ['ADMIN','ACCOUNTANT','RECEIVER','SALESMAN','VIEWER','PACKER'];
   const co = id => id == null ? 'Both' : (S.branches.find(b => b.id === id)?.code === 'MGT' ? 'Ajman' : 'Al Quoz');
   S.uq = S.uq || '';
-  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + RN(u.role) + ' ' + (u.username||'') + ' ' + (u.itrade_name||'') + ' ' + (u.erp_user||'') + ' ' + (u.erp_warehouse||'')).toUpperCase().includes(S.uq.toUpperCase()));
+  const shown = list.filter(u => !S.uq || (u.name + ' ' + u.role + ' ' + RN(u.role) + ' ' + (u.username||'') + ' ' + (u.itrade_name||'') + ' ' + (u.erp_user||'') + ' ' + (u.erp_warehouse||'') + ' ' + (u.designation||'')).toUpperCase().includes(S.uq.toUpperCase()));
   if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><div class="row" style="margin:0"><button class="p" id="addu">Add user</button><label>Search<input id="uq" value="${esc(S.uq)}" placeholder="Name, role…"></label></div>${tools()}</div>
-    <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th>Company</th><th class="l">ERP user</th><th class="l">Sales Executive (ERP)</th><th class="l">Warehouse (ERP)</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
-    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(RN(u.role))}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.erp_user||'')}</td><td class="l">${esc(u.itrade_name||'')}</td><td class="l">${esc(u.erp_warehouse||'')}</td>
+    <div class="tw"><table><tr><th class="l">Name</th><th class="l">Username</th><th>Role</th><th class="l">Designation</th><th>Company</th><th class="l">ERP user</th><th class="l">Sales Executive (ERP)</th><th class="l">Warehouse (ERP)</th><th>Login</th><th>Last sign-in</th><th>Active</th><th></th></tr>
+    ${shown.map(u => `<tr><td class="l">${esc(u.name)}</td><td class="l">${esc(u.username||'—')}</td><td>${esc(RN(u.role))}</td><td class="l">${esc(u.designation||'')}</td><td>${co(u.branch_id)}</td><td class="l">${esc(u.erp_user||'')}</td><td class="l">${esc(u.itrade_name||'')}</td><td class="l">${esc(u.erp_warehouse||'')}</td>
       <td>${u.role === 'PACKER' ? '—' : u.has_login ? 'Yes' : '<span class="bad">No</span>'}</td><td>${u.last_sign_in ? esc(new Date(u.last_sign_in).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : ''}</td>
       <td>${u.active ? 'Yes' : '<span class="bad">Disabled</span>'}</td><td><button data-ed="${u.id}">Edit</button></td></tr>`).join('')}</table></div>
     <p class="muted" style="margin-top:8px">Username = name in small letters without spaces. The same username and password work in the app and the portal. Disabled users cannot sign in.</p></div>`;
@@ -1470,7 +1470,7 @@ async function vStaff(){ const __t = S.nav;
   $('#uq').oninput = e => { S.uq = e.target.value; const c = e.target.selectionStart; vStaff().then(() => { const i = $('#uq'); if (i) { i.focus(); i.setSelectionRange(c, c); } }); };
   $('#addu').onclick = () => userDialog(null);
   $('#v').querySelectorAll('[data-ed]').forEach(b => b.onclick = () => userDialog(list.find(u => u.id === +b.dataset.ed)));
-  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{l:'Role',f:u=>RN(u.role)},{l:'Company',f:u=>co(u.branch_id)},{k:'erp_user',l:'ERP user'},{k:'itrade_name',l:'Sales Executive (ERP)'},{k:'erp_warehouse',l:'Warehouse (ERP)'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
+  bindTools('Users', [['Users', [{k:'name',l:'Name'},{k:'username',l:'Username'},{l:'Role',f:u=>RN(u.role)},{k:'designation',l:'Designation'},{l:'Company',f:u=>co(u.branch_id)},{k:'erp_user',l:'ERP user'},{k:'itrade_name',l:'Sales Executive (ERP)'},{k:'erp_warehouse',l:'Warehouse (ERP)'},{k:'email',l:'Email'},{l:'Login',f:u=>u.has_login?'Yes':'No'},{l:'Active',f:u=>u.active?'Yes':'No'}], list]]);
 
   async function vDevices(list, __t){
     const D = await q(sb.from('app_devices').select('*').order('last_seen', { ascending:false })).catch(() => null); if (!D || __t !== S.nav) return;
@@ -1495,6 +1495,7 @@ async function vStaff(){ const __t = S.nav;
     d.innerHTML = `<form method="dialog"><h3 style="margin-top:0">${u ? 'Edit user · ' + esc(u.name) : 'Add user'}</h3>
       <label>Name<input name="name" required value="${esc(u?.name||'')}" autocomplete="off"></label>
       <label>Role<select name="role">${roles.map(r => `<option value="${r}" ${r===(u?.role||'SALESMAN')?'selected':''}>${RN(r)}</option>`).join('')}</select></label>
+      <label>Designation<input name="desig" value="${esc(u?.designation||'')}" placeholder="Inventory Controller" autocomplete="off"></label>
       <label>Company<select name="br"><option value="">Both</option>${S.branches.slice().sort((x,y)=>x.code==='MGAZ'?-1:1).map(b => `<option value="${b.id}" ${(u ? u.branch_id===b.id : b.id===S.br)?'selected':''}>${co(b.id)}</option>`).join('')}</select></label>
       <label class="itr">Salesman name (ERP user)<input name="erpu" value="${esc(u?.erp_user||'')}" autocomplete="off"></label>
       <label class="itr">Sales Executive (ERP)<input name="itrade" value="${esc(u?.itrade_name||'')}" autocomplete="off"></label>
@@ -1517,6 +1518,7 @@ async function vStaff(){ const __t = S.nav;
       ev.target.disabled = true;
       try { const r = await rpc('admin_user_save', { p_id: u ? u.id : null, p_name: f.name.value, p_role: f.role.value, p_branch: f.br.value ? +f.br.value : null,
           p_itrade: f.role.value === 'SALESMAN' ? f.itrade.value : (u?.itrade_name || ''), p_email: f.email.value, p_active: f.active.checked, p_password: f.role.value === 'PACKER' ? null : (f.pw.value || null) });
+        if ((f.desig.value || '') !== (u?.designation || '')) await rpc('admin_user_designation', { p_id: r.id, p_designation: f.desig.value });
         if (f.role.value === 'SALESMAN') await rpc('admin_user_erp', { p_id: r.id, p_erp_user: f.erpu.value, p_erp_warehouse: f.erpw.value });
         d.close(); d.remove(); toast((u ? 'Saved ' : 'Added ') + r.name + (r.username ? ' · username ' + r.username : ''));
         S.staff = await q(sb.from('staff').select('id,name,role,branch_id,active').order('name')); vStaff(); }
