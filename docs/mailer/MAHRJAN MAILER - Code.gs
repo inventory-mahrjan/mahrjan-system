@@ -191,7 +191,12 @@ function qtyGridHtml_(D, units, per) {
   var body = h1 + normal.map(line).join('') + (offer.length ? '<tr><th colspan="' + nmen + '">OFFER ITEMS</th></tr>' + offer.map(line).join('') : '');
   var title = '<div style="text-align:center;margin-bottom:6px"><div style="font-size:20px;font-weight:700;color:' + C_.green + '">MAHRJAN GENERAL TRADING LLC &mdash; ' + units.map(function (u) { return unitName_(u.unit); }).join(' &amp; ') + '</div>'
     + '<div style="font-size:15px;font-weight:700">DAILY SALES QTY</div><div style="font-size:12px;font-weight:700;font-style:italic">Date: ' + esc_(per) + '</div></div>';
-  return { html: doc_(title + '<table class="t" style="font-size:12px">' + body + '</table>', true) };
+  // one A4 landscape page like the old Daily Check mail: compact rows, full grid lines; shrink a little more when there are many items or salesmen
+  var rows = items.length + 6, cols = nmen, fs = rows > 34 || cols > 20 ? 10 : rows > 28 || cols > 17 ? 11 : 11.5, pd = rows > 34 ? 1.5 : rows > 28 ? 2 : 2.5;
+  var css = '<style>table.qg{table-layout:auto}table.qg th,table.qg td{font-size:' + fs + 'px;padding:' + pd + 'px 3px;border:1px solid ' + C_.line + ';line-height:1.15;white-space:nowrap}'
+    + 'table.qg th{border-bottom:1px solid ' + C_.dark + '}table.qg tr,table.qg{page-break-inside:avoid}</style>';
+  title = title.replace('margin-bottom:6px', 'margin-bottom:4px').replace('font-size:20px', 'font-size:18px').replace('font-size:15px', 'font-size:13px');
+  return { html: doc_(css + '<div style="page-break-inside:avoid">' + title + '<table class="t qg">' + body + '</table></div>', true) };
 }
 
 // ---------- 4. CUSTOMER VISIT STATUS (summary + one page per salesman) ----------
