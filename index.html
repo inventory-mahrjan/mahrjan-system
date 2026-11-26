@@ -24,6 +24,16 @@
   .row label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
   /* shell */
   .sidebar{width:232px;position:fixed;inset:0 auto 0 0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 14px 18px;overflow:auto}
+  .rail{width:84px;background:var(--accent);border:0;padding:14px 8px;align-items:center;gap:6px;z-index:30}
+  .raillogo{width:54px;height:54px;object-fit:contain;border-radius:12px;background:#fff;margin-bottom:12px}
+  .rg{width:68px;border:0;background:none;color:#cfe0d7;border-radius:12px;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+  .rg small{font-size:10.5px;line-height:1.1}.rg:hover{background:rgba(255,255,255,.08);color:#fff}.rg.on{background:rgba(255,255,255,.14);color:#fff;box-shadow:inset 3px 0 0 #F2C94C}
+  .rspace{flex:1}.ravatar{width:40px;height:40px;border-radius:50%;background:#F2C94C;color:#3a2a00;display:grid;place-items:center;font-weight:700;font-size:13px;margin:6px 0}
+  .fly{position:fixed;left:84px;top:0;bottom:0;width:240px;background:var(--surface);border-right:1px solid var(--line);box-shadow:8px 0 30px rgba(0,0,0,.08);transform:translateX(-110%);transition:transform .18s ease;z-index:25;display:flex;flex-direction:column;padding:18px 12px;overflow:auto}
+  .fly.open{transform:none}.flyh{padding:4px 10px 10px;font-size:15px}.fly nav button{font-size:14px;padding:9px 10px}
+  .flyshade{position:fixed;inset:0;background:rgba(0,0,0,.15);z-index:20;display:none}.flyshade.open{display:block}
+  .pgdd{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px}.pgdd span{font-size:.55em;color:var(--muted)}
+  .bbar{display:none}
   .brand{display:flex;flex-direction:column;gap:8px;padding:0 8px 10px;font-weight:600;font-size:15px}
   .brandlogo{height:46px;width:auto;max-width:100%;border-radius:7px;display:block;align-self:flex-start;object-fit:contain}
   .brand small{display:block;font-size:10.5px;font-weight:400;color:var(--muted);letter-spacing:.02em;margin-top:2px}
@@ -33,7 +43,7 @@
   nav button:hover{background:#f3f4f1} nav button.on{background:var(--soft);color:var(--accent-ink);font-weight:600}
   .sidebar-bottom{margin-top:auto;border-top:1px solid var(--line);padding:14px 8px 0;display:flex;flex-direction:column;gap:10px}
   .who{display:flex;flex-direction:column;gap:2px;font-size:13px} .who span{color:var(--muted);font-size:12px}
-  main{margin-left:232px;padding:32px 40px 40px;max-width:1500px;display:flex;flex-direction:column;gap:20px}
+  main{margin-left:84px;padding:28px 40px 40px;max-width:1660px;display:flex;flex-direction:column;gap:20px}
   .top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
   .top label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
   #v{display:flex;flex-direction:column;gap:20px}
@@ -50,7 +60,7 @@
   th+th,td+td{border-left:1px solid var(--line)}
   /* smaller laptop screens (or Windows display zoom 125%/150%): tables get tighter so they fit without side scrolling */
   @media screen and (max-width:1600px){#v table,#v #oldv table{font-size:12.5px} #v th,#v #oldv th{padding:7px 7px;white-space:normal;line-height:1.25} #v td,#v #oldv td{padding:6px 7px}}
-  @media screen and (max-width:1500px){#v table,#v #oldv table{font-size:12px} #v th,#v #oldv th{padding:6px 5px} #v td,#v #oldv td{padding:5px 5px} .sidebar{width:200px} main{margin-left:200px;padding:24px 24px 32px} }
+  @media screen and (max-width:1500px){#v table,#v #oldv table{font-size:12px} #v th,#v #oldv th{padding:6px 5px} #v td,#v #oldv td{padding:5px 5px}  main{margin-left:84px;padding:22px 24px 32px} }
   td.l,th.l{text-align:left}
   tbody tr:hover td,tr:hover td{background:#fafbf9}
   .st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;background:#eef0ec;color:#3c4442}
@@ -73,10 +83,13 @@
   .login-card label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--muted)}
   .login-card input,.login-card button{height:40px;width:100%}
   @media (max-width:900px){
-    .sidebar{position:static;width:auto;border-right:0;border-bottom:1px solid var(--line);padding:12px}
-    nav{flex-direction:row;flex-wrap:wrap}.navlabel{display:none}nav button{width:auto}
-    .sidebar-bottom{flex-direction:row;flex-wrap:wrap;align-items:center}
-    main{margin:0;padding:16px}.login-wrap{grid-template-columns:1fr}.login-side{display:none}
+    .rail{display:none}
+    .fly{left:0;right:0;top:auto;bottom:0;width:auto;max-height:75vh;border-radius:18px 18px 0 0;transform:translateY(110%);padding-bottom:84px;z-index:41}
+    .fly nav button{font-size:15px;padding:12px 12px}
+    .flyshade{z-index:40}
+    .bbar{display:flex;flex-direction:row;gap:0;position:fixed;left:0;right:0;bottom:0;height:66px;background:var(--accent);z-index:42;justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom)}
+    .bbar button{width:auto!important;border:0;background:none!important;color:#cfe0d7;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;padding:6px 4px;min-width:60px}.bbar button.on{color:#F2C94C} .bbar button::before{display:none} .bbar button:hover{padding-left:4px}
+    main{margin:0;padding:16px 14px 88px} main>header h1{font-size:22px} button,input,select{min-height:40px}.login-wrap{grid-template-columns:1fr}.login-side{display:none}
   }
   main>header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
   .eyebrow{font-size:11.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
@@ -87,6 +100,12 @@
   .card>.muted:first-of-type{margin-top:-10px}
   footer{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding-top:8px}
   .notice{font-size:13px;color:#5f5233;background:#faf6ea;border:1px solid #efe5c8;border-radius:8px;padding:10px 14px;line-height:1.5}
+  .ovtop{display:grid;grid-template-columns:1.1fr 1.2fr 1fr 1.3fr;gap:14px} @media(max-width:1300px){.ovtop{grid-template-columns:1fr 1fr}} @media(max-width:700px){.ovtop{grid-template-columns:1fr}}
+  .ovtop .card{padding:16px 18px} .ovtop h3{font-size:14px;margin:0 0 10px} .ovwel{display:flex;align-items:center;gap:14px}
+  .ovna{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line);cursor:pointer} .ovna:hover{color:var(--accent)} .ovna b.warn{color:var(--amb)}
+  .ovqr{display:grid;grid-template-columns:1fr 1fr;gap:8px} .ovqr button{font-size:12.5px;padding:8px;text-align:left}
+  .ovlog{font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.8} .ovlog i{font-style:normal;color:var(--muted);margin-right:8px} .ovlog b{font-weight:600;margin-right:4px}
+  .ovlog .kB{color:#1B4332}.ovlog .kR{color:#a8650f}.ovlog .kE{color:#1f4f86}.ovlog .kP,.ovlog .kC{color:#5b3c86}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px} @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
   .dbars{display:flex;align-items:flex-end;gap:4px;height:210px;padding-top:18px} .dbars>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0} .dbars i{display:block;width:70%;background:#1B4332;border-radius:3px 3px 0 0} .dbars i.z{background:#d8dad5} .dbars em{font-style:normal;font-size:9px;color:#6b7370;white-space:nowrap} .dbars b{font-size:10px;color:#6b7370;font-weight:500;margin-top:4px}
   .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
@@ -128,7 +147,7 @@
 #osh .report-filters button,#osh .report-type-tabs button{white-space:nowrap}
 #osh .section-head button{white-space:nowrap;flex:none}
 #osh .skel{display:block;background:linear-gradient(90deg,#eceeea 25%,#f6f7f4 37%,#eceeea 63%);background-size:400% 100%;animation:skel 1.3s ease infinite;border-radius:7px}
-  @media print{ @page{size:A4;margin:10mm} body{background:#fff} .sidebar,.header-actions,.noprint,footer,.msg,#xl,#pr{display:none!important}
+  @media print{ @page{size:A4;margin:10mm} body{background:#fff} .fly,.flyshade,.bbar,.sidebar,.header-actions,.noprint,footer,.msg,#xl,#pr{display:none!important}
     main{margin:0;padding:0;max-width:none;gap:10px} .card{border:0;padding:0} .sheet{break-after:page} .tw{overflow:visible;border:0;max-height:none!important}
     table{font-size:10.5px} th,td{padding:4px 6px} th{position:static;-webkit-print-color-adjust:exact;print-color-adjust:exact} input,select{border:0;padding:0}
     .printonly{display:block!important} main:has(.screp) > header{display:none!important} }
@@ -209,6 +228,7 @@ const $ = (s, el=document) => el.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g,'')); return isNaN(n) ? 0 : n; };
 const money = v => num(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtD = d => { const p = String(d || '').split('-'); return p.length === 3 ? p[2] + '-' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+p[1] - 1] + '-' + p[0] : String(d || ''); };
 const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n*864e5).toISOString().slice(0,10);
 function today(off=0){ const d=new Date(Date.now()+off*864e5); return d.toLocaleDateString('en-CA',{timeZone:'Asia/Dubai'}); }
 function toast(t, ok=true){ const m=document.createElement('div'); m.className='msg '+(ok?'ok':'er'); m.textContent=t; document.body.appendChild(m); setTimeout(()=>m.remove(), ok?2500:6000); }
@@ -309,19 +329,35 @@ function render(){
     se:'Van stock variance per salesman and item for a date range.', wo:'Damage, expiry, waste and FOC per salesman and item.', qs:'Net sales qty per salesman and item, in cartons or packs.',
     sa:'Salesman, customer, item and invoice-wise sales with drill-down.', lr:'Load, sale, return and short / excess for the period.', vl:'KM, temperature, load and unload times per van day.',
     co:'Customer collections by salesman and payment mode.', ex:'Route expenses by type and salesman.', em:'Who gets which scheduled email, and what was sent.', set:'Rates used by the system, such as the carton rates.', itm:'Item master and BOM (raw egg and packing material per finished-good carton).', stf:'Add users, set their role, company and password, or disable them.', acc:'What each role can see (View) and post or change (Edit). Saved rules apply on the next sign-in.', dc:'Items, salesmen and van days that need attention.' };
-  const navTop = document.querySelector('.sidebar')?.scrollTop || 0;
+  const navTop = 0, GRPS = [...new Set(T.map(t => t[2]).filter(Boolean))], curG = (T.find(t => t[0] === S.tab) || [])[2] || GRPS[0];
+  const ini = String(S.me.name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const NODATE = ['stf','acc','set','itm','em','sri','dc'], NOCO = ['acc','set','itm','dc'];   // pages that do not use the date / company
   $('#app').innerHTML = `
-    <aside class="sidebar"><div class="brand"><img class="brandlogo" src="${LOGO}" alt="Mahrjan"><div>MAHRJAN<small style="font-weight:600;letter-spacing:.06em">${esc(unitName)}</small></div></div>
-      <nav>${T.map(([k,l,g],i) => (i === 0 || T[i-1][2] !== g ? `<div class="navlabel">${g}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${l}</button>`).join('')}</nav>
-      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.designation || RN(S.me.role))} · ${esc(br)}</span></div><button id="out">Sign out</button></div></aside>
-    <main><header><div><div class="eyebrow">Mahrjan Sales Portal</div><h1>${esc(title)}</h1><p id="subtitle">${OLDT.includes(S.tab) ? '' : SUB[S.tab]||''}</p></div>
+    <aside class="sidebar rail"><img class="raillogo" src="${LOGO}" alt="Mahrjan" title="${esc(unitName)}">
+      ${GRPS.map(g => `<button class="rg ${g===curG?'on':''}" data-g="${esc(g)}" title="${esc(g)}">${GICON[g]||GICON.Admin}<small>${esc(g)}</small></button>`).join('')}
+      <div class="rspace"></div><div class="ravatar" title="${esc(S.me.name)} · ${esc(S.me.designation || RN(S.me.role))}">${esc(ini)}</div>
+      <button class="rg" id="out" title="Sign out">${GICON.Out}<small>Sign out</small></button></aside>
+    <div class="fly" id="fly"><div class="flyh" id="flyh"></div><nav id="flyn"></nav>
+      <div class="sidebar-bottom"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.designation || RN(S.me.role))} · ${esc(br)}</span></div></div></div>
+    <div class="flyshade" id="flyshade"></div>
+    <nav class="bbar">${GRPS.slice(0,4).map(g => `<button class="${g===curG?'on':''}" data-g="${esc(g)}">${GICON[g]||GICON.Admin}<small>${esc(g)}</small></button>`).join('')}<button data-g="__all">${GICON.More}<small>More</small></button></nav>
+    <main><header><div><div class="eyebrow">Mahrjan Sales Portal · ${esc(br)}</div><h1><button class="pgdd" id="pgdd" title="Switch page">${esc(title)} <span>▾</span></button></h1><p id="subtitle">${OLDT.includes(S.tab) ? '' : SUB[S.tab]||''}</p></div>
       <div class="header-actions">${S.me.branch_id || NOCO.includes(S.tab) ? '' : `<div class="cobox">Company<details class="cosel" id="cosel"><summary>${S.brs.length > 1 ? 'Both' : esc(brN(S.br))}</summary><div>${S.branches.slice().sort((x,y) => x.code === 'MGAZ' ? -1 : 1).map(b => `<label><input type="checkbox" data-br="${b.id}" ${S.brs.includes(b.id)?'checked':''}> ${esc(brN(b.id))}</label>`).join('')}</div></details></div>`}
         ${RANGE.has(S.tab) && !OLDT.includes(S.tab) ? `<label>From<input type="date" id="df" value="${S.from}"></label>` : ''}${S.tab === 'ds' || OLDT.includes(S.tab) || NODATE.includes(S.tab) ? '' : `<label>${RANGE.has(S.tab) ? 'To' : 'Date'}<input type="date" id="dt" value="${S.date}"></label>`}</div></header>
       <div id="v"></div>
       <footer>MAHRJAN SALES PORTAL <span>Quantities in packs (raw egg in pieces). Amounts in AED incl. VAT.</span></footer></main>`;
-  $('.sidebar').scrollTop = navTop;
   $('#out').onclick = () => sb.auth.signOut();
+  // page menu: groups on the green rail (desktop) or the bottom bar (phone); a group opens its pages
+  const fly = $('#fly'), shade = $('#flyshade');
+  const openFly = g => { const L = g === '__all' ? T : T.filter(t => t[2] === g);
+    $('#flyh').innerHTML = g === '__all' ? '<b>All pages</b>' : `<b>${esc(g)}</b>`;
+    $('#flyn').innerHTML = L.map(([k,l,gg],i) => (g === '__all' && (i === 0 || L[i-1][2] !== gg) ? `<div class="navlabel">${esc(gg)}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${esc(l)}</button>`).join('');
+    $('#flyn').querySelectorAll('button').forEach(b => b.onclick = () => { closeFly(); S.tab = b.dataset.t; S.dayId = null; render(); });
+    fly.classList.add('open'); shade.classList.add('open'); fly.dataset.g = g; };
+  const closeFly = () => { fly.classList.remove('open'); shade.classList.remove('open'); };
+  document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => fly.classList.contains('open') && fly.dataset.g === b.dataset.g ? closeFly() : openFly(b.dataset.g));
+  $('#pgdd').onclick = () => openFly(window.innerWidth <= 900 ? '__all' : curG); shade.onclick = closeFly;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFly(); }, { once: true });
   document.querySelectorAll('[data-br]').forEach(c => c.onchange = () => { let v = [...document.querySelectorAll('[data-br]:checked')].map(x => +x.dataset.br); if (!v.length) { c.checked = true; return; }
     if (ONE_CO.includes(S.tab) && v.length > 1) { S.brs = [+c.dataset.br]; S.br = +c.dataset.br; S.dayId = null; S.lsm = null; S.rsm = null; return render(); }   // one-company page: ticking a company switches to it
     S.brs = v; S.br = v[0]; S.brsAuto = null; localStorage.setItem('mj_brs', JSON.stringify(v)); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
@@ -329,9 +365,15 @@ function render(){
   $('#brs') && ($('#brs').onchange = e => { S.br = +e.target.value; localStorage.setItem('mj_branch', S.br); S.dayId = null; S.lsm = null; S.rsm = null; render(); });
   $('#dt') && ($('#dt').onchange = e => { S.date = e.target.value; if (S.from > S.date) { S.from = S.date; if ($('#df')) $('#df').value = S.date; } S.dayId = null; view(); });
   $('#df') && ($('#df').onchange = e => { S.from = e.target.value; if (S.from > S.date) { S.date = S.from; $('#dt').value = S.from; } view(); });
-  document.querySelectorAll('nav button').forEach(b => b.onclick = () => { S.tab = b.dataset.t; S.dayId = null; render(); });
   view();
 }
+const GICON = (() => { const sv = p => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  return { Summary: sv('<rect x="4" y="4" width="6" height="7" rx="1"/><rect x="14" y="4" width="6" height="4" rx="1"/><rect x="14" y="12" width="6" height="8" rx="1"/><rect x="4" y="15" width="6" height="5" rx="1"/>'),
+    'Daily flow': sv('<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>'),
+    Reports: sv('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>'),
+    Analysis: sv('<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>'),
+    Admin: sv('<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>'),
+    More: sv('<path d="M4 7h16M4 12h16M4 17h16"/>'), Out: sv('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>') }; })();
 // page entry animation: only when a page opens or its date / company changes, not while the user types or clicks in it
 ['input','change','click'].forEach(ev => document.addEventListener(ev, e => { if (e.target.closest && e.target.closest('#v')) $('#v')?.classList.remove('an'); }, true));
 function view(){ S.nav = (S.nav || 0) + 1; $('#v')?.classList.add('an'); clearCache(); if (S.brs.length > 1 && ['wh','ite','pc','se','wo','qs','whr','dd','sri'].includes(S.tab)) { $('#v').innerHTML = '<div class="card"><p class="muted">This page works for one company at a time. Untick Al Quoz or Ajman in Company.</p></div>'; return; } ({ load:vLoading, ret:vReturn, days:vDays, oe:vOffice, imp:vImport, sri:vStockReport, req:vRequirement, wh:vWarehouse, ite:vItrade, sc:vStock, ov:vOverview, dd:()=>vOld('VanDayView'), whr:()=>vOld('WarehouseView'), ds:vSheets, pc:vPetty, se:()=>vOld('ShortExcessView'), wo:()=>vOld('WriteOffView'), qs:()=>vOld('QtySalesView'), sa:vAnalysis, lr:vLoadRet, vl:vVanLog, co:vCollections, ex:vExpenses, stf:vStaff, em:vEmail, set:vSettings, itm:vItems, dc:vCheck, acc:vAccess, none:() => $('#v').innerHTML = '<div class="card"><p class="muted">Your role has no pages yet. Ask the admin to give access in Role access.</p></div>' })[S.tab](); }
@@ -1045,7 +1087,37 @@ const kpi = (l, v, sub = '') => `<div class="kpi"><span>${esc(l)}</span><b>${v}<
 function aggregate(rows, keyF, init, add){ const m = new Map(); rows.forEach(r => { const k = keyF(r); if (k == null) return; if (!m.has(k)) m.set(k, init(r)); add(m.get(k), r); }); return [...m.values()]; }
 
 // ---------- OVERVIEW ----------
-async function vOverview(){ const __t = S.nav; if (S.ovCmp == null) S.ovCmp = '';   // default: only the selected days, no comparison
+// Overview top row: welcome, what needs action, quick reports and today's activity (live, for the ticked companies)
+async function vOverview(){ await vOverview0(); const __t = S.nav; ovTop(__t); }
+async function ovTop(__t){
+  const td = today(), from = addDays(td, -30), nm = id => S.staff.find(x => x.id === id)?.name || '';
+  const [vd, wb, last, em] = await Promise.all([
+    q(sb.from('van_day').select('id,business_date,status,salesman_id,load_time,unload_time,branch_id').in('branch_id', S.brs).gte('business_date', from)).catch(() => []),
+    q(sb.from('wh_batches').select('batch_no,status,work_date,issued_at,returned_at,process,branch_id').in('branch_id', S.brs).gte('work_date', addDays(td, -7))).catch(() => []),
+    q(sb.from('sales_lines').select('tran_date').in('branch_id', S.brs).order('tran_date', { ascending:false }).limit(1)).catch(() => []),
+    q(sb.from('email_log').select('report,status,sent_at').gte('sent_at', td + 'T00:00:00+04:00').order('sent_at', { ascending:false }).limit(6)).catch(() => [])]);
+  if (__t !== S.nav || !$('#v')) return;
+  const notRet = vd.filter(d => d.status === 'LOADED' && d.business_date < td).length, notClosed = vd.filter(d => ['RETURNED','SETTLED'].includes(d.status) && d.business_date < td).length;
+  const openB = wb.filter(b => b.status === 'ISSUED' && b.work_date < addDays(td, -1)).length, lastD = last[0]?.tran_date;
+  const need = [['Returns not posted (30 days)', notRet, 'days'], ['Van days not closed (30 days)', notClosed, 'days'], ['Production / cleaning batches open', openB, 'wh'], ['Sales imported up to', lastD ? fmtD(lastD) : '—', 'imp']];
+  const t5 = x => String(x || '').slice(0, 5), ev = [];
+  vd.filter(d => d.business_date === td).forEach(d => { if (d.load_time) ev.push([t5(d.load_time), 'BOARD', nm(d.salesman_id) + ' loaded']); if (d.unload_time) ev.push([t5(d.unload_time), 'RETURN', nm(d.salesman_id) + ' returned']); });
+  const dt = x => x ? new Date(new Date(x).getTime() + 4 * 3600000).toISOString().slice(11, 16) : '';
+  const isTd = x => x && new Date(new Date(x).getTime() + 4 * 3600000).toISOString().slice(0, 10) === td;
+  wb.forEach(b => { if (isTd(b.issued_at)) ev.push([dt(b.issued_at), b.process === 'CLEANING' ? 'CLEANING' : 'PRODUCTION', b.batch_no + ' issued']); if (isTd(b.returned_at)) ev.push([dt(b.returned_at), 'RETURN', b.batch_no + ' returned']); });
+  em.forEach(e => ev.push([dt(e.sent_at), 'EMAIL', e.report.replace(/_/g, ' ').toLowerCase() + ' ' + String(e.status || '').toLowerCase()]));
+  ev.sort((a, b) => a[0] < b[0] ? 1 : -1);
+  const QR = [['ds','Daily sheets'],['se','Short & excess'],['wo','FOC & write-offs'],['qs','Qty by salesman'],['pc','Cash sheet'],['sa','Sales analysis']].filter(([k]) => tabsFor().some(t => t[0] === k));
+  const el = document.createElement('div'); el.className = 'ovtop';
+  el.innerHTML = `<div class="card ovwel"><div class="ravatar" style="width:52px;height:52px;font-size:16px;margin:0">${esc(String(S.me.name||'').trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>
+      <div><span class="muted" style="font-size:12px">Welcome,</span><h3 style="margin:2px 0">${esc(S.me.name)}</h3><span class="muted" style="font-size:12.5px">${esc(S.me.designation || RN(S.me.role))} · ${fmtD(td)}</span></div></div>
+    <div class="card"><h3>Needs action</h3>${need.map(([l,v,k]) => `<div class="ovna" data-go="${k}"><span>${esc(l)}</span><b class="${typeof v === 'number' && v ? 'warn' : ''}">${v}</b></div>`).join('')}</div>
+    <div class="card"><h3>Quick reports</h3><div class="ovqr">${QR.map(([k,l]) => `<button data-go="${k}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="card"><h3>Today's activity</h3><div class="ovlog">${ev.length ? ev.slice(0, 7).map(([t,k,x]) => `<div><i>${esc(t)}</i><b class="k${k[0]}">${esc(k)}</b> ${esc(x)}</div>`).join('') : '<p class="muted">Nothing posted yet today.</p>'}</div></div>`;
+  $('#v').prepend(el);
+  el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { if (!tabsFor().some(t => t[0] === b.dataset.go)) return; S.tab = b.dataset.go; S.dayId = null; render(); });
+}
+async function vOverview0(){ const __t = S.nav; if (S.ovCmp == null) S.ovCmp = '';   // default: only the selected days, no comparison
   loading();
   const [sales, days] = await Promise.all([getSales(), getDays()]);
   const [cash, coll, exp] = await Promise.all([getCash(days), getColl(days), getExp(days)]);
