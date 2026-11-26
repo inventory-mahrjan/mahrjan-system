@@ -1,27 +1,46 @@
--- BOARD AFTER RETURN - CREATE
--- A missed board can be corrected from the PDT after the return is posted, until the van day is settled.
--- The PDT sends the full day's board, so it replaces the load; short / excess recalculates by itself.
-create or replace function public.post_loading(p_salesman bigint, p_date date, p_van bigint, p_start_km integer, p_load_temp numeric, p_lines jsonb)
-returns bigint language plpgsql security definer set search_path to 'public' as $function$
-declare s public.staff; d public.van_day; v_route bigint;
+-- WAREHOUSE ADD TO BATCH - CREATE
+-- Extra raw egg / material (production) or extra packs (cleaning) can be added to a batch that is still open (no return yet).
+-- The lines join the same batch (slip I1), so the return counts original + additional issue together.
+-- wh_lines.issue_no: 1 = original issue, 2, 3 ... = additional issues (each prints its own ADDITIONAL ISSUE slip).
+alter table public.wh_lines add column if not exists issue_no smallint not null default 1;
+
+create or replace function public.wh_issue_add(p_batch bigint, p_duty bigint, p_lines jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare b public.wh_batches; v_no smallint; v_eggs numeric;
 begin
-  select * into s from public.staff where id = p_salesman and role = 'SALESMAN' and active;
-  if not found then raise exception 'Salesman % not found or inactive', p_salesman; end if;
-  perform public.require_role(array['M:load'], s.branch_id);
-  if jsonb_array_length(coalesce(p_lines,'[]')) = 0 then raise exception 'No loading lines'; end if;
-  select route_id into v_route from public.customer_assignment where salesman_id = p_salesman and to_date is null and route_id is not null group by route_id order by count(*) desc limit 1;
-  insert into public.van_day (branch_id, business_date, salesman_id, route_id, van_id, start_km, load_temp, load_time, status)
-    values (s.branch_id, p_date, p_salesman, v_route, p_van, p_start_km, p_load_temp, localtime, 'LOADED')
-    on conflict (salesman_id, business_date) do nothing;
-  select * into d from public.van_day where salesman_id = p_salesman and business_date = p_date;
-  -- correction board after the return is allowed until the cash is settled; the day stays RETURNED
-  d := public.day_for_update(d.id, array['M:load'], array['OPEN','LOADED','RETURNED']);
-  update public.van_day set van_id = coalesce(p_van, van_id), start_km = coalesce(p_start_km, start_km), load_temp = coalesce(p_load_temp, load_temp),
-    status = case when status = 'RETURNED' then 'RETURNED' else 'LOADED' end where id = d.id;
-  delete from public.loading_lines where van_day_id = d.id;
-  insert into public.loading_lines (van_day_id, item_id, qty)
-    select d.id, (x->>'item_id')::bigint, sum((x->>'qty')::numeric) from jsonb_array_elements(p_lines) x
-    where coalesce((x->>'qty')::numeric, 0) > 0 group by (x->>'item_id')::bigint;
-  return d.id;
-end $function$;
+  select * into b from public.wh_batches where id = p_batch for update;
+  if not found then raise exception 'Batch not found'; end if;
+  perform public.wh_check_duty(p_duty, b.branch_id);
+  if b.status <> 'ISSUED' then raise exception '% is already % — additional issue is allowed only before the return.', b.batch_no, lower(b.status); end if;
+
+  drop table if exists t_l;
+  create temp table t_l on commit drop as
+  select (x->>'fg_item_id')::bigint fg, nullif(x->>'item_id','')::bigint it, round(coalesce((x->>'qty')::numeric,0)) qty,
+         nullif(x->>'exp_date','')::date exp, nullif(trim(x->>'origin'),'') origin
+    from jsonb_array_elements(coalesce(p_lines,'[]')) x where coalesce((x->>'qty')::numeric,0) > 0;
+  if not exists (select 1 from t_l) then raise exception 'Enter at least one qty.'; end if;
+  if exists (select 1 from t_l t left join public.items i on i.id = t.fg and i.item_type = 'FG' where i.id is null) then
+    raise exception 'Not a finished good in the list'; end if;
+  if b.process = 'PRODUCTION' and exists (select 1 from t_l t where not exists
+       (select 1 from public.v_fg_bom m where m.fg_item_id = t.fg and m.item_id = t.it)) then
+    raise exception 'A line is not in the bill of materials of its finished good'; end if;
+
+  select coalesce(max(issue_no),1) + 1 into v_no from public.wh_lines where batch_id = b.id and slip = 'I1';
+  if b.process = 'PRODUCTION' then
+    insert into public.wh_lines (batch_id, slip, line_type, for_item_id, item_id, qty, egg_pcs, exp_date, origin, issue_no)
+    select b.id, 'I1', case when i.item_type = 'RAW_EGG' then 'ISSUE RAW' else 'ISSUE MATERIAL' end, t.fg, t.it, t.qty,
+           case when i.item_type = 'RAW_EGG' then t.qty else 0 end,
+           case when i.item_type = 'RAW_EGG' then t.exp end, case when i.item_type = 'RAW_EGG' then t.origin end, v_no
+      from t_l t join public.items i on i.id = t.it;
+  else
+    insert into public.wh_lines (batch_id, slip, line_type, for_item_id, item_id, qty, egg_pcs, issue_no)
+    select b.id, 'I1', 'ISSUE FG', t.fg, t.fg, t.qty, t.qty * coalesce(f.pcs_per_pack,0), v_no
+      from t_l t join public.items f on f.id = t.fg;
+  end if;
+  select coalesce(sum(egg_pcs),0) into v_eggs from public.wh_lines where batch_id = b.id and slip = 'I1';
+  update public.wh_batches set issued_egg_pcs = v_eggs, updated_at = now(), updated_by = auth.uid() where id = b.id;
+  return jsonb_build_object('batch_id', b.id, 'batch_no', b.batch_no, 'issue_no', v_no, 'issued_egg_pcs', v_eggs);
+end $$;
+revoke all on function public.wh_issue_add(bigint, bigint, jsonb) from public, anon;
+grant execute on function public.wh_issue_add(bigint, bigint, jsonb) to authenticated;
 notify pgrst, 'reload schema';
