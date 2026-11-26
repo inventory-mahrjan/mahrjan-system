@@ -193,7 +193,7 @@
 <script>/* loading % : counts database requests in flight; bar on top + "Loading… NN%" */
 (function(){var S=0,D=0,P=0,bar,lab,t;function ui(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#1B4332;z-index:9999;transition:width .2s;width:0';lab=document.createElement('div');lab.style.cssText='position:fixed;top:8px;right:12px;z-index:9999;background:#1B4332;color:#fff;font:600 12px system-ui;padding:3px 9px;border-radius:10px';document.body.appendChild(bar);document.body.appendChild(lab);}var on=S>D;bar.style.width=(on?P:100)+'%';bar.style.opacity=lab.style.opacity=on?1:0;lab.textContent='Loading… '+P+'%';document.querySelectorAll('.mjpct').forEach(function(e){e.textContent=P+'%';});}
 function step(){P=Math.max(P,Math.min(99,Math.round(D/Math.max(S,1)*100)));if(S===D){P=100;clearTimeout(t);t=setTimeout(function(){if(S===D){S=D=P=0;}},400);}if(document.body)ui();}
-var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=28"></script><script src="old-sheets.js?v=13"></script><script src="old-views.js?v=9"></script>
+var F=window.fetch;window.fetch=function(u){var sup=/supabase\.co/.test(String(u&&u.url||u));if(!sup)return F.apply(this,arguments);if(S===D){S=D=P=0;}S++;step();var r=F.apply(this,arguments);r.then(function(){D++;step();},function(){D++;step();});return r;};})();</script><script>window.MJ_AUTH_KEY = 'sb-xhndwjkqfqmmpfcglqzu-auth-token';</script><script src="mj-bridge.js?v=29"></script><script src="old-sheets.js?v=13"></script><script src="old-views.js?v=9"></script>
 <script type="module">
 import { createClient } from './vendor/supabase-2.119.2.esm.js';
 
@@ -620,16 +620,47 @@ async function vWarehouse(){ const __t = S.nav;
       ${bs.map(b => `<tr><td class="l">${esc(b.batch_no)}</td><td>${b.shift}</td><td><span class="st ${b.status==='CLOSED'?'CLOSED':b.status==='ISSUED'?'LOADED':''}">${b.status}</span></td>
         <td class="l">${b.staff_ids.map(nm).join(', ')}</td><td class="l">${esc(nm(b.issued_by))}</td><td>${num(b.issued_egg_pcs)}</td><td>${b.fg_packs!=null?num(b.fg_packs):''}</td>
         <td>${b.broken_pcs!=null?num(b.broken_pcs):''}</td><td>${b.waste_pcs!=null?num(b.waste_pcs):''}</td><td class="${num(b.egg_diff)?'bad':''}">${b.egg_diff!=null?num(b.egg_diff):''}</td>
-        <td>${b.hours!=null?num(b.hours):''}</td><td>${b.output_per_staff_hour!=null?num(b.output_per_staff_hour):''}</td><td><button data-b="${b.id}">Lines</button></td></tr>`).join('')}
+        <td>${b.hours!=null?num(b.hours):''}</td><td>${b.output_per_staff_hour!=null?num(b.output_per_staff_hour):''}</td><td style="white-space:nowrap"><button data-b="${b.id}">Lines</button>${b.status==='ISSUED'&&canE('wh')?` <button class="p" data-add="${b.id}">Add material</button>`:''}</td></tr>`).join('')}
     </table></div>` : '<p class="muted">No batches for this work date.</p>'}</div><div id="wl"></div>`;
   $('#v').querySelectorAll('[data-b]').forEach(btn => btn.onclick = async () => {
     const b = bs.find(x => x.id === +btn.dataset.b), L = await q(sb.from('wh_lines').select('*').eq('batch_id', b.id).order('id'));
     $('#wl').innerHTML = `<div class="card"><h3>${esc(b.batch_no)} — lines</h3><div class="tw"><table>
-      <tr><th>Slip</th><th class="l">Line</th><th class="l">For product</th><th class="l">Item</th><th>Qty</th><th>Egg pcs</th><th>Calculated</th><th>Difference</th><th class="l">Reason</th><th>EXP</th><th class="l">Origin</th></tr>
-      ${L.map(l => `<tr><td>${b.batch_no}-${l.slip}</td><td class="l">${esc(l.line_type)}</td><td class="l">${esc(item(l.for_item_id).short_name||item(l.for_item_id).name||'')}</td>
+      <tr><th>Slip</th><th>Issue</th><th class="l">Line</th><th class="l">For product</th><th class="l">Item</th><th>Qty</th><th>Egg pcs</th><th>Calculated</th><th>Difference</th><th class="l">Reason</th><th>EXP</th><th class="l">Origin</th></tr>
+      ${L.map(l => `<tr><td>${b.batch_no}-${l.slip}</td><td>${l.slip==='I1'?((l.issue_no||1)>1?'Additional '+((l.issue_no||1)-1):'Original'):''}</td><td class="l">${esc(l.line_type)}</td><td class="l">${esc(item(l.for_item_id).short_name||item(l.for_item_id).name||'')}</td>
         <td class="l">${esc(item(l.item_id).short_name||item(l.item_id).name)}</td><td>${num(l.qty)}</td><td>${num(l.egg_pcs)||''}</td><td>${l.calculated!=null?num(l.calculated):''}</td>
         <td class="${num(l.difference)?'bad':''}">${l.difference!=null?num(l.difference):''}</td><td class="l">${esc(l.reason||'')}</td><td>${l.exp_date||''}</td><td class="l">${esc(l.origin||'')}</td></tr>`).join('')}
     </table></div>${b.cancel_reason?`<p class="muted">Cancelled: ${esc(b.cancel_reason)}</p>`:''}</div>`;
+  });
+  // additional issue: extra raw egg / material (production) or packs (cleaning) into a batch that has no return yet
+  $('#v').querySelectorAll('[data-add]').forEach(btn => btn.onclick = async () => {
+    const b = bs.find(x => x.id === +btn.dataset.add), P = b.process === 'PRODUCTION';
+    const L0 = await q(sb.from('wh_lines').select('for_item_id').eq('batch_id', b.id).eq('slip', 'I1'));
+    const inB = [...new Set(L0.map(l => l.for_item_id))], fgs = S.items.filter(i => i.item_type === 'FG' && i.active !== false).sort((x, y) => (inB.includes(y.id) - inB.includes(x.id)) || (x.display_order||0) - (y.display_order||0));
+    const duty = S.staff.filter(s => s.active && ['ACCOUNTANT','RECEIVER'].includes(s.role) && (s.branch_id == null || s.branch_id === b.branch_id));
+    const d = document.createElement('dialog'); d.className = 'udlg';
+    d.innerHTML = `<form method="dialog"><h3 style="margin-top:0">Add material · ${esc(b.batch_no)}</h3>
+      <p class="muted" style="margin:0">Goes into the same batch. The return counts the original and the additional issue together.</p>
+      <label>Supervisor on duty<select name="duty">${duty.map(s => `<option value="${s.id}" ${s.id===S.me.id?'selected':''}>${esc(s.name)} · ${esc(RN(s.role))}</option>`).join('')}</select></label>
+      <label>${P ? 'For finished good' : 'Finished good to clean'}<select name="fg">${fgs.map(i => `<option value="${i.id}">${esc(i.short_name||i.name)}${inB.includes(i.id)?' · in this batch':''}</option>`).join('')}</select></label>
+      <div id="am"></div><p class="bad st"></p>
+      <div class="row" style="justify-content:flex-end;margin:0"><button value="cancel" formnovalidate>Cancel</button><button class="p" id="amsv" value="ok">Add to batch</button></div></form>`;
+    document.body.append(d); const f = d.querySelector('form');
+    const draw = async () => { const fg = +f.fg.value;
+      if (!P) { d.querySelector('#am').innerHTML = `<label>Packs to clean<input type="number" min="0" name="q_${fg}" data-it="${fg}"></label>`; return; }
+      const bom = await q(sb.from('v_fg_bom').select('*').eq('fg_item_id', fg)).catch(() => []);
+      d.querySelector('#am').innerHTML = bom.length ? bom.map(m => { const it = item(m.item_id), egg = it.item_type === 'RAW_EGG';
+        return `<label>${esc(it.short_name||it.name)} · pieces<input type="number" min="0" data-it="${m.item_id}" data-egg="${egg?1:''}"></label>${egg?`<div class="row" style="margin:0;gap:8px"><label style="flex:1">EXP date (optional)<input type="date" data-exp="${m.item_id}"></label><label style="flex:1">Country (optional)<input data-org="${m.item_id}"></label></div>`:''}`; }).join('')
+        : '<p class="bad">No bill of materials for this finished good.</p>'; };
+    f.fg.onchange = draw; await draw();
+    d.querySelector('#amsv').onclick = async ev => { ev.preventDefault(); const st = d.querySelector('.st'); st.textContent = ''; const fg = +f.fg.value;
+      const lines = [...d.querySelectorAll('[data-it]')].map(x => ({ fg_item_id: fg, item_id: +x.dataset.it, qty: Math.round(num(x.value)),
+        exp_date: d.querySelector(`[data-exp="${x.dataset.it}"]`)?.value || null, origin: (d.querySelector(`[data-org="${x.dataset.it}"]`)?.value || '').toUpperCase() || null })).filter(l => l.qty > 0);
+      if (!lines.length) { st.textContent = 'Enter at least one qty.'; return; }
+      if (!f.duty.value) { st.textContent = 'Choose the supervisor on duty.'; return; }
+      ev.target.disabled = true;
+      try { const r = await rpc('wh_issue_add', { p_batch: b.id, p_duty: +f.duty.value, p_lines: lines }); d.close(); toast(`Added to ${r.batch_no} · additional issue ${r.issue_no - 1}`); vWarehouse(); }
+      catch (e) { st.textContent = e.message || String(e); ev.target.disabled = false; } };
+    d.addEventListener('close', () => d.remove()); d.showModal();
   });
 }
 

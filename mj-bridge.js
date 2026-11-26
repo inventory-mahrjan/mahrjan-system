@@ -446,7 +446,7 @@
       returnedAt: fmt(b.returned_at), recvBy: nm(b.received_by), hours: b.hours == null ? '' : num(b.hours), beyond: b.beyond_shift == null ? '' : num(b.beyond_shift), output: b.output_per_staff_hour == null ? '' : num(b.output_per_staff_hour),
       lines: L.filter(function (l) { return l.batch_id === b.id; }).map(function (l) { var it = m.itemById[l.item_id] || {}, egg = it.item_type === 'RAW_EGG';
         return { slip: b.batch_no + '-' + l.slip, t: l.line_type, f: cd(l.for_item_id), code: cd(l.item_id), name: it.name || '', raw: egg ? cd(l.item_id) : '', qty: num(l.qty), egg: num(l.egg_pcs),
-          calc: l.calculated == null ? '' : num(l.calculated), diff: l.difference == null ? '' : num(l.difference), reason: l.reason || '', exp: l.exp_date || '', origin: l.origin || '' }; }) };
+          calc: l.calculated == null ? '' : num(l.calculated), diff: l.difference == null ? '' : num(l.difference), reason: l.reason || '', exp: l.exp_date || '', origin: l.origin || '', n: l.issue_no || 1 }; }) };
   }
   async function whBatches(m) { var c = await sb(), from = new Date(Date.parse(shiftNow().work + 'T12:00:00Z') - 86400000).toISOString().slice(0, 10);
     var B = await q(c.from('wh_batches').select('*').eq('branch_id', m.br.id).or('status.eq.ISSUED,work_date.gte.' + from).neq('status', 'CANCELLED').order('id'));
@@ -469,6 +469,13 @@
           if (type === 'C') lines.push({ fg_item_id: idOf(l.f), qty: pcs });
           else lines.push({ fg_item_id: idOf(l.f), item_id: idOf(l.code), qty: pcs, exp_date: l.exp || null, origin: l.origin || null }); });
         if (!lines.length) throw new Error('Enter at least one qty.');
+        if (p.addTo) {   // additional issue to a batch that has no return yet
+          var ob = (await q(c.from('wh_batches').select('id,process,status').eq('batch_no', String(p.addTo).trim())))[0]; if (!ob) throw new Error('Batch ' + p.addTo + ' not found.');
+          if ((ob.process === 'CLEANING' ? 'C' : 'P') !== type) throw new Error(p.addTo + ' is a ' + ob.process.toLowerCase() + ' batch.');
+          var ra = await rpc('wh_issue_add', { p_batch: ob.id, p_duty: staffId(p.duty), p_lines: lines });
+          var BA = await q(c.from('wh_batches').select('*').eq('id', ob.id)), LA = await q(c.from('wh_lines').select('*').eq('batch_id', ob.id));
+          return { ok: true, batch: batchOut(m, BA[0], LA), addNo: ra.issue_no };
+        }
         var r = await rpc('wh_issue', { p_branch: m.br.id, p_process: type === 'C' ? 'CLEANING' : 'PRODUCTION', p_duty: staffId(p.duty), p_staff: (p.staff || []).map(staffId), p_lines: lines });
         var B = await q(c.from('wh_batches').select('*').eq('id', r.batch_id)), L = await q(c.from('wh_lines').select('*').eq('batch_id', r.batch_id));
         return { ok: true, batch: batchOut(m, B[0], L) };
