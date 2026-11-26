@@ -45,13 +45,28 @@
         for (var i = 0; i < 2; i++) { var q = ease(seg(p, .15 + i * .35, .55 + i * .35)); if (q <= 0 || q >= 1) continue;
           note(c, lerp(85, 252, q), lerp(120, 140, q) - Math.sin(q * Math.PI) * 55, lerp(.5, .7, q), lerp(0, 12, q)); }
         if (d > 0) { c.fillStyle = '#EEF4F0'; rr(c, 212, 150, 80 * ease(d * 1.5), 30, 5); c.fill(); if (d > .5) { c.fillStyle = FOREST; c.font = 'bold 16px sans-serif'; c.fillText('PAID', 228, 171); } } },
-    DELETE: function (c, p, d) { var g = ease(d); c.fillStyle = 'rgb(' + [255, 255, 255].map(function (v) { return Math.round(lerp(v, 236, g)); }) + ')'; c.strokeStyle = '#D7DCD7'; c.lineWidth = 1.5;
-        rr(c, 75, 15, 170, 205, 8); c.fill(); c.stroke(); c.fillStyle = g > .5 ? '#9AA19C' : FOREST; c.font = 'bold 13px sans-serif'; c.fillText('TAX INVOICE', 90, 40);
-        c.font = '11px sans-serif'; for (var i = 0; i < 4; i++) { c.fillRect(90, 62 + i * 22, 70 + (i % 2) * 20, 4); c.fillRect(200, 62 + i * 22, 30, 4); } c.font = 'bold 12px sans-serif'; c.fillText('Total', 90, 170);
-        c.strokeStyle = RED; c.lineWidth = 6; c.lineCap = 'round'; [[85, 25, 235, 210], [235, 25, 85, 210]].forEach(function (L, k) { var q = ease(seg(p, .1 + k * .35, .45 + k * .35)); if (q <= 0) return;
-          c.beginPath(); c.moveTo(L[0], L[1]); c.lineTo(lerp(L[0], L[2], q), lerp(L[1], L[3], q)); c.stroke(); });
-        if (d > 0) { var s = lerp(1.6, 1, ease(d * 2)); c.save(); c.globalAlpha = clamp(d * 3); c.translate(160, 118); c.rotate(-.24); c.scale(s, s); c.strokeStyle = RED; c.lineWidth = 4; rr(c, -70, -22, 140, 44, 8); c.stroke();
-          c.fillStyle = RED; c.font = 'bold 26px sans-serif'; c.textAlign = 'center'; c.fillText('DELETED', 0, 10); c.restore(); } }
+    DELETE: function (c, p, d) {   // the invoice crumples, flies into the dustbin; the lid shuts once the delete is saved
+        var bx = 235, rim = 128, open = ease(seg(p, 0, .22)) * (1 - ease(seg(d, 0, .45))), shut = d > .45 ? Math.sin(clamp((d - .45) / .4) * Math.PI) * .12 : 0;
+        c.fillStyle = '#3A403C'; c.beginPath(); c.ellipse(bx, rim, 44, 8, 0, 0, 7); c.fill();   // dark opening
+        var f = ease(seg(p, .18, .72)), dr = ease(seg(p, .72, .9)), t = f, u = 1 - t;
+        var x = u * u * 85 + 2 * u * t * 150 + t * t * bx, y = u * u * 110 + 2 * u * t * -5 + t * t * (rim - 8) + dr * 40;
+        var sc = lerp(1, .32, ease(seg(p, .1, .7))), rot = lerp(0, 4.2, f), crum = seg(p, .1, .45);
+        c.save(); if (dr > 0) { c.beginPath(); c.rect(0, 0, 320, rim); c.clip(); }
+        c.translate(x, y); c.rotate(rot); c.scale(sc, sc);
+        if (crum < 1) { var k = 1 - crum * .35; c.fillStyle = '#fff'; c.strokeStyle = '#C9D0CB'; c.lineWidth = 2;
+          poly(c, [[-48 * k, -62], [44 * k, -60 + crum * 10], [50 * k, 60], [-46 * k, 58 - crum * 12]], '#fff', '#C9D0CB');
+          c.fillStyle = FOREST; c.font = 'bold 12px sans-serif'; c.fillText('INVOICE', -38 * k, -40);
+          c.fillStyle = '#9AA19C'; for (var i = 0; i < 4; i++) c.fillRect(-38 * k, -24 + i * 16, (54 + (i % 2) * 18) * k, 4);
+          c.fillStyle = FOREST; c.fillRect(-38 * k, 44, 40 * k, 5); }
+        else { c.fillStyle = '#F4F5F2'; c.strokeStyle = '#B9C1BB'; c.lineWidth = 3; c.beginPath();
+          for (var a = 0; a < 12; a++) { var r = 44 + (a % 3) * 7; c.lineTo(Math.cos(a / 12 * 6.283) * r, Math.sin(a / 12 * 6.283) * r); } c.closePath(); c.fill(); c.stroke();
+          c.beginPath(); c.moveTo(-20, -18); c.lineTo(10, 4); c.lineTo(-6, 24); c.moveTo(18, -26); c.lineTo(4, -6); c.stroke(); }
+        c.restore();
+        poly(c, [[bx - 46, rim], [bx + 46, rim], [bx + 36, 218], [bx - 36, 218]], '#6B7A72', '#4E5A54');   // bin body
+        c.strokeStyle = '#59665F'; c.lineWidth = 3; [-20, 0, 20].forEach(function (o) { c.beginPath(); c.moveTo(bx + o * 1.05, rim + 16); c.lineTo(bx + o * .8, 206); c.stroke(); });
+        c.fillStyle = '#56635C'; rr(c, bx - 49, rim - 3, 98, 8, 4); c.fill();
+        c.save(); c.translate(bx + 50, rim - 3); c.rotate(open * 1.75 - shut);   // lid hinged on the right
+        c.fillStyle = '#7D8C84'; rr(c, -102, -10, 104, 11, 5); c.fill(); c.fillStyle = '#56635C'; rr(c, -62, -17, 24, 8, 3); c.fill(); c.restore(); }
   };
   var LABEL = { BOARD: ['Loading the van\u2026', 'Board posted'], RETURN: ['Unloading\u2026', 'Return posted'], COLLECTION: ['Receiving money\u2026', 'Collection posted'],
     EXPENSE: ['Paying out\u2026', 'Expense posted'], DELETE: ['Deleting invoice\u2026', 'Invoice deleted'] };
