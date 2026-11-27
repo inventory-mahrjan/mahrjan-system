@@ -1458,7 +1458,7 @@ async function vPetty(){ const __t = S.nav;
     const close = has ? num(op) + T(1) - T(3) + rec - pay - exp - num(C.dep) : '', hand = has ? close - susT : '';
     const counted = cnt.reduce((a, x) => a + num(x.denom) * num(x.qty), 0), anyCnt = cnt.some(x => num(x.qty));
     const se = has && anyCnt ? counted - hand : '';
-    const opCell = forPrint || !E ? fx(op) : `<input id="csOpen" value="${has ? r2(op) : ''}" inputmode="decimal" placeholder="Type, then Enter" class="csin">${C.auto ? '<div class="cshint">previous day's closing balance · press Enter to save</div>' : ''}`;
+    const opCell = forPrint || !E ? fx(op) : `<input id="csOpen" value="${has ? r2(op) : ''}" inputmode="decimal" placeholder="Type, then Save" class="csin">${C.auto ? '<div class="cshint">previous day’s closing balance · Save to keep it</div>' : ''}`;
     const pos = [['OPENING CASH BALANCE', opCell, 1], ['+ CASH SALES', fx(T(1))], ['− CASH SALES RETURN', fx(T(3))], ['+ CASH RECEIPTS', fx(rec)], ['− PAYMENTS', fx(pay)], ['− EXPENSES', fx(exp)], ['− BANK DEPOSITS', fx(num(C.dep))],
       ['CLOSING BALANCE', fx(close), 0, 1], ['− SUSPENSE OUTSTANDING', fx(susT)], ['CASH IN HAND', fx(hand), 0, 1], ['CASH COUNTED', anyCnt ? fx(counted) : '', 0, 1], ['SHORT / EXCESS', se === '' ? '' : `<span style="color:${se < -0.004 ? '#b0432e' : se > 0.004 ? '#2f7a4f' : 'inherit'}">${money(se)}</span>`, 0, 1]];
     const cntRows = forPrint ? DENOMS.map(d => { const qn = cnt.filter(x => num(x.denom) === d).reduce((a, x) => a + num(x.qty), 0); return `<tr><td>${d}</td><td class="q">${qn || ''}</td><td>${qn ? money(qn * d) : ''}</td></tr>`; }).join('')
@@ -1469,7 +1469,7 @@ async function vPetty(){ const __t = S.nav;
         ${C.men.map(m => `<tr><td class="l">${esc(m[0])}</td>${m.slice(1).map(v => `<td>${money(v)}</td>`).join('')}</tr>`).join('')}<tr class="tot"><td class="l">TOTAL</td>${[1,2,3,4,5,6,7].map(j => `<td>${money(T(j))}</td>`).join('')}</tr></table></div>
       <div><div class="csh">CASH SETTLEMENT</div><table class="cst">${pos.map(p => `<tr class="${p[3] ? 'tot' : ''}"><td class="l">${p[0]}</td><td>${p[1]}</td></tr>`).join('')}</table></div>
       <div><div class="csh">CASH COUNT</div><table class="cst"><tr><th>${forPrint ? 'AED' : 'CURRENCY'}</th><th>QTY</th><th>TOTAL</th>${!forPrint && E ? '<th class="noprint"></th>' : ''}</tr>${cntRows}<tr class="tot"><td class="l">TOTAL</td><td></td><td>${anyCnt ? money(counted) : ''}</td>${!forPrint && E ? '<td class="noprint"></td>' : ''}</tr></table>
-        ${!forPrint && E ? '<div class="row noprint" style="margin-top:6px"><button id="cAdd">+ Add row</button><button class="p" id="cSv">Save count</button></div>' : ''}</div></div>
+        ${!forPrint && E ? '<div class="row noprint" style="margin-top:6px"><button id="cAdd">+ Add row</button></div>' : ''}</div></div>
       <div class="csh" style="margin-top:12px">RECEIPTS · PAYMENTS · SUSPENSE</div><table class="cst"><tr><th>REF</th><th class="l">RECEIPTS — PARTICULARS</th><th>AMOUNT</th><th>REF</th><th class="l">PAYMENTS — PARTICULARS</th><th>AMOUNT</th><th class="l">SUSPENSE</th><th>AMOUNT</th></tr>${R}
         <tr class="tot"><td></td><td class="l">TOTAL RECEIPTS</td><td>${money(rec)}</td><td></td><td class="l">TOTAL PAYMENTS</td><td>${money(pay)}</td><td class="l">TOTAL</td><td>${money(susT)}</td></tr></table>`; };
   const printIt = () => { const w = window.open('', '_blank'); if (!w) return toast('Allow pop-ups to print', false);
@@ -1481,9 +1481,9 @@ async function vPetty(){ const __t = S.nav;
   const draw = () => {
     const tin = lines.filter(l => pdir(l.line_type) > 0).reduce((a,l) => a + num(l.amount), 0), tout = lines.filter(l => pdir(l.line_type) < 0).reduce((a,l) => a + num(l.amount), 0);
     if (__t !== S.nav) return; $('#v').innerHTML = `<div class="pills noprint" style="margin-bottom:10px"><button class="on">Day</button><button id="toPer">Period</button></div>
-      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3><div class="row noprint" style="margin:0"><button id="csx">Download Excel</button></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3><div class="row noprint" style="margin:0">${E ? '<button class="p" id="csSave">Save · refresh</button>' : ''}<button id="csx">Download Excel</button></div></div>
       <div id="csBody">${sheetHtml(false)}</div></div>
-      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3>${E ? '<div class="row noprint" style="margin:0"><button class="p" id="sv">Save day</button></div>' : ''}</div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3></div>
       ${E ? `<div class="cbnew noprint"><select id="nT">${PT.map(([k,lb]) => `<option value="${k}" ${k===(S.cbT||'PAYMENT')?'selected':''}>${lb}</option>`).join('')}</select><input id="nR" placeholder="Ref"><input id="nP" placeholder="Particulars" list="sus"><input id="nN" placeholder="Narration" list="nts"><input id="nD" type="date" title="For date (bank deposit)" ${(S.cbT||'PAYMENT')==='DEPOSIT'?'':'disabled'}><input id="nA" placeholder="Amount" inputmode="decimal" style="text-align:right"><button class="p" id="nAdd">+ Add</button></div>` : ''}
       <div class="tw"><table><tr><th>#</th><th class="l">Type</th><th class="l">Ref</th><th class="l">Particulars</th><th class="l">Narration</th><th>For date</th><th>In</th><th>Out</th>${E ? '<th class="noprint"></th>' : ''}</tr>
         ${lines.map((l,i) => E ? `<tr data-i="${i}"><td>${i+1}</td><td class="l"><select data-k="line_type">${PT.map(([k,lb]) => `<option value="${k}" ${k===l.line_type?'selected':''}>${lb}</option>`).join('')}</select></td>
@@ -1493,21 +1493,18 @@ async function vPetty(){ const __t = S.nav;
           : `<tr><td>${i+1}</td><td class="l">${esc(PT.find(x=>x[0]===l.line_type)?.[1]||l.line_type)}</td><td class="l">${esc(l.ref)}</td><td class="l">${esc(l.party)}</td><td class="l">${esc(l.note)}</td><td>${esc(l.for_date)}</td><td>${pdir(l.line_type)>0?money(l.amount):''}</td><td>${pdir(l.line_type)<0?money(l.amount):''}</td></tr>`).join('')}
         <tr class="tot"><td></td><td class="l" colspan="5">Total</td><td>${money(tin)}</td><td>${money(tout)}</td>${E ? '<td class="noprint"></td>' : ''}</tr></table></div>
         <datalist id="sus">${openSus.map(o => `<option value="${esc(o.party)}">`).join('')}</datalist><datalist id="nts"><option value="Food allowance"><option value="Travel allowance"></datalist>
-        <p class="muted" style="margin:8px 0 0">After <b>Save day</b> the receipts, payments, bank deposits and suspense in the cash sheet above update.</p></div>`;
+        <p class="muted" style="margin:8px 0 0"><b>Save · refresh</b> (top) saves the opening balance, the cash count and the cash book together, then updates the cash sheet.</p></div>`;
     $('#toPer').onclick = () => { S.csTab = 'period'; vPetty(); };
     $('#csx').onclick = excel;
     if (!E) return;
     const reCash = () => { $('#csBody').innerHTML = sheetHtml(false); bindSheet(); };
     const bindSheet = () => {
-      const oi = $('#csOpen'); if (oi) { oi.onkeydown = e => { if (e.key === 'Enter') oi.blur(); };
-        oi.onchange = async () => { const v = oi.value.trim(); if (v !== '' && !isFinite(Number(v))) return toast('Enter a number', false);
-          try { await rpc('save_cash_opening', { p_branch:S.br, p_date:S.date, p_amount: v === '' ? null : Number(v) }); toast(v === '' ? 'Opening balance removed' : 'Opening balance saved'); vPetty(); } catch (e) { toast(e.message, false); } }; }
+      const oi = $('#csOpen'); if (oi) oi.onkeydown = e => { if (e.key === 'Enter') saveAll(); };
       $('#csBody').querySelectorAll('tr[data-c]').forEach(tr => tr.oninput = tr.onchange = e => { const k = e.target.dataset.ck; if (!k) return; cnt[+tr.dataset.c][k] = e.target.value === '' ? '' : num(e.target.value);
         const x = cnt[+tr.dataset.c]; tr.querySelector('.ct').textContent = num(x.qty) ? money(num(x.denom) * num(x.qty)) : '';
         if (e.type === 'change') { const f = document.activeElement && document.activeElement.dataset.ck ? [document.activeElement.closest('tr').dataset.c, document.activeElement.dataset.ck] : null; reCash(); if (f) { const el = $('#csBody').querySelector(`tr[data-c="${f[0]}"] [data-ck="${f[1]}"]`); el && el.focus(); } } });
       $('#csBody').querySelectorAll('[data-cx]').forEach(b => b.onclick = () => { cnt.splice(+b.dataset.cx, 1); if (!cnt.length) cnt.push({ denom:1000, qty:'' }); reCash(); });
       $('#cAdd').onclick = () => { const used = cnt.map(x => num(x.denom)); cnt.push({ denom: DENOMS.find(d => !used.includes(d)) || 1, qty:'' }); reCash(); $('#csBody').querySelector(`tr[data-c="${cnt.length-1}"] [data-ck="qty"]`)?.focus(); };
-      $('#cSv').onclick = async () => { try { const t = await rpc('save_cash_count', { p_branch:S.br, p_date:S.date, p_rows: cnt.filter(x => num(x.qty)).map(x => ({ denom:num(x.denom), qty:num(x.qty) })) }); toast('Cash count saved · AED ' + money(t)); } catch (e) { toast(e.message, false); } };
     };
     bindSheet();
     $('#v').querySelectorAll('tr[data-i]').forEach(tr => tr.onchange = e => { const k = e.target.dataset.k; if (!k) return; lines[+tr.dataset.i][k] = k === 'amount' ? num(e.target.value) : e.target.value; if (k === 'line_type' || k === 'amount') draw(); });
@@ -1515,10 +1512,22 @@ async function vPetty(){ const __t = S.nav;
     // new line is typed in the box above the table, then + Add (Enter also adds); it goes to the table, Save day saves the day
     $('#nT').onchange = e => { S.cbT = e.target.value; $('#nD').disabled = e.target.value !== 'DEPOSIT'; };
     const addNew = () => { const party = $('#nP').value.trim(), amount = num($('#nA').value); if (!party || amount <= 0) return toast('Particulars and amount are needed', false);
-      lines.push({ line_type:$('#nT').value, ref:$('#nR').value.trim(), party, note:$('#nN').value.trim(), for_date:$('#nT').value === 'DEPOSIT' ? $('#nD').value : '', amount }); draw(); $('#nP').focus(); toast('Line added · click Save day to save'); };
+      lines.push({ line_type:$('#nT').value, ref:$('#nR').value.trim(), party, note:$('#nN').value.trim(), for_date:$('#nT').value === 'DEPOSIT' ? $('#nD').value : '', amount }); draw(); $('#nP').focus(); toast('Line added · click Save · refresh to save'); };
     $('#nAdd').onclick = addNew; ['nR','nP','nN','nA'].forEach(id => $('#' + id).onkeydown = e => { if (e.key === 'Enter') addNew(); });
-    $('#sv').onclick = async () => { const bad = lines.findIndex(l => !l.party.trim() || num(l.amount) <= 0); if (bad > -1) return toast(`Line ${bad+1}: particulars and amount are needed`, false);
-      try { await rpc('save_petty_cash', { p_branch:S.br, p_date:S.date, p_lines:lines.map(l => ({ ...l, for_date:l.line_type === 'DEPOSIT' ? l.for_date : '' })) }); toast('Cash book saved'); vPetty(); } catch (e) { toast(e.message, false); } };
+    // one button: opening balance + cash count + cash book are saved together, then the cash sheet is rebuilt from the saved data
+    let saving = false;
+    async function saveAll() { if (saving) return;
+      const hasOi = !!$('#csOpen'), ov = hasOi ? $('#csOpen').value.trim() : null; if (ov && !isFinite(Number(ov))) return toast('Opening balance: enter a number', false);
+      if ($('#nP').value.trim() || num($('#nA').value)) { const n0 = lines.length; addNew(); if (lines.length === n0) return; }   // a line still in the entry box is added first
+      const bad = lines.findIndex(l => !String(l.party || '').trim() || num(l.amount) <= 0); if (bad > -1) return toast(`Cash book line ${bad+1}: particulars and amount are needed`, false);
+      saving = true; const b = $('#csSave'); if (b) { b.disabled = true; b.textContent = 'Saving…'; }
+      try {
+        if (hasOi && (C.auto ? ov !== '' : ov !== (op == null ? '' : String(r2(op))))) await rpc('save_cash_opening', { p_branch:S.br, p_date:S.date, p_amount: ov === '' ? null : Number(ov) });
+        await rpc('save_cash_count', { p_branch:S.br, p_date:S.date, p_rows: cnt.filter(x => num(x.qty)).map(x => ({ denom:num(x.denom), qty:num(x.qty) })) });
+        await rpc('save_petty_cash', { p_branch:S.br, p_date:S.date, p_lines:lines.map(l => ({ ...l, for_date:l.line_type === 'DEPOSIT' ? l.for_date : '' })) });
+        toast('Saved · cash sheet updated'); vPetty();
+      } catch (e) { toast(e.message, false); saving = false; if (b) { b.disabled = false; b.textContent = 'Save · refresh'; } } }
+    $('#csSave').onclick = saveAll;
   };
   draw();
 }
