@@ -963,7 +963,7 @@ async function itradeZip(kind){
 }
 
 async function vItrade(){ const __t = S.nav;
-  S.ito = S.ito && S.ito >= S.date ? S.ito : S.date;
+  S.ito = S.date;   // one day: the date chosen at the top
   const [bs, days] = await Promise.all([
     q(sb.from('wh_batches').select('id,process,status').eq('branch_id', S.br).gte('work_date', S.date).lte('work_date', S.ito)),
     q(sb.from('van_day').select('id,salesman_id').eq('branch_id', S.br).gte('business_date', S.date).lte('business_date', S.ito))]);
@@ -983,7 +983,7 @@ async function vItrade(){ const __t = S.nav;
   sec.push(['SALESMAN WASTAGE', 'Expiry and waste returned by the vans (packs)', sw, ['EXP','WST']]);
   const open = bs.filter(b => b.status === 'ISSUED').length;
   S.itx = sec;
-  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row"><label>To date<input type="date" id="to" value="${S.ito}"></label>
+  if (__t !== S.nav) return; $('#v').innerHTML = `<div class="card"><div class="row">
       <button class="p" id="xl">Download Excel</button>${canE('imp') ? '<button id="zl">Loading zip (Store Issue)</button><button id="zr">Return zip (Store Issue)</button><button id="zd">Damaged goods zip</button>' : ''}
       <span class="muted">${closed.length} closed batch(es), ${days.length} van day(s).${open ? ` <b class="bad">${open} batch(es) still open — not included.</b>` : ''}</span></div></div>
     ${sec.map(([t, sub, m, cols]) => { const ids = Object.keys(m).map(Number).sort((a,b) => (item(a).display_order||0) - (item(b).display_order||0));
@@ -993,7 +993,6 @@ async function vItrade(){ const __t = S.nav;
         ${ids.map(id => { const it = item(id); return `<tr><td class="l">${esc(it.short_name||it.name)}</td><td>${esc(it.itrade_code||'')}</td>
           ${cols.map(c => `<td>${num(m[id][c]) || ''}</td>`).join('')}${multi?`<td><b>${cols.reduce((a,c)=>a+num(m[id][c]),0)}</b></td>`:''}</tr>`; }).join('')}
         <tr class="tot"><td class="l">Total</td><td></td>${cols.map(c => `<td>${tot(c)}</td>`).join('')}${multi?`<td>${cols.reduce((a,c)=>a+tot(c),0)}</td>`:''}</tr></table></div>` : '<p class="muted">Nothing for this period.</p>'}</div>`; }).join('')}`;
-  $('#to').onchange = e => { S.ito = e.target.value; vItrade(); };
   // iTrade Damaged Goods zip: one .txt per wastage section, each line = company code, iTrade code, (cost blank), qty
   $('#zd') && ($('#zd').onclick = () => {
     const code = S.branches.find(x => x.id === S.br)?.code || 'MGAZ', dt = S.date + (S.ito !== S.date ? '_to_' + S.ito : ''), files = [];
