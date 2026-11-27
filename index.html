@@ -353,8 +353,9 @@ function render(){
     $('#flyh').innerHTML = g === '__all' ? '<b>All pages</b>' : `<b>${esc(g)}</b>`;
     $('#flyn').innerHTML = L.map(([k,l,gg],i) => (g === '__all' && (i === 0 || L[i-1][2] !== gg) ? `<div class="navlabel">${esc(gg)}</div>` : '') + `<button data-t="${k}" class="${k===S.tab?'on':''}">${esc(l)}</button>`).join('');
     $('#flyn').querySelectorAll('button').forEach(b => b.onclick = () => { closeFly(); S.tab = b.dataset.t; S.dayId = null; render(); });
-    fly.classList.add('open'); shade.classList.add('open'); fly.dataset.g = g; };
-  const closeFly = () => { fly.classList.remove('open'); shade.classList.remove('open'); };
+    fly.classList.add('open'); shade.classList.add('open'); fly.dataset.g = g; markG(g); };
+  const markG = g => document.querySelectorAll('.rail [data-g], .bbar [data-g]').forEach(x => x.classList.toggle('on', x.dataset.g === g));
+  const closeFly = () => { fly.classList.remove('open'); shade.classList.remove('open'); markG(curG); };
   document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => fly.classList.contains('open') && fly.dataset.g === b.dataset.g ? closeFly() : openFly(b.dataset.g));
   $('#pgdd').onclick = () => openFly(window.innerWidth <= 900 ? '__all' : curG); shade.onclick = closeFly;
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFly(); }, { once: true });
