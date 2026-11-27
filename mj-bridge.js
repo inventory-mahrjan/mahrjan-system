@@ -773,31 +773,40 @@
       R.total.SALES = U ? (sM[U] || 0) : sT; R.hasSales = true; } catch (e) {}
     return R;
   }
-  async function oQtySales(m, sm, from, to) {
+  async function oQtySales(m, sm, from, to, withRaw) {
     if (from > to) { var x0 = from; from = to; to = x0; }
     var c = await sb(), R2 = function (v) { return Math.round(v * 100) / 100; };
-    var L = await perDay(from, to, function (d) { return c.from('sales_lines').select('item_id,item_code,item_name,qty,tran_type,salesman_id,itrade_user,sales_executive,warehouse').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
+    var L = await perDay(from, to, function (d) { return c.from('sales_lines').select('item_id,item_code,item_name,qty,rate,tran_type,salesman_id,itrade_user,sales_executive,warehouse').eq('branch_id', m.br.id).eq('cancelled', false).eq('tran_date', d).order('id'); });
     var list = [], seen = {}, noC = {};
     m.items.filter(function (it) { return it.item_type === 'FG' && m.code(it); }).sort(function (a, b) { return (a.display_order || 1e9) - (b.display_order || 1e9); }).forEach(function (it) {
       // CTN = raw egg cartons: packs × eggs per pack ÷ the raw egg's pcs per carton (e.g. KHALEEJ 6: 6 eggs, raw 360 per carton → 60 packs per carton)
       var egg = (m.bom || []).filter(function (x) { return x.fg_item_id === it.id && x.item_type === 'RAW_EGG'; })[0], rw = egg && m.itemById[egg.item_id], rpc = egg && rw && num(egg.per_pack) > 0 && num(rw.pcs_per_carton) > 0 ? num(rw.pcs_per_carton) / num(egg.per_pack) : 0;
       var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: rpc || it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
+    // raw egg sold as eggs (separate section, broken egg left out): an OFFER raw egg is promotional
+    if (withRaw) m.items.filter(function (it) { return it.item_type === 'RAW_EGG' && m.code(it) && !/BROKEN/i.test(it.name); }).sort(function (a, b) { return (a.display_order || 1e9) - (b.display_order || 1e9); }).forEach(function (it) {
+      var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: num(it.pcs_per_carton) || 360, cat: /OFFER/i.test(it.name) || it.segment === 'OFFER' ? 'RAW EGG - PROMOTIONAL' : 'RAW EGG - NORMAL', active: it.active, raw: true }; list.push(seen[cd]); });
+    // iTrade raw egg qty can be eggs, trays or cartons: the line rate against the item cost tells which (nearest of 1, 30, pcs per carton)
+    var eggsPer = function (it, rate) { var cost = num(it.unit_cost), pcc = num(it.pcs_per_carton) || 360; rate = Math.abs(num(rate)); if (!(cost > 0) || !(rate > 0)) return 1;
+      var e = rate / cost, best = 1; [1, 30, pcc].forEach(function (u) { if (Math.abs(Math.log(e / u)) < Math.abs(Math.log(e / best))) best = u; }); return best; };
     var U = up(sm || ''), men = {}, allQ = {}, menS = {}, allS = {}, menR = {}, allR = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
     L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
       var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
       var usr = up(l.itrade_user), ex = up(l.sales_executive); if (l.warehouse && st.erp_warehouse) { if (up(l.warehouse) !== up(st.erp_warehouse)) return; } else if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
       var who = up(st.name); if (U && who !== U) return;
-      var it = l.item_id && m.itemById[l.item_id]; if (it && it.item_type !== 'FG') return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
-      var q2 = Math.abs(num(l.qty)) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;
+      var it = l.item_id && m.itemById[l.item_id], isRaw = !!(it && it.item_type === 'RAW_EGG');
+      if (it && it.item_type !== 'FG' && !(isRaw && withRaw)) return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
+      if (isRaw && !seen[cd]) return;   // broken egg / inactive raw codes are not in the list
+      var q2 = Math.abs(num(l.qty)) * (isRaw ? eggsPer(it, l.rate) : 1) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;
       if (!seen[cd]) { seen[cd] = { code: cd, name: String(l.item_name || cd).replace(/\s+/g, ' ').trim(), pc: 0, cat: 'NORMAL', active: false, extra: true }; list.push(seen[cd]); }
       add(men[who] || (men[who] = {}), cd, q2); add(allQ, cd, q2);
       if (q2 > 0) { add(menS[who] || (menS[who] = {}), cd, q2); add(allS, cd, q2); } else { add(menR[who] || (menR[who] = {}), cd, -q2); add(allR, cd, -q2); } });
     // sal = sales qty, ret = sales return qty (shown positive), pcs = net sales qty; ctn on the net
-    var block = function (name, Q, S, Rt) { S = S || {}; Rt = Rt || {}; var G = ['NORMAL', 'PROMOTIONAL'].map(function (cat) { var rows = list.filter(function (i) { return i.cat === cat && (Q[i.code] || S[i.code] || Rt[i.code]); }).map(function (i) { var q2 = Q[i.code] || 0, ct = i.pc > 0 ? R2(q2 / i.pc) : null; if (q2 && !(i.pc > 0)) noC[i.code] = i.name; return { code: i.code, name: i.name, sal: S[i.code] || 0, ret: Rt[i.code] || 0, pcs: q2, ctn: q2 ? ct : 0 }; });
+    var block = function (name, Q, S, Rt) { S = S || {}; Rt = Rt || {}; var G = ['NORMAL', 'PROMOTIONAL', 'RAW EGG - NORMAL', 'RAW EGG - PROMOTIONAL'].map(function (cat) { var rows = list.filter(function (i) { return i.cat === cat && (Q[i.code] || S[i.code] || Rt[i.code]); }).map(function (i) { var q2 = Q[i.code] || 0, ct = i.pc > 0 ? R2(q2 / i.pc) : null; if (q2 && !(i.pc > 0)) noC[i.code] = i.name; return { code: i.code, name: i.name, sal: S[i.code] || 0, ret: Rt[i.code] || 0, pcs: q2, ctn: q2 ? ct : 0 }; });
         var sm2 = function (f) { return rows.reduce(function (a, x) { return a + (x[f] || 0); }, 0); };
-        return { cat: cat, rows: rows, sal: sm2('sal'), ret: sm2('ret'), pcs: sm2('pcs'), ctn: R2(sm2('ctn')) }; }).filter(function (g) { return g.rows.length; });
-      var sg = function (f) { return G.reduce(function (a, g) { return a + g[f]; }, 0); };
-      return { name: name, groups: G, sal: sg('sal'), ret: sg('ret'), pcs: sg('pcs'), ctn: R2(sg('ctn')) }; };
+        return { cat: cat, raw: cat.indexOf('RAW') === 0, rows: rows, sal: sm2('sal'), ret: sm2('ret'), pcs: sm2('pcs'), ctn: R2(sm2('ctn')) }; }).filter(function (g) { return g.rows.length; });
+      var sg = function (f, raw) { return G.reduce(function (a, g) { return a + (g.raw === raw ? g[f] : 0); }, 0); };   // qty totals per kind (packs and eggs are not added together)
+      return { name: name, groups: G, sal: sg('sal', false), ret: sg('ret', false), pcs: sg('pcs', false), ctn: R2(sg('ctn', false)),
+        raw: { sal: sg('sal', true), ret: sg('ret', true), pcs: sg('pcs', true), ctn: R2(sg('ctn', true)) }, ctnAll: R2(sg('ctn', false) + sg('ctn', true)) }; };
     var names = Object.keys(men).sort(), blocks = (U ? [] : [block('ALL SALESMEN', allQ, allS, allR)]).concat(names.map(function (n) { return block(n, men[n], menS[n], menR[n]); }));
     return { salesman: U ? (names[0] || U) : 'ALL SALESMEN', from: from, to: to, blocks: blocks, men: names, noCtn: Object.keys(noC).map(function (k) { return noC[k]; }) };
   }
@@ -837,7 +846,7 @@
     PU = UNIT_CODE[unit] ? unit : 'AL QUOZ'; var m = await masters(PU);
     if (fn === 'portalShortExcess') return oShortExcess(m, String(a[1] || ''), String(a[2]), String(a[3]));
     if (fn === 'portalReturnBreakdown') return oReturnBreakdown(m, String(a[1] || ''), String(a[2]), String(a[3]));
-    if (fn === 'portalQtySales') return oQtySales(m, String(a[1] || ''), String(a[2]), String(a[3]));
+    if (fn === 'portalQtySales') return oQtySales(m, String(a[1] || ''), String(a[2]), String(a[3]), !!a[4]);
     if (fn === 'portalSalesExecs') return (await oQtySales(m, '', String(a[1]), String(a[2]))).men;
     if (fn === 'portalWarehouse') return oWarehouse(m, String(a[1]), String(a[2]));
     if (fn === 'portalVanDay') return oVanDay(m, String(a[1]));
