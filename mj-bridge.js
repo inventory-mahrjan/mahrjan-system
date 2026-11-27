@@ -537,7 +537,7 @@
   async function savedOpening_(m, date) { try { var r = await q((await sb()).from('cash_opening').select('amount').eq('branch_id', m.br.id).eq('open_date', date)); return r.length ? num(r[0].amount) : null; } catch (e) { return null; } }
   async function autoOpening_(m, date, depth) { if (depth > 6) return null; var prev = dayShift_(date, -1), o = await savedOpening_(m, prev);
     if (o == null) o = await autoOpening_(m, prev, depth + 1); if (o == null) return null;
-    var F = roundCash_(await cashFigures_(m, await dayData(m, prev))); return Math.round((o + F.tot.cs - F.tot.gc + F.rc - F.pay - F.et - F.dep - susOut_(F)) * 100) / 100; }
+    var F = roundCash_(await cashFigures_(m, await dayData(m, prev))); return Math.round((o + F.tot.cs - F.tot.gc + F.rc - F.pay - F.et - F.dep) * 100) / 100; }   // previous day's CLOSING BALANCE (uncleared suspense stays in the suspense table, not taken off twice)
   function cashExport_(F, opening) { var r2 = function (v) { return Math.round((Number(v) || 0) * 100) / 100; }, ref = function (v) { return v === '' || v == null ? '' : String(v); };
     return { opening: opening == null ? null : r2(opening), dep: r2(F.dep),
       men: F.order.concat(['STORE']).map(function (k) { var r = F.rows[k]; return [k === 'STORE' ? 'STORE SALE' : k, r2(r.cs), r2(r.cr), r2(r.gc), r2(r.gr), r2(r.FUEL), r2(r.PARKING), r2(r.CARTON)]; }),
@@ -576,7 +576,7 @@
     if (name === 'LOADING SHEET') await loadingSheet_(o, m, D, sm, await readReqs(m, date));
     else if (name === 'SALESMAN SUMMARY') salesmanSummary_(o, m, D, sm);
     else { var F = roundCash_(await cashFigures_(m, D)), op = await savedOpening_(m, date), auto = false;   /* opening typed on the Cash sheet page (cash_opening) */
-      if (op == null) { op = await autoOpening_(m, date, 0); auto = op != null; }   // nothing saved: previous day's cash in hand (editable on the page)
+      if (op == null) { op = await autoOpening_(m, date, 0); auto = op != null; }   // nothing saved: previous day's closing balance (editable on the page)
       cashRows_(o, F, op); cx = cashExport_(F, op); cx.auto = auto; try { cx.count = await q((await sb()).from('cash_count').select('denom,qty').eq('branch_id', m.br.id).eq('count_date', date).order('line_no')); var ct = await q((await sb()).from('cash_count_total').select('total').eq('branch_id', m.br.id).eq('count_date', date)); cx.counted = ct.length ? num(ct[0].total) : null; } catch (e) { cx.count = []; cx.counted = null; } pos = cashPosition_(F, op).map(function (p) { return [p[0], '', p[1]]; }); }
     return JSON.parse(JSON.stringify({ ok: true, name: name, date: date, salesman: sm, rows: o.rows, head: o.head, bold: o.bold, money: o.money, segs: o.segs, titles: o.titles, sign: o.sign, position: pos, cash: cx }));
   }
