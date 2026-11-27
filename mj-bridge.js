@@ -791,9 +791,12 @@
     var U = up(sm || ''), men = {}, allQ = {}, menS = {}, allS = {}, menR = {}, allR = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
     L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
       var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
-      var usr = up(l.itrade_user), ex = up(l.sales_executive); if (l.warehouse && st.erp_warehouse) { if (up(l.warehouse) !== up(st.erp_warehouse)) return; } else if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
-      var who = up(st.name); if (U && who !== U) return;
       var it = l.item_id && m.itemById[l.item_id], isRaw = !!(it && it.item_type === 'RAW_EGG');
+      // raw egg is billed from the main warehouse by the office with the salesman as Sales Executive: match it on Sales Executive only
+      var usr = up(l.itrade_user), ex = up(l.sales_executive);
+      if (!isRaw) { if (l.warehouse && st.erp_warehouse) { if (up(l.warehouse) !== up(st.erp_warehouse)) return; } else if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; }
+      if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
+      var who = up(st.name); if (U && who !== U) return;
       if (it && it.item_type !== 'FG' && !(isRaw && withRaw)) return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
       if (isRaw && !seen[cd]) return;   // broken egg / inactive raw codes are not in the list
       var q2 = Math.abs(num(l.qty)) * (isRaw ? eggsPer(it, l.rate) : 1) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;
