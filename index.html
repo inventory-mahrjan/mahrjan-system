@@ -1481,7 +1481,8 @@ async function vPetty(){ const __t = S.nav;
   const draw = () => {
     const tin = lines.filter(l => pdir(l.line_type) > 0).reduce((a,l) => a + num(l.amount), 0), tout = lines.filter(l => pdir(l.line_type) < 0).reduce((a,l) => a + num(l.amount), 0);
     if (__t !== S.nav) return; $('#v').innerHTML = `<div class="pills noprint" style="margin-bottom:10px"><button class="on">Day</button><button id="toPer">Period</button></div>
-      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3><div class="row noprint" style="margin:0">${E ? '<button class="p" id="csSave">Save · refresh</button>' : ''}<button id="csx">Download Excel</button></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Daily cash sheet — ${S.date}${lock ? ' <span class="muted" style="font-size:12px">🔒 locked (older than 5 days)</span>' : ''}</h3></div>
+      <div class="csfab noprint">${E ? '<button class="p" id="csSave">Save · refresh</button>' : ''}<button id="csx">Download Excel</button></div>
       <div id="csBody">${sheetHtml(false)}</div></div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Cash book — ${S.date}</h3></div>
       ${E ? `<div class="cbnew noprint"><select id="nT">${PT.map(([k,lb]) => `<option value="${k}" ${k===(S.cbT||'PAYMENT')?'selected':''}>${lb}</option>`).join('')}</select><input id="nR" placeholder="Ref"><input id="nP" placeholder="Particulars" list="sus"><input id="nN" placeholder="Narration" list="nts"><input id="nD" type="date" title="For date (bank deposit)" ${(S.cbT||'PAYMENT')==='DEPOSIT'?'':'disabled'}><input id="nA" placeholder="Amount" inputmode="decimal" style="text-align:right"><button class="p" id="nAdd">+ Add</button></div>` : ''}
@@ -1531,7 +1532,8 @@ async function vPetty(){ const __t = S.nav;
   };
   draw();
 }
-const CS_CSS = `.csg{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}.csh{background:#1B4332;color:#fff;font-weight:700;text-align:center;padding:5px;font-size:12px;letter-spacing:.04em}
+const CS_CSS = `.csfab{position:fixed;right:28px;bottom:22px;z-index:15;display:flex;gap:8px;background:#fff;padding:8px;border-radius:12px;border:1px solid #dde2de;box-shadow:0 10px 28px rgba(0,0,0,.16)} @media(max-width:900px){.csfab{right:12px;bottom:78px}} #v:has(.csfab){padding-bottom:70px}
+  .csg{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}.csh{background:#1B4332;color:#fff;font-weight:700;text-align:center;padding:5px;font-size:12px;letter-spacing:.04em}
   table.cst{width:100%;border-collapse:collapse;font-size:12px}table.cst th{background:#e8efe9;font-weight:700;padding:5px 6px;border:1px solid #cfd6d1;white-space:nowrap}table.cst td{padding:4px 6px;border:1px solid #dde2de;text-align:right;font-variant-numeric:tabular-nums}
   .cbnew{display:grid;grid-template-columns:150px 90px minmax(0,1.4fr) minmax(0,1.2fr) 150px 120px auto;gap:8px;margin:10px 0;padding:10px;background:#f3f6f4;border:1px solid #dde2de;border-radius:8px}.cbnew input,.cbnew select{width:100%;min-width:0}
   table.cst td.l,table.cst th.l{text-align:left}table.cst tr.tot td{font-weight:700;background:#f3f6f4}table.cst td.q{background:#fff6d6}.csin{width:100%;text-align:right;padding:4px 6px}.cshint{font-size:10px;color:#9a6b1d;text-align:right}`;
