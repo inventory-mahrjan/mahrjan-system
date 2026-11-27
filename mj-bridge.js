@@ -782,7 +782,7 @@
       // CTN = raw egg cartons: packs × eggs per pack ÷ the raw egg's pcs per carton (e.g. KHALEEJ 6: 6 eggs, raw 360 per carton → 60 packs per carton)
       var egg = (m.bom || []).filter(function (x) { return x.fg_item_id === it.id && x.item_type === 'RAW_EGG'; })[0], rw = egg && m.itemById[egg.item_id], rpc = egg && rw && num(egg.per_pack) > 0 && num(rw.pcs_per_carton) > 0 ? num(rw.pcs_per_carton) / num(egg.per_pack) : 0;
       var cd = m.code(it); seen[cd] = { code: cd, name: it.short_name || it.name, pc: rpc || it.packs_per_carton || 0, cat: it.segment === 'OFFER' ? 'PROMOTIONAL' : 'NORMAL', active: it.active, raw: false }; list.push(seen[cd]); });
-    var U = up(sm || ''), men = {}, allQ = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
+    var U = up(sm || ''), men = {}, allQ = {}, menS = {}, allS = {}, menR = {}, allR = {}, add = function (o, cd, q2) { o[cd] = (o[cd] || 0) + q2; };
     L.forEach(function (l) { if (l.cancelled && l.cancel_reason === 'DELETE LIST') return; if (l.cancelled) return;
       var st = m.staffById[l.salesman_id]; if (!st || st.role !== 'SALESMAN') return;
       var usr = up(l.itrade_user), ex = up(l.sales_executive); if (l.warehouse && st.erp_warehouse) { if (up(l.warehouse) !== up(st.erp_warehouse)) return; } else if (usr && usr !== up(st.name) && usr !== up(st.itrade_name) && usr !== up(st.erp_user)) return; if (ex && ex !== up(st.name) && ex !== up(st.itrade_name)) return;
@@ -790,11 +790,15 @@
       var it = l.item_id && m.itemById[l.item_id]; if (it && it.item_type !== 'FG') return; var cd = it ? m.code(it) : String(l.item_code || ''); if (!cd) return;
       var q2 = Math.abs(num(l.qty)) * (up(l.tran_type) === 'SR' ? -1 : 1); if (!q2) return;
       if (!seen[cd]) { seen[cd] = { code: cd, name: String(l.item_name || cd).replace(/\s+/g, ' ').trim(), pc: 0, cat: 'NORMAL', active: false, extra: true }; list.push(seen[cd]); }
-      add(men[who] || (men[who] = {}), cd, q2); add(allQ, cd, q2); });
-    var block = function (name, Q) { var G = ['NORMAL', 'PROMOTIONAL'].map(function (cat) { var rows = list.filter(function (i) { return i.cat === cat && Q[i.code]; }).map(function (i) { var q2 = Q[i.code] || 0, ct = i.pc > 0 ? R2(q2 / i.pc) : null; if (q2 && !(i.pc > 0)) noC[i.code] = i.name; return { code: i.code, name: i.name, pcs: q2, ctn: q2 ? ct : 0 }; });
-        return { cat: cat, rows: rows, pcs: rows.reduce(function (a, x) { return a + x.pcs; }, 0), ctn: R2(rows.reduce(function (a, x) { return a + (x.ctn || 0); }, 0)) }; }).filter(function (g) { return g.rows.length; });
-      return { name: name, groups: G, pcs: G.reduce(function (a, g) { return a + g.pcs; }, 0), ctn: R2(G.reduce(function (a, g) { return a + g.ctn; }, 0)) }; };
-    var names = Object.keys(men).sort(), blocks = (U ? [] : [block('ALL SALESMEN', allQ)]).concat(names.map(function (n) { return block(n, men[n]); }));
+      add(men[who] || (men[who] = {}), cd, q2); add(allQ, cd, q2);
+      if (q2 > 0) { add(menS[who] || (menS[who] = {}), cd, q2); add(allS, cd, q2); } else { add(menR[who] || (menR[who] = {}), cd, -q2); add(allR, cd, -q2); } });
+    // sal = sales qty, ret = sales return qty (shown positive), pcs = net sales qty; ctn on the net
+    var block = function (name, Q, S, Rt) { S = S || {}; Rt = Rt || {}; var G = ['NORMAL', 'PROMOTIONAL'].map(function (cat) { var rows = list.filter(function (i) { return i.cat === cat && (Q[i.code] || S[i.code] || Rt[i.code]); }).map(function (i) { var q2 = Q[i.code] || 0, ct = i.pc > 0 ? R2(q2 / i.pc) : null; if (q2 && !(i.pc > 0)) noC[i.code] = i.name; return { code: i.code, name: i.name, sal: S[i.code] || 0, ret: Rt[i.code] || 0, pcs: q2, ctn: q2 ? ct : 0 }; });
+        var sm2 = function (f) { return rows.reduce(function (a, x) { return a + (x[f] || 0); }, 0); };
+        return { cat: cat, rows: rows, sal: sm2('sal'), ret: sm2('ret'), pcs: sm2('pcs'), ctn: R2(sm2('ctn')) }; }).filter(function (g) { return g.rows.length; });
+      var sg = function (f) { return G.reduce(function (a, g) { return a + g[f]; }, 0); };
+      return { name: name, groups: G, sal: sg('sal'), ret: sg('ret'), pcs: sg('pcs'), ctn: R2(sg('ctn')) }; };
+    var names = Object.keys(men).sort(), blocks = (U ? [] : [block('ALL SALESMEN', allQ, allS, allR)]).concat(names.map(function (n) { return block(n, men[n], menS[n], menR[n]); }));
     return { salesman: U ? (names[0] || U) : 'ALL SALESMEN', from: from, to: to, blocks: blocks, men: names, noCtn: Object.keys(noC).map(function (k) { return noC[k]; }) };
   }
   async function oWarehouse(m, from, to) {
